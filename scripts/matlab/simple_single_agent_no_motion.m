@@ -3,12 +3,7 @@ close all
 clc
 
 %% Parameters
-N = 1000;                       % total number of observations
-b = 0.9;                        % sensor probability to black tile
-w = 0.7;                        % sensor probability to white tile
-sim_cycles = 50;                % number of agents to simulate (or
-                                % simulation cycles for one agent)
-desired_fill_ratio = rand(1);   % fill ratio, f (can be set to rand(1))
+param_simple_single_agent_no_motion
 
 %% Simulation
 
@@ -41,7 +36,7 @@ for i = 1:sim_cycles
         end
         
         agent_observations(i, j) = curr_obs;
-        p_z_1_sim(i, j) = ( prev_obs + curr_obs ) / j; % record estimation
+        p_z_1_sim(i, j) = ( prev_obs + curr_obs ) / j; % record estimation (h/t)
         prev_obs = prev_obs + curr_obs;
         
     end
@@ -77,15 +72,24 @@ end
 f_hat_mean = mean(f_hat, 1);
 f_hat_std = std(f_hat, 0, 1);
 
+% Compute the mean and std dev of f_hat_err across the simulation cycles
+f_hat_err_mean = mean(f - f_hat, 1);
+f_hat_err_std = std(f - f_hat, 0, 1);
+
 % Compute the variance of f_hat based on simulated observations
-var_f_hat = zeros(sim_cycles, N);
+fisher_inv_sqrt = zeros(sim_cycles, N);
 
 for i = 1:sim_cycles
     for j = 1:N
-        h = sum(agent_observations(i, 1:j) ~= 0);
-        var_f_hat(i, j) = compute_f_hat_var(h, j, b, w);
+        h = sum(agent_observations(i, 1:j));
+        fisher_inv_sqrt(i, j) = sqrt(compute_fisher_inv(h, j, b, w));
     end
 end
+
+% Compute the mean and std dev of fisher_inv_sqrt across the simulation
+% cycles
+fisher_inv_sqrt_mean = mean(fisher_inv_sqrt, 1);
+fisher_inv_sqrt_std = std(fisher_inv_sqrt, 0, 1);
 
 %% Plot generation
 
@@ -107,8 +111,8 @@ title("Probability of black tiles from simulated observations",...
     'Interpreter', 'latex', 'Fontsize', 14)
 xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
 ylabel('$P(z=1)$', 'Interpreter', 'latex', 'Fontsize', 14)
-legend("1\sigma of " + sim_cycles + " simulated probabilities",...
-    "Mean of " + sim_cycles + " simulated probabilities" ,...
+legend("Sample 1\sigma of " + sim_cycles + " simulated probabilities",...
+    "Sample mean of " + sim_cycles + " simulated probabilities" ,...
     "Computed probability using L.o.T.P. = " + p_z_1_act, "Location", "Best")
 grid on
 hold off
@@ -130,21 +134,47 @@ plot([1,N], ones(1, 2)*f, '-.k')
 title('Estimated $\hat{f}$ from simulated observations', 'Interpreter', 'latex', 'Fontsize', 14)
 xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
 ylabel('Estimated fill ratio, $\hat{f}$', 'Interpreter', 'latex', 'Fontsize', 14)
-legend("1\sigma of " + sim_cycles + " estimated fill ratios",...
-    "Mean of " + sim_cycles + " estimated fill ratios",...
+legend("Sample 1\sigma of " + sim_cycles + " estimated fill ratios",...
+    "Sample mean of " + sim_cycles + " estimated fill ratios",...
     "Actual fill ratio = " + f, "Location", "Best")
+grid on
+hold off
+
+% Plot the estimated fill ratio error w.r.t. observations
+conf_bounds_f_hat_err = [ f_hat_err_mean + f_hat_err_std, f_hat_err_mean(end:-1:1) - f_hat_err_std(end:-1:1) ];
+
+figure
+p = fill( [1:N, N:-1:1], conf_bounds_f_hat_err, 'b' );
+p.FaceColor = [0.8 0.8 1];
+p.EdgeColor = 'none'; 
+
+hold on
+plot(1:N, f_hat_err_mean)
+ylim( [max( min(conf_bounds_f_hat_err), -0.4 ), min( max(conf_bounds_f_hat_err), 1.4 )] )
+
+plot([1,N], zeros(1, 2), '-.k')
+
+title('Estimated $\hat{f}$ error from simulated observations', 'Interpreter', 'latex', 'Fontsize', 14)
+xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
+ylabel('Estimated fill ratio error, $f - \hat{f}$', 'Interpreter', 'latex', 'Fontsize', 14)
+legend("Sample 1\sigma of " + sim_cycles + " estimated fill ratio errors",...
+    "Sample mean of " + sim_cycles + " estimated fill ratio errors", "Location", "Best")
 grid on
 hold off
 
 % Plot the inverse of Fisher information (variance)
 figure
 
-semilogy(1:N, mean(var_f_hat, 1))
+semilogy(1:N, fisher_inv_sqrt_mean, 2:N, fisher_inv_sqrt_std(2:end)) % due to the way the variance is set up, the first observation will always yield te same result
 hold on
-title('Variance of $\hat{f}$ from simulated observations', 'Interpreter', 'latex', 'Fontsize', 14)
+title('Standard deviation of $\hat{f}$ from simulated observations', 'Interpreter', 'latex', 'Fontsize', 14)
 xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
-ylabel('$\mathrm{Var}[\hat{f}_{general}]$', 'Interpreter', 'latex', 'Fontsize', 14)
+ylabel('$\sqrt{\mathrm{Var}[\hat{f}_{general}]}$', 'Interpreter', 'latex', 'Fontsize', 14)
+legend("Sample mean of $\sqrt{\mathrm{Var}[\hat{f}_{general}]}$ over " + sim_cycles + " experiments",...
+    "Sample 1$\sigma$ of $\sqrt{\mathrm{Var}[\hat{f}_{general}]}$ over " + sim_cycles + " experiments",...
+    "Interpreter", "latex", "Location", "Best")
 grid on
+hold off
 
 %% Functions
 function observed_color = observe_color(tile_color, color_prob)
@@ -158,15 +188,15 @@ function observed_color = observe_color(tile_color, color_prob)
     end
 end
 
-function var_out = compute_f_hat_var(h, t, b, w)
+function fisher_inv = compute_fisher_inv(h, t, b, w)
     if h <= (1-w)*t
-        var_out = w^2 * (w-1)^2 / ...
+        fisher_inv = w^2 * (w-1)^2 / ...
             ( (b+w-1)^2 * (t*w^2 - 2*(t-h)*w + (t-h)) );
     elseif h >= b*t
-        var_out = b^2 * (b-1)^2 / ...
+        fisher_inv = b^2 * (b-1)^2 / ...
             ( (b+w-1)^2 * (t*b^2 - 2*h*b + h) );
     else
-        var_out = h * (t-h) / ...
+        fisher_inv = h * (t-h) / ...
             ( t^3 * (b+w-1)^2 );
     end
 end
