@@ -3,7 +3,7 @@ close all
 clc
 
 %% Parameters
-param_simple_single_agent_no_motion
+param_simple_single_agent_no_motion % call the parameter file
 
 %% Simulation
 
