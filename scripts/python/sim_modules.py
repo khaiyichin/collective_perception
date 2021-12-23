@@ -1,19 +1,16 @@
 import numpy as np
 import csv
-import os
 from datetime import datetime
 
 class Sim:
 
-    def __init__(self, num_cycles, num_obs, des_fill_ratio):
+    def __init__(self, num_cycles, num_obs, des_fill_ratio, main_filename_suffix):
         self.num_cycles = num_cycles
         self.num_obs = num_obs
         self.des_fill_ratio = des_fill_ratio
         self.avg_fill_ratio = 0.0
         self.tiles_record = np.empty( (self.num_cycles, self.num_obs) )
-
-        # TODO: print warning on minimum number of observations for generating tiles
-        self.generate_tiles()
+        self.main_filename_suffix = main_filename_suffix
 
     def generate_tiles(self):
         """Generate the tiles based on the desired/nominal fill ratios.
@@ -38,7 +35,6 @@ class Sim:
     def compute_fisher_inv(self, h, t, b, w):
         """Compute the Fisher information for one agent.
         """
-
         
         if h <= (1.0 - w) * t:
             return np.square(w) * np.square(w-1.0) / ( np.square(b+w-1.0) * (t*np.square(w) - 2*(t-h)*w + (t-h)) )
@@ -48,11 +44,10 @@ class Sim:
             return h * (t-h) / ( np.power(t, 3) * np.square(b+w-1.0) )
 
     def _write_data_to_csv(self, f_hat_data, fisher_inv_data, suffix=""):
-        curr_time = datetime.now().strftime("%m%d%Y_%H%M%S")
 
-        f_hat_filename = "./data/f_hat_" + curr_time + "_" + str(self.num_cycles) + "_" + str(self.num_obs) + "_" + suffix + ".csv"
-        fisher_inv_filename = "./data/fisher_inv_" + curr_time + "_" + str(self.num_cycles) + "_" + str(self.num_obs) + "_" + suffix + ".csv"
-        tiles_filename =  "./data/tiles_" + curr_time + "_" + str(self.num_cycles) + "_" + str(self.num_obs) + "_" + suffix + ".csv"
+        f_hat_filename = "f_hat" + self.main_filename_suffix + suffix + ".csv"
+        fisher_inv_filename = "fisher_inv" + self.main_filename_suffix + suffix + ".csv"
+        tiles_filename =  "tiles" + self.main_filename_suffix + suffix + ".csv"
 
         with open(f_hat_filename, "w", encoding="UTF8", newline="") as f:
             writer = csv.writer(f)
@@ -68,9 +63,9 @@ class Sim:
 
 class SingleAgentSim(Sim):
 
-    def __init__(self, num_cycles, num_obs, des_fill_ratio, b_prob, w_prob):
+    def __init__(self, num_cycles, num_obs, des_fill_ratio, b_prob, w_prob, main_f_suffix):
 
-        super().__init__(num_cycles, num_obs, des_fill_ratio)
+        super().__init__(num_cycles, num_obs, des_fill_ratio, main_f_suffix)
 
         self.b_prob = b_prob # P(black|black)
         self.w_prob = w_prob # P(white|white)
@@ -100,7 +95,7 @@ class SingleAgentSim(Sim):
 
         self.compute_sample_max()
 
-        if data_flag: self.write_data()
+        if data_flag: self.write_data_to_csv()
 
     def compute_sample_mean(self):
         
@@ -165,7 +160,12 @@ class SingleAgentSim(Sim):
             self.avg_fill_ratio =  (cycle_ind)/(cycle_ind+1) * self.avg_fill_ratio + 1/(cycle_ind+1) * sum(tiles)/self.num_obs
 
     def write_data_to_csv(self):
-        suffix = "b" + str( int(self.b_prob*100) ) + "w" + str( int(self.w_prob*100) )
+        """Write simulation data to CSV files.
+        """
+
+        prob_suffix = "_b" + str( int(self.b_prob*1e2) ) + "w" + str( int(self.w_prob*1e2) )
+        f_suffix = "_df" + str( int(self.des_fill_ratio*1e2) ) + "af" + str( int(self.avg_fill_ratio*1e2) )
+        suffix = prob_suffix + f_suffix
 
         self._write_data_to_csv( self.f_hat, self.fisher_inv, suffix )
 
@@ -173,15 +173,13 @@ class HeatmapData:
     """Class to store and process heatmap data
     """
 
-    def __init__(self, num_cycle, num_obs, sensor_prob_range, fill_ratio_range):
+    def __init__(self, num_cycle, num_obs, sensor_prob_range, fill_ratio_range, main_filename_suffix):
 
         self.num_cycle = num_cycle
         self.num_obs = num_obs
         self.sensor_prob_range = sensor_prob_range
         self.fill_ratio_range = fill_ratio_range
-
-        self.sensor_prob_inc = self.sensor_prob_range[1] - self.sensor_prob_range[0]
-        self.fill_ratio_inc = self.fill_ratio_range[1] - self.fill_ratio_range[0]
+        self.main_filename_suffix = main_filename_suffix
 
         self.f_hat_data = {"mean": [], "min": [], "max": []}
         self.fisher_inv_data = {"mean": [], "min": [], "max": []}
@@ -203,24 +201,15 @@ class HeatmapData:
     def write_data_to_csv(self):
         """Write completed heatmap data to CSV files.
         """
-    
-        min_sensor_prob, max_sensor_prob = int(self.sensor_prob_range[0]*1e2), int(self.sensor_prob_range[-1]*1e2)
-        min_des_fill_ratio, max_des_fill_ratio = int(self.fill_ratio_range[0]*1e2), int(self.fill_ratio_range[-1]*1e2)        
-        sensor_prob_inc, fill_ratio_inc = int(self.sensor_prob_inc*1e2), int(self.fill_ratio_inc*1e2)
-        
-        prob_suffix = "_p" + str(min_sensor_prob) + "-" + str(sensor_prob_inc) + "-" + str(max_sensor_prob)
-        f_suffix = "_f" + str(min_des_fill_ratio) + "-" + str(fill_ratio_inc) + "-" + str(max_des_fill_ratio)
-        suffix = prob_suffix + f_suffix
         
         # Write heatmap data
-        f_hat_mean_filename = "f_hat_heatmap_mean_" + str(self.num_cycle) + "_" + str(self.num_obs) + suffix + ".csv"
-        f_hat_min_filename = "f_hat_heatmap_min_" + str(self.num_cycle) + "_" + str(self.num_obs) + suffix + ".csv"    
-        f_hat_max_filename = "f_hat_heatmap_max_" + str(self.num_cycle) + "_" + str(self.num_obs) + suffix + ".csv"
-        fisher_inv_mean_filename = "fisher_inv_heatmap_mean_" + str(self.num_cycle) + "_" + str(self.num_obs) + suffix + ".csv"
-        fisher_inv_min_filename = "fisher_inv_heatmap_min_" + str(self.num_cycle) + "_" + str(self.num_obs) + suffix + ".csv"    
-        fisher_inv_max_filename = "fisher_inv_heatmap_max_" + str(self.num_cycle) + "_" + str(self.num_obs) + suffix + ".csv"
-        des_f_avg_f_filename = "des_f_avg_f_" + str(self.num_cycle) + "_" + str(self.num_obs) + suffix + ".csv"
-        
+        f_hat_mean_filename = "f_hat_heatmap_mean" + self.main_filename_suffix + ".csv"
+        f_hat_min_filename = "f_hat_heatmap_min" + self.main_filename_suffix + ".csv"
+        f_hat_max_filename = "f_hat_heatmap_max" + self.main_filename_suffix + ".csv"
+        fisher_inv_mean_filename = "fisher_inv_heatmap_mean" + self.main_filename_suffix + ".csv"
+        fisher_inv_min_filename = "fisher_inv_heatmap_min" + self.main_filename_suffix + ".csv"
+        fisher_inv_max_filename = "fisher_inv_heatmap_max" + self.main_filename_suffix + ".csv"
+        des_f_avg_f_filename = "des_f_avg_f" + self.main_filename_suffix + ".csv"
 
         with open(f_hat_mean_filename, "w", encoding="UTF8", newline="") as f:
             writer = csv.writer(f)
@@ -276,5 +265,5 @@ class HeatmapRow:
         self.fisher_inv_mean.append( single_agent_sim_obj.fisher_inv_sample_mean[-1] )
         self.fisher_inv_min.append( single_agent_sim_obj.fisher_inv_sample_min[-1] )
         self.fisher_inv_max.append( single_agent_sim_obj.fisher_inv_sample_max[-1] )
-        
+
         self.avg_f = single_agent_sim_obj.avg_fill_ratio
