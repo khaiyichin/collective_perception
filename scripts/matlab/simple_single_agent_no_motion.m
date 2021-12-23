@@ -13,19 +13,19 @@ p_w_b = 1 - b;  % black given white
 p_w_w = w;      % white given white
 p_b_w = 1 - w;  % white given black
 
-% Generate actual number of colored tiles
-tile_occurences = binornd(1, ones(1, N) * desired_fill_ratio);
-
-f = nnz(tile_occurences)/N; % actual fill ratio
-
-p_z_1_sim = zeros(sim_cycles, N); % probability that the agent sees a black tile
+p_z_1_sim = zeros(sim_cycles, N); % probability that the agent sees a black tile (h/t)
 agent_observations = zeros(sim_cycles, N); % agent observations
+f = zeros(sim_cycles, N); % actual fill ratios (each column in the same row should have the same value)
 
 % Feed the agent with tiles occurences
 for i = 1:sim_cycles
 
     prev_obs = 0;
     curr_obs = 0;
+    
+    tile_occurences = generate_tiles(desired_fill_ratio, N);
+
+    f(i, :) = ones(1, N) .* nnz(tile_occurences)/N; % actual fill ratio
     
     for j = 1:N
         
@@ -45,7 +45,7 @@ end
 %% Analysis
 
 % Compute the actual probability P(z = 1)
-p_z_1_act = b * f + (1 - w) * (1 - f);
+p_z_1_act = b * mean(f, 1) + (1 - w) * (1 - mean(f, 1));
 
 % Compute the mean and std dev of simulated probability P(z = 1)
 p_z_1_sim_mean = mean(p_z_1_sim, 1);
@@ -74,7 +74,7 @@ f_hat_std = std(f_hat, 0, 1);
 
 % Compute the mean and std dev of f_hat_err across the simulation cycles
 f_hat_err_mean = mean(f - f_hat, 1);
-f_hat_err_std = std(f - f_hat, 0, 1);
+f_hat_err_std = sqrt( var(f - f_hat, 0, 1) );
 
 % Compute the variance of f_hat based on simulated observations
 fisher_inv_sqrt = zeros(sim_cycles, N);
@@ -98,14 +98,14 @@ conf_bounds_p_z_1 = [ p_z_1_sim_mean + p_z_1_sim_std, p_z_1_sim_mean(end:-1:1) -
 
 figure
 p = fill( [1:N, N:-1:1], conf_bounds_p_z_1, [0.8, 0.8, 1] );
-% p.FaceColor = [0.8 0.8 1];
+p.FaceColor = [0.8 0.8 1];
 p.EdgeColor = 'none'; 
 
 hold on
 plot(1:N, p_z_1_sim_mean, 'Color', [0.0, 0.447, 0.741])
 ylim( [max( min(conf_bounds_p_z_1), 0 ), min( max(conf_bounds_p_z_1), 1 )] )
 
-plot([1,N], ones(1, 2)*p_z_1_act, '-.k')
+plot([1,N], ones(1, 2)*p_z_1_act(1), '-.k')
 
 title("Probability of black tiles from simulated observations",...
     'Interpreter', 'latex', 'Fontsize', 14)
@@ -113,7 +113,7 @@ xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
 ylabel('$P(z=1)$', 'Interpreter', 'latex', 'Fontsize', 14)
 legend("Sample 1\sigma of " + sim_cycles + " simulated probabilities",...
     "Sample mean of " + sim_cycles + " simulated probabilities" ,...
-    "Computed probability using L.o.T.P. = " + p_z_1_act, "Location", "Best")
+    "Computed probability using L.o.T.P. = " + p_z_1_act(1), "Location", "Best")
 grid on
 hold off
 
@@ -129,14 +129,14 @@ hold on
 plot(1:N, f_hat_mean)
 ylim( [max( min(conf_bounds_f_hat), 0 ), min( max(conf_bounds_f_hat), 1 )] )
 
-plot([1,N], ones(1, 2)*f, '-.k')
+plot([1,N], ones(1, 2)*mean(f(:, 1), 1), '-.k')
 
 title('Estimated $\hat{f}$ from simulated observations', 'Interpreter', 'latex', 'Fontsize', 14)
 xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
 ylabel('Estimated fill ratio, $\hat{f}$', 'Interpreter', 'latex', 'Fontsize', 14)
 legend("Sample 1\sigma of " + sim_cycles + " estimated fill ratios",...
     "Sample mean of " + sim_cycles + " estimated fill ratios",...
-    "Actual fill ratio = " + f, "Location", "Best")
+    "Sample mean of " + sim_cycles + " actual fill ratios = " + mean(f(:, 1), 1), "Location", "Best")
 grid on
 hold off
 
@@ -167,7 +167,7 @@ figure
 
 semilogy(1:N, fisher_inv_sqrt_mean, 2:N, fisher_inv_sqrt_std(2:end)) % due to the way the variance is set up, the first observation will always yield te same result
 hold on
-title('Standard deviation of $\hat{f}$ from simulated observations', 'Interpreter', 'latex', 'Fontsize', 14)
+title('Root inverse Fisher information of $\hat{f}$', 'Interpreter', 'latex', 'Fontsize', 14)
 xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
 ylabel('$\sqrt{\mathrm{Var}[\hat{f}_{general}]}$', 'Interpreter', 'latex', 'Fontsize', 14)
 legend("Sample mean of $\sqrt{\mathrm{Var}[\hat{f}_{general}]}$ over " + sim_cycles + " experiments",...
@@ -177,6 +177,12 @@ grid on
 hold off
 
 %% Functions
+function tiles = generate_tiles(fill_ratio, total_tiles)
+
+    % Generate actual number of colored tiles
+    tiles = binornd(1, ones(1, total_tiles) * fill_ratio);
+end
+
 function observed_color = observe_color(tile_color, color_prob)
 % tile_color must be in the form of 0 or 1
 
