@@ -1,0 +1,15 @@
+---
+sensorProb:
+  min: 0.55
+  max: 1.0
+  incSteps: 19
+  # incSteps: 4
+desFillRatios:
+  min: 0.05
+  max: 0.95
+  incSteps: 19
+  # incSteps: 5
+numCycle: 200
+numObs: 1000
+writeAllData: False
+...

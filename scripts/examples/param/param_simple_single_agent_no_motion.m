@@ -1,7 +1,7 @@
 %% Parameter file for simple_single_agent_no_motion.m
 
-N = 1000;                       % total number of observations
-b = 0.45;                        % sensor probability to black tile
+N = 100;                       % total number of observations
+b = 0.55;                        % sensor probability to black tile
 w = b;                          % sensor probability to white tile
 sim_cycles = 200;                % number of agents to simulate (or
                                 % simulation cycles for one agent)
