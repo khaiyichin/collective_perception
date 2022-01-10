@@ -10,7 +10,7 @@ function heatmap_matrix = import_heatmap_data(filename, numCols, dataLines)
 %  scalar integers for dis-contiguous row intervals.
 %
 %  Example:
-%  heatmap_matrix = importfile("C:\Users\khaiy\Documents\collective_consensus\scripts\python\data\heatmap_mean16122021_114721_50_1000.csv", [1, Inf]);
+%  heatmap_matrix = importfile("C:\Users\khaiy\Documents\collective_consensus\scripts\python\data\heatmap_mean16122021_114721_50_1000.csv", 5, [1, Inf]);
 %
 %  See also READTABLE.
 %

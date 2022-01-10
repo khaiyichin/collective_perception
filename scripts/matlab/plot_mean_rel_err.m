@@ -25,7 +25,7 @@ c200_o500_err_avg_trend = mean(c200_o500_err_mean, 1);
 c200_o1000_err_avg_trend = mean(c200_o1000_err_mean, 1);
 
 % Plot data
-sz_factor = 5e3;
+sz_factor = 5e3; % scaling factor for marker size to indicate std dev
 
 figure
 ax_sct = gca;
