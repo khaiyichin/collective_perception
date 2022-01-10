@@ -1,3 +1,4 @@
+import yaml
 import numpy as np
 import csv
 from datetime import datetime
@@ -127,7 +128,7 @@ class SingleAgentSim(Sim):
             prev_obs = 0
             curr_obs = 0
 
-            tiles = self.generate_tiles()
+            tiles = self.generate_tiles() # generate a new set of tiles for the current agent/cycle
 
             for tile_ind, tile_color in enumerate(tiles):
                 
@@ -173,13 +174,13 @@ class HeatmapData:
     """Class to store and process heatmap data
     """
 
-    def __init__(self, num_cycle, num_obs, sensor_prob_range, fill_ratio_range, main_filename_suffix):
+    def __init__(self, sim_param_obj):
 
-        self.num_cycle = num_cycle
-        self.num_obs = num_obs
-        self.sensor_prob_range = sensor_prob_range
-        self.fill_ratio_range = fill_ratio_range
-        self.main_filename_suffix = main_filename_suffix
+        self.num_cycle = sim_param_obj.num_cycle
+        self.num_obs = sim_param_obj.num_obs
+        self.sensor_prob_range = sim_param_obj.sp_range
+        self.fill_ratio_range = sim_param_obj.dfr_range
+        self.main_filename_suffix = sim_param_obj.full_suffix
 
         self.f_hat_data = {"mean": [], "min": [], "max": []}
         self.fisher_inv_data = {"mean": [], "min": [], "max": []}
@@ -267,3 +268,44 @@ class HeatmapRow:
         self.fisher_inv_max.append( single_agent_sim_obj.fisher_inv_sample_max[-1] )
 
         self.avg_f = single_agent_sim_obj.avg_fill_ratio
+
+class SimParam:
+
+    def __init__(self, yaml_config):
+
+        dfr_min = yaml_config["desFillRatios"]["min"]
+        dfr_max = yaml_config["desFillRatios"]["max"]
+        dfr_inc = yaml_config["desFillRatios"]["incSteps"]
+
+        sp_min = yaml_config["sensorProb"]["min"]
+        sp_max = yaml_config["sensorProb"]["max"]
+        sp_inc = yaml_config["sensorProb"]["incSteps"]
+
+        self.sp_range  = np.round(np.linspace(sp_min, sp_max, sp_inc), 3)
+        self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3)        
+        self.num_obs = yaml_config["numObs"]
+        self.num_cycle = yaml_config["numCycle"]
+        self.write_all = yaml_config["writeAllData"]
+
+        self.create_filename_descriptors()
+
+    def create_filename_descriptors(self):
+        """Create filename descriptors for informative folder and filenames.
+        """
+
+        # Compute increment step sizes
+        sensor_prob_inc = self.sp_range[1] - self.sp_range[0]
+        fill_ratio_inc = self.dfr_range[1] - self.dfr_range[0]
+        
+        # Define filename descriptors
+        min_sensor_prob, max_sensor_prob = int(self.sp_range[0]*1e2), int(self.sp_range[-1]*1e2)
+        min_des_fill_ratio, max_des_fill_ratio = int(self.dfr_range[0]*1e2), int(self.dfr_range[-1]*1e2)
+        p_inc, f_inc = int(sensor_prob_inc*1e2), int(fill_ratio_inc*1e2)
+
+        self.filename_suffix_1 = "_c" +str(self.num_cycle) + "_o" + str(self.num_obs) # describing number of cycles and observations
+
+        prob_suffix = "_p" + str(min_sensor_prob) + "-" + str(p_inc) + "-" + str(max_sensor_prob)
+        f_suffix = "_f" + str(min_des_fill_ratio) + "-" + str(f_inc) + "-" + str(max_des_fill_ratio)
+        self.filename_suffix_2 = prob_suffix + f_suffix # describing the probabilites and fill ratios
+
+        self.full_suffix = self.filename_suffix_1 + self.filename_suffix_2

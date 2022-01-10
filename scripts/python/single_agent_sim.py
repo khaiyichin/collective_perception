@@ -1,7 +1,8 @@
-from sim_modules import SingleAgentSim, HeatmapData, HeatmapRow
+from sim_modules import SingleAgentSim, HeatmapData, HeatmapRow, SimParam
 
 import numpy as np
 import os
+import yaml
 from datetime import datetime
 
 def create_data_folder():
@@ -45,54 +46,55 @@ def create_simulation_folder(suffix):
         except Exception:
             pass
 
+def parse_yaml_param_file(yaml_filepath):
+    """Parse the YAML parameter file.
+    """
+
+    with open(yaml_filepath) as fopen:
+        try:
+            config = yaml.safe_load(fopen)
+        except yaml.YAMLError as exception:
+            print(exception)
+    
+        # Displayed processed arguments
+        print('\n\t' + '='*15 + ' Processed Parameters ' + '='*15 + '\n')
+        print('\t\t', end='')
+        for line in yaml.dump(config, indent=4, default_flow_style=False):        
+            if line == '\n':
+                print(line, '\t\t',  end='')
+            else:
+                print(line, end='')
+        print('\r', end='') # reset the cursor for print
+        print('\n\t' + '='*13 + ' End Processed Parameters ' + '='*13  + '\n')
+
+    param_obj = SimParam(config)
+
+    return param_obj
+
 if __name__ == "__main__":
-    """
-    SIM PARAM BEGIN
-    """
-    sensor_prob = np.round(np.linspace(0.55, 1.0, 19), 3)
-    des_fill_ratios = np.round(np.linspace(0.05, 0.95, 19), 3)
-    
-    num_cycle = 200
-    num_obs = 500
 
-    """
-    SIM PARAM END
-    """
-
-    # Compute increment step sizes
-    sensor_prob_inc = sensor_prob[1] - sensor_prob[0]
-    fill_ratio_inc = des_fill_ratios[1] - des_fill_ratios[0]
-    
-    # Define filename descriptors
-    min_sensor_prob, max_sensor_prob = int(sensor_prob[0]*1e2), int(sensor_prob[-1]*1e2)
-    min_des_fill_ratio, max_des_fill_ratio = int(des_fill_ratios[0]*1e2), int(des_fill_ratios[-1]*1e2)
-    p_inc, f_inc = int(sensor_prob_inc*1e2), int(fill_ratio_inc*1e2)
-
-    filename_suffix_1 = "_c" +str(num_cycle) + "_o" + str(num_obs) # describing number of cycles and observations
-
-    prob_suffix = "_p" + str(min_sensor_prob) + "-" + str(p_inc) + "-" + str(max_sensor_prob)
-    f_suffix = "_f" + str(min_des_fill_ratio) + "-" + str(f_inc) + "-" + str(max_des_fill_ratio)
-    filename_suffix_2 = prob_suffix + f_suffix # describing the probabilites and fill ratios
+    # Parse simulation parameters
+    param_obj = parse_yaml_param_file("param_single_agent_sim.yaml")
 
     # Create a folder to store simulation data
-    create_simulation_folder(filename_suffix_1+filename_suffix_2)
+    create_simulation_folder(param_obj.full_suffix)
 
     # Create a HeatmapData object to process heatmap data
-    hm = HeatmapData(num_cycle, num_obs, sensor_prob, des_fill_ratios, filename_suffix_1+filename_suffix_2)
+    hm = HeatmapData(param_obj)
 
     # Run simulations
-    for f in des_fill_ratios: # iterate through each desired fill ratio
+    for f in param_obj.dfr_range: # iterate through each desired fill ratio
 
         # Create HeatmapRow object
         hr = HeatmapRow()
 
         print("\nRunning cases with fill ratio = " + str(f))
         
-        for p in sensor_prob: # iterate through each sensor probabilities
+        for p in param_obj.sp_range: # iterate through each sensor probabilities
             print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
 
-            s = SingleAgentSim(num_cycle, num_obs, f, p, p, filename_suffix_1)
-            s.run() # run the single agent simulation
+            s = SingleAgentSim(param_obj.num_cycle, param_obj.num_obs, f, p, p, param_obj.filename_suffix_1)
+            s.run(param_obj.write_all) # run the single agent simulation
 
             hr.populate(s) # populate one heatmap row for both f_hat and fisher_inv
 
@@ -100,4 +102,7 @@ if __name__ == "__main__":
             
         hm.compile_data(hr)
 
+    # Write completed heatmap data to CSV files
     hm.write_data_to_csv()
+
+    print("\nSimulation complete!")

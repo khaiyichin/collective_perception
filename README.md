@@ -4,7 +4,7 @@
 The MATLAB scripts are mostly for quick prototyping and data processing/visualization.
 
 ### `plot_heat_surf.m`
-Used for plotting heatmap data from the following files (obtained from running the sing):
+Used for plotting heatmap data from the following files (obtained from running `single_agent_sim.py`):
 - `fisher_inv_heatmap_*.csv`,
 - `f_hat_heatmap_*.csv`,
 - `des_f_avg_f_*.csv`.
@@ -96,7 +96,10 @@ To run the script, create/modify a `param_single_agent_sim.yaml` file to set the
 ```
 $ python3 single_agent_sim.py
 ```
-which would produce CSV files that can be used for further analysis.
+which would produce heatmap CSV files that can be used for further analysis:
+- `fisher_inv_heatmap_*.csv`: `fisher_inv` heatmap data file,
+- `f_hat_heatmap_*.csv`: `f_hat` heatmap data file,
+- `des_f_avg_f_*.csv`: desired and actual (average) fill ratio file.
 
 The parameter file should look like the following:
 ```yaml
@@ -117,4 +120,14 @@ writeAllData: <BOOL> # whether to write data from every single experiment
 ... # document end marker
 ```
 
-Note:
+If `writeAllData` is set to `True`, then the additional output files look someting like the following:
+- `tiles_c200_o100_b57w57_df85af85.csv`, entire history of tile configurations for the current experiment,
+- `fisher_inv_c200_o100_b57w57_df85af85.csv`, entire history of `fisher_inv` for the current experiment,
+- `f_hat_c200_o100_b57w57_df85af85.csv`, entire history of `f_hat` for the current experiment
+
+where the current experiment parameters are described by the flags and their values (separated by underscores) in the filenames:
+- `c` = total number of cycles `<numCycle>`,
+- `o` = total number of observations `<numObs>`,
+- `b` = `w` = current sensor probability simulated * 100 (rounded to closest 1),
+- `df` = current desired fill ratio simulated * 100 (rounded to closest 1),
+- `af` = current actual (averaged) fill ratio simulated * 100 (rounded to closest 1).
