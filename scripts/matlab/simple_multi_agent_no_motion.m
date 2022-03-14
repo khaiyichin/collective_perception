@@ -17,7 +17,7 @@ obs_comms_ratio = 1;            % ratio of observations per communication round
 b = 0.65;                        % sensor probability to black tile
 w = b;                          % sensor probability to white tile
 n_experiments = 5;                % number of experiments
-desired_fill_ratio = 0.7;   % fill ratio, f (can be set to rand(1))
+desired_fill_ratio = 0.8;   % fill ratio, f (can be set to rand(1))
 
 % Call parameter file otherwise
 
@@ -83,13 +83,6 @@ for exp_ind = 1:n_experiments
             % Compute Fisher inverse based on h
             fisher_inv(agt_ind, obs_ind, exp_ind) = ...
                 compute_fisher_inv(h, obs_ind, b, w);
-
-            % Define initial guess
-            if obs_ind == 1
-                x0 = x(agt_ind, obs_ind, exp_ind);
-            else
-                x0 = x(agt_ind, obs_ind-1, exp_ind);
-            end
         end
 
         % Compute social values once all agents have processed local
@@ -134,55 +127,101 @@ end
 %% Plot data
 
 % Plot agent averaged x trajectory for 1st experiment
-conf_bounds_x = [ x_trajectories_avg(1, 1:end) + x_trajectories_std(1, 1:end),...
-    x_trajectories_avg(1, end:-1:1) - x_trajectories_std(1, end:-1:1) ];
+% conf_bounds_x = [ x_trajectories_avg(1, 1:end) + x_trajectories_std(1, 1:end),...
+%     x_trajectories_avg(1, end:-1:1) - x_trajectories_std(1, end:-1:1) ];
+% 
+% figure
+% p = fill( [1:n_obs, n_obs:-1:1], conf_bounds_x, 'b' );
+% p.FaceColor = [0.8 0.8 1];
+% p.EdgeColor = 'none';
+% hold on
+% 
+% plot(1:n_obs, x_trajectories_avg(1, 1:end));
+% title("Average $x$ across " + n_agents + " agents",...
+%     'Interpreter', 'latex', 'Fontsize', 14)
+% xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
+% ylabel('$x$', 'Interpreter', 'latex', 'Fontsize', 14)
+% grid on
+% hold off
 
+% Plot x trajectories across different experiments
 figure
-p = fill( [1:n_obs, n_obs:-1:1], conf_bounds_x, 'b' );
+
+for i = 1:n_experiments
+    subplot(n_experiments, 2, 2*i)
+    conf_bounds_x = [ (desired_fill_ratio - x_trajectories_avg(i, :)) + x_trajectories_std(i, 1:end),...
+        (desired_fill_ratio - x_trajectories_avg(i, end:-1:1)) - x_trajectories_std(i, end:-1:1) ];
+    p = fill( [1:n_obs, n_obs:-1:1], conf_bounds_x, 'b' );
+    p.FaceColor = [0.8 0.8 1];
+    p.EdgeColor = 'none';
+    hold on
+
+    title("Agent-averaged $x-x^*$ across " + n_agents + " agents, experiment " + i,...
+    'Interpreter', 'latex', 'Fontsize', 14)
+
+    plot(1:n_obs, desired_fill_ratio - x_trajectories_avg(i, 1:end));
+
+    grid on
+    hold off
+end
+xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
+
+subplot(n_experiments, 2, [1:2:2*n_experiments])
+total_mean = mean(x_trajectories_avg, 1);
+total_std = std(x_trajectories_avg, 0, 1);
+conf_bounds_total = [ (desired_fill_ratio - total_mean) + total_std(1:end),...
+    (desired_fill_ratio - total_mean(end:-1:1)) - total_std(end:-1:1) ];
+p = fill( [1:n_obs, n_obs:-1:1], conf_bounds_total, 'b' );
 p.FaceColor = [0.8 0.8 1];
 p.EdgeColor = 'none';
 hold on
-
-plot(1:n_obs, x_trajectories_avg(1, 1:end));
-title("Average $x$ across " + n_agents + " agents",...
-    'Interpreter', 'latex', 'Fontsize', 14)
+plot(1:n_obs, desired_fill_ratio - total_mean)
+xlim([50 n_obs])
+ylim([-0.1 0.1])
+title("Absolute final estimate error across " + n_agents + " agents and " + n_experiments + " experiments", "Interpreter", "Latex", "Fontsize", 14);
 xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
-ylabel('$x$', 'Interpreter', 'latex', 'Fontsize', 14)
-grid on
-hold off
+ylabel('$x-x^*$', 'Interpreter', 'latex', 'Fontsize', 14)
 
-% Plot x trajectories across different agents
-figure
-
-hold on
-for i = 1:n_experiments
-    plot(1:n_obs, x_trajectories_avg(i, 1:end));
-end
-
-title("Average $x$ across " + n_agents + " agents for " + n_experiments + " experiments",...
-    'Interpreter', 'latex', 'Fontsize', 14)
-xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
-ylabel('$x$', 'Interpreter', 'latex', 'Fontsize', 14)
+legend("Sample 1$\sigma$ of $x^*-x$",...
+    "Sample mean of $x^*-x$", "Interpreter", "Latex", "Location", "Best")
 grid on
 hold off
 
 % Plot inverse of Fisher info across different agents
 figure
 
-for i = 1:n_agents
-    semilogy(1:n_obs, fisher_inv(i, 1:end, 1));
+for i = 1:n_experiments
+    semilogy( 1:n_obs, mean(fisher_inv(:, 1:end, i), 1) );
     hold on
 end
+
+title("var[$\hat{x}$] agents for " + n_experiments + " experiments",...
+    'Interpreter', 'latex', 'Fontsize', 14)
+xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
+ylabel('var[$x$]', 'Interpreter', 'latex', 'Fontsize', 14)
 grid on
 hold off
 
-% Investigate low-pass filtering properties of agent 1
+% Investigate low-pass filtering properties of random agents
 % input = x_hat, output = x
 figure
-subplot(2,1,1)
-plot(1:n_obs, x_hat(1, :, 1));
-subplot(2,1,2)
-plot(1:n_obs, x(1,:,1))
+% subplot(2,1,1)
+% plot(1:n_obs, x_hat(1, :, 1));
+% subplot(2,1,2)
+% plot(1:n_obs, x(1,:,1))
+
+exps = randi(n_experiments, [1,3]);
+agts = randi(n_agents, [1,3]);
+
+for i = 1:length(exps)
+    subplot(length(exps), 1, i);
+    plot( 1:n_obs, x_hat(agts(i), :, exps(i)), 1:n_obs, x(agts(i), :, exps(i)) );
+    title("Random agent i=" + agts(i) + " from random experiment " + exps(i), 'Interpreter', 'latex', 'Fontsize', 14)
+    ylabel('$x$ and $\hat{x}$', 'Interpreter', 'latex', 'Fontsize', 14)
+    legend("$\hat{x}$", "$x$", 'Interpreter', 'latex', 'Fontsize', 14, "Location", "Best")
+    grid on
+end
+xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
 
 %% Functions
 function tiles = generate_tiles(n_agents, fill_ratio, total_tiles)
