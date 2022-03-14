@@ -11,12 +11,12 @@ Assumptions:
 
 %% Parameters
 
-n_agents = 10;                  % number of agents
-n_obs = 100;                       % total number of observations
+n_agents = 50;                  % number of agents
+n_obs = 1000;                       % total number of observations
 obs_comms_ratio = 1;            % ratio of observations per communication round
 b = 0.65;                        % sensor probability to black tile
 w = b;                          % sensor probability to white tile
-n_experiments = 1;                % number of experiments
+n_experiments = 5;                % number of experiments
 desired_fill_ratio = 0.7;   % fill ratio, f (can be set to rand(1))
 
 % Call parameter file otherwise
@@ -34,9 +34,10 @@ p_z_1_sim = zeros(n_agents, n_obs, n_experiments); % probability that the agent 
 agent_observations = zeros(n_agents, n_obs, n_experiments); % agent observations
 f = zeros(n_agents, 1, n_experiments); % actual fill ratios (each column in the same row should have the same value)
 x_hat = zeros(n_agents, n_obs, n_experiments); % local estimates
-x_bar = zeros(2, n_obs, n_experiments); % social estimates
+x_bar = zeros(n_agents, n_obs, n_experiments); % social estimates
 x = zeros(n_agents, n_obs, n_experiments); % final local guess
-fisher_inv= zeros(n_agents, n_obs, n_experiments); % fisher inverse (variances)
+fisher_inv = zeros(n_agents, n_obs, n_experiments); % fisher inverse (variances)
+fisher_inv_bar = zeros(n_agents, n_obs, n_experiments); % social fisher inverse (variances)
 
 % Run through all experiments
 for exp_ind = 1:n_experiments
@@ -49,7 +50,7 @@ for exp_ind = 1:n_experiments
     prev_obs = zeros(n_agents, 1); % initialize observation collection
 
     % Go through each observation cycle
-    for obs_ind = 1:n_obs-1
+    for obs_ind = 1:n_obs
 
         % Perform local actions
         curr_obs = zeros(n_agents, 1);
@@ -91,21 +92,97 @@ for exp_ind = 1:n_experiments
             end
         end
 
-        % Solve primal function (analytical form exists)
-        x(:, obs_ind, exp_ind) = ...
-            solve_f_x(x_hat(:, obs_ind, exp_ind),...
-                      x_bar(1, obs_ind, exp_ind),... % social estimate
-                      1./fisher_inv(:, obs_ind, exp_ind),... % local fisher info
-                      1./x_bar(2, obs_ind, exp_ind)); % social fisher info (rho)
+        % Compute social values once all agents have processed local
+        % estimate
+        for agt_ind = 1:n_agents
+            [x_bar(agt_ind, obs_ind, exp_ind),...
+                fisher_inv_bar(agt_ind, obs_ind, exp_ind)] = ...
+                    solve_g_x( x(1:end ~= agt_ind, obs_ind, exp_ind),...
+                               fisher_inv(1:end ~= agt_ind, obs_ind, exp_ind) );
+        end
 
-        % Compute social estimate and confidences
-        x_bar(:, obs_ind+1, exp_ind) = ...
-            solve_g_x( x_hat(:, obs_ind, exp_ind),...
-                       fisher_inv(:, obs_ind, exp_ind) );
+        % Solve primal function (analytical form exists)
+        if obs_ind ~= n_obs
+            x(:, obs_ind+1, exp_ind) = ...
+                solve_f_x(x_hat(:, obs_ind, exp_ind),... % local estimate
+                          x_bar(:, obs_ind, exp_ind),... % social estimate
+                          1./fisher_inv(:, obs_ind, exp_ind),... % local fisher info (alpha)
+                          1./fisher_inv_bar(:, obs_ind, exp_ind)); % social fisher info (rho)
+        end
     end
 end
 
 %% Analysis
+
+% Compute the mean and std
+x_hat_trajectories_avg = zeros(n_experiments, n_obs);
+x_hat_trajectories_std = zeros(n_experiments, n_obs);
+x_trajectories_avg = zeros(n_experiments, n_obs);
+x_trajectories_std = zeros(n_experiments, n_obs);
+alpha_trajectories_avg = zeros(n_experiments, n_obs);
+alpha_trajectories_std = zeros(n_experiments, n_obs);
+
+for i = 1:n_experiments
+    x_hat_trajectories_avg(i, :) = mean(x_hat(:, :, i), 1);
+    x_hat_trajectories_std(i, :) = std(x_hat(:, :, i), 0, 1);
+    x_trajectories_avg(i, :) = mean(x(:, :, i), 1);
+    x_trajectories_std(i, :) = std(x(:, :, i), 0, 1);
+    alpha_trajectories_avg(i, :) = mean(1./fisher_inv(:, :, i), 1);
+    alpha_trajectories_std(i, :) = std(1./fisher_inv(:, :, i), 0, 1);
+end
+
+%% Plot data
+
+% Plot agent averaged x trajectory for 1st experiment
+conf_bounds_x = [ x_trajectories_avg(1, 1:end) + x_trajectories_std(1, 1:end),...
+    x_trajectories_avg(1, end:-1:1) - x_trajectories_std(1, end:-1:1) ];
+
+figure
+p = fill( [1:n_obs, n_obs:-1:1], conf_bounds_x, 'b' );
+p.FaceColor = [0.8 0.8 1];
+p.EdgeColor = 'none';
+hold on
+
+plot(1:n_obs, x_trajectories_avg(1, 1:end));
+title("Average $x$ across " + n_agents + " agents",...
+    'Interpreter', 'latex', 'Fontsize', 14)
+xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
+ylabel('$x$', 'Interpreter', 'latex', 'Fontsize', 14)
+grid on
+hold off
+
+% Plot x trajectories across different agents
+figure
+
+hold on
+for i = 1:n_experiments
+    plot(1:n_obs, x_trajectories_avg(i, 1:end));
+end
+
+title("Average $x$ across " + n_agents + " agents for " + n_experiments + " experiments",...
+    'Interpreter', 'latex', 'Fontsize', 14)
+xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
+ylabel('$x$', 'Interpreter', 'latex', 'Fontsize', 14)
+grid on
+hold off
+
+% Plot inverse of Fisher info across different agents
+figure
+
+for i = 1:n_agents
+    semilogy(1:n_obs, fisher_inv(i, 1:end, 1));
+    hold on
+end
+grid on
+hold off
+
+% Investigate low-pass filtering properties of agent 1
+% input = x_hat, output = x
+figure
+subplot(2,1,1)
+plot(1:n_obs, x_hat(1, :, 1));
+subplot(2,1,2)
+plot(1:n_obs, x(1,:,1))
 
 %% Functions
 function tiles = generate_tiles(n_agents, fill_ratio, total_tiles)
@@ -168,7 +245,7 @@ function x_next = solve_f_x(x_hat_arr, x_bar_arr, alpha_arr, rho_arr)
 end
 
 % Compute social estimate and variance
-function x_bar = solve_g_x(x_hat_arr, fish_inv_arr)
-    x_bar(1,1) = mean(x_hat_arr);
-    x_bar(2,1) = mean(fish_inv_arr);
+function [x_bar, fisher_inv_bar] = solve_g_x(x_arr, fish_inv_arr)
+    x_bar = mean(x_arr, 1);
+    fisher_inv_bar = mean(fish_inv_arr, 1);
 end
