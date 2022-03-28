@@ -223,6 +223,32 @@ for i = 1:length(exps)
 end
 xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
 
+% Analyze frequency response at the final observation step
+denom = fisher_inv(:,end,1) + fisher_inv_bar(:,end,1); % evaluate at the end
+
+D_inv = diag(ones(n_agents, 1)) ./ (n_agents -1) ; % inverse of degree matrix (fully connected)
+A = double(~eye(n_agents)); % adjacency matrix
+F_tilde = eye(n_agents) .* fisher_inv(:, end, 1) ./ denom;
+F = F_tilde * D_inv * A;
+
+G = eye(n_agents) .* fisher_inv_bar(:,end,1) ./ denom;
+
+sys = ss(F, G, eye(n_agents), 0);
+
+if n_agents < 4
+    figure;
+    bode_opt = bodeoptions;
+    bode_opt.FreqUnits = 'Hz';
+    bode(sys, bode_opt);
+    grid on
+end
+
+figure;
+sigma_opt = sigmaoptions;
+sigma_opt.FreqUnits = 'Hz';
+sigma(sys, sigma_opt);
+grid on
+
 %% Functions
 function tiles = generate_tiles(n_agents, fill_ratio, total_tiles)
 
