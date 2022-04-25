@@ -1,9 +1,17 @@
-from sim_modules import SingleAgentSim, HeatmapData, HeatmapRow, SimParam
+from sim_modules import MultiAgentSim, Agent, HeatmapData, HeatmapRow, SimParam
 
 import numpy as np
 import os
 import yaml
 from datetime import datetime
+
+
+"""
+Want to test/break the following assumptions:
+- full communication with all agents (graph comm probability =/= 1.0)
+- same sensor quality among all agents
+- communicate after each observation
+"""
 
 def create_data_folder():
     """Create a folder named data and use it as the working directory.
@@ -13,7 +21,7 @@ def create_data_folder():
     try:
         os.mkdir("data")
         os.chdir("data")
-
+        
     except FileExistsError:
 
         # Change to `data` directory
@@ -55,11 +63,11 @@ def parse_yaml_param_file(yaml_filepath):
             config = yaml.safe_load(fopen)
         except yaml.YAMLError as exception:
             print(exception)
-
+    
         # Displayed processed arguments
         print('\n\t' + '='*15 + ' Processed Parameters ' + '='*15 + '\n')
         print('\t\t', end='')
-        for line in yaml.dump(config, indent=4, default_flow_style=False):
+        for line in yaml.dump(config, indent=4, default_flow_style=False):        
             if line == '\n':
                 print(line, '\t\t',  end='')
             else:
@@ -73,6 +81,9 @@ def parse_yaml_param_file(yaml_filepath):
 
 if __name__ == "__main__":
 
+    # 'num_agents', 'num_exp', 'num_obs', 'des_fill_ratio', 'b_prob', 'w_prob', and 'main_f_suffix'
+    sample_init_params = [4, 2, 10, 0.75, 0.9, 0.9, 'dummy-debug']
+
     # Parse simulation parameters
     param_obj = parse_yaml_param_file("param_single_agent_sim.yaml")
 
@@ -82,27 +93,30 @@ if __name__ == "__main__":
     # Create a HeatmapData object to process heatmap data
     hm = HeatmapData(param_obj)
 
-    # Run simulations
     for f in param_obj.dfr_range: # iterate through each desired fill ratio
 
         # Create HeatmapRow object
         hr = HeatmapRow()
-
         print("\nRunning cases with fill ratio = " + str(f))
-
+        
         for p in param_obj.sp_range: # iterate through each sensor probabilities
             print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
 
-            s = SingleAgentSim(param_obj.num_exp, param_obj.num_obs, f, p, p, param_obj.filename_suffix_1)
+            s = MultiAgentSim(param_obj.num_agents,
+                              param_obj.num_exp,
+                              param_obj.num_obs,
+                              f, p, p, param_obj.filename_suffix_1)
             s.run(param_obj.write_all) # run the single agent simulation
 
             hr.populate(s) # populate one heatmap row for both f_hat and fisher_inv
 
             print("Done!")
-
+            
         hm.compile_data(hr)
 
     # Write completed heatmap data to CSV files
     hm.write_data_to_csv()
 
     print("\nSimulation complete!")
+
+    s = MultiAgentSim(*sample_init_params)

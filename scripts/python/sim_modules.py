@@ -2,25 +2,55 @@ import yaml
 import numpy as np
 import csv
 from datetime import datetime
+import graph_tool as gt
+import graph_tool.generation as gt_gen
+import graph_tool.stats as gt_stats
+import random
+
+BLACK_TILE = 1
+WHITE_TILE = 0
+
+# TODO:
+# implement run_sim() --> almost done; wanna figure out how to log the data using
+# HeatmapRow and HeatmapData.
+# run for fully connected data and compare with matlab
+# Create abstract functions in Sim to have the child class implement
+# use parallel processing to run experiments
+# from joblib import Parallel, delayed
 
 class Sim:
 
-    def __init__(self, num_cycles, num_obs, des_fill_ratio, main_filename_suffix):
-        self.num_cycles = num_cycles
+    def __init__(self, num_exp, num_obs, des_fill_ratio, main_filename_suffix):
+        self.num_exp = num_exp
         self.num_obs = num_obs
         self.des_fill_ratio = des_fill_ratio
         self.avg_fill_ratio = 0.0
-        self.tiles_record = np.empty( (self.num_cycles, self.num_obs) )
+        self.tiles_record = np.empty( (self.num_exp, self.num_obs) )
         self.main_filename_suffix = main_filename_suffix
 
-    def generate_tiles(self):
+    def generate_tiles(self, num_agents=1):
         """Generate the tiles based on the desired/nominal fill ratios.
-        """
-        
-        # Draw bernoulli samples for tiles based on desired fill ratio
-        tiles = np.random.binomial(1, self.des_fill_ratio * np.ones(self.num_obs) )
 
-        assert(len(tiles) == self.num_obs)
+        Args:
+            num_agents: Number of tiles rows to generate, only used in multi-agent simulations.
+
+        Returns:
+            A 1-D (single agent simulation) or a (num_agents x self.num_obs) 2-D numpy array
+             of binary tiles (multi-agent simulation).
+        """
+
+        # Draw bernoulli samples for tiles based on desired fill ratio
+        if num_agents > 1:
+            tiles = np.random.binomial(1, self.des_fill_ratio * np.ones((num_agents, self.num_obs)))
+
+            # For debugging purposes; should be removed in the future
+            assert(tiles.shape[1] == self.num_obs)
+            assert(tiles.shape[1] == self.num_obs)
+
+        else:
+            tiles = np.random.binomial(1, self.des_fill_ratio * np.ones(self.num_obs) )
+
+            assert(len(tiles) == self.num_obs)
 
         return tiles
 
@@ -33,16 +63,42 @@ class Sim:
         else:
             return 1.0 - tile_color
 
-    def compute_fisher_inv(self, h, t, b, w):
-        """Compute the Fisher information for one agent.
+    def compute_x_hat(self, h, t, b, w):
+        """Compute the fill ratio estimate for one agent.
         """
-        
+
+        if h <= (1.0 - w) * t:
+            return 0.0
+        elif h >= b*t:
+            return 1.0
+        else:
+            return (h/t + w - 1.0) / (b + w -1)
+
+    def compute_fisher_inv(self, h, t, b, w):
+        """Compute the inverse Fisher information (variance) for one agent.
+        """
+
         if h <= (1.0 - w) * t:
             return np.square(w) * np.square(w-1.0) / ( np.square(b+w-1.0) * (t*np.square(w) - 2*(t-h)*w + (t-h)) )
         elif h >= b*t:
             return np.square(b) * np.square(b-1.0) / ( np.square(b+w-1.0) * (t*np.square(b) - 2*h*b + h) )
         else:
             return h * (t-h) / ( np.power(t, 3) * np.square(b+w-1.0) )
+
+    def compute_fisher(self, h, t, b, w):
+        """Compute the Fisher information for one agent.
+        """
+
+        return np.reciprocal( self.compute_fisher_inv(h, t, b, w) )
+
+    def compute_x_bar(self, x_arr):
+        return np.mean(x_arr)
+
+    def compute_fisher_bar(self, fisher_arr):
+        return np.mean( np.reciprocal( fisher_arr ) )
+
+    def compute_x(self, x_hat, x_bar, alpha, rho):
+        return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
 
     def _write_data_to_csv(self, f_hat_data, fisher_inv_data, suffix=""):
 
@@ -64,18 +120,18 @@ class Sim:
 
 class SingleAgentSim(Sim):
 
-    def __init__(self, num_cycles, num_obs, des_fill_ratio, b_prob, w_prob, main_f_suffix):
+    def __init__(self, num_exp, num_obs, des_fill_ratio, b_prob, w_prob, main_f_suffix):
 
-        super().__init__(num_cycles, num_obs, des_fill_ratio, main_f_suffix)
+        super().__init__(num_exp, num_obs, des_fill_ratio, main_f_suffix)
 
         self.b_prob = b_prob # P(black|black)
         self.w_prob = w_prob # P(white|white)
-        self.agent_obs = np.zeros( (num_cycles, num_obs) )
-        self.agent_avg_black_obs = np.zeros( (num_cycles, num_obs) )
+        self.agent_obs = np.zeros( (num_exp, num_obs) )
+        self.agent_avg_black_obs = np.zeros( (num_exp, num_obs) )
 
         # Define data members
-        self.f_hat = np.zeros( (num_cycles, num_obs) )
-        self.fisher_inv = np.zeros( (num_cycles, num_obs) )
+        self.f_hat = np.zeros( (num_exp, num_obs) )
+        self.fisher_inv = np.zeros( (num_exp, num_obs) )
         self.f_hat_sample_mean = np.zeros( num_obs )
         self.fisher_inv_sample_mean = np.zeros( num_obs )
         self.f_hat_sample_std = np.zeros( num_obs )
@@ -99,7 +155,7 @@ class SingleAgentSim(Sim):
         if data_flag: self.write_data_to_csv()
 
     def compute_sample_mean(self):
-        
+
         self.f_hat_sample_mean = np.mean(self.f_hat, axis=0)
         self.fisher_inv_sample_mean = np.mean(self.fisher_inv, axis=0)
 
@@ -110,12 +166,12 @@ class SingleAgentSim(Sim):
         self.fisher_inv_sample_std = np.std(self.fisher_inv, axis=0, ddof=1)
 
     def compute_sample_min(self):
-        
+
         self.f_hat_sample_min = np.amin(self.f_hat, axis=0)
         self.fisher_inv_sample_min = np.amin(self.fisher_inv, axis=0)
 
     def compute_sample_max(self):
-        
+
         self.f_hat_sample_max = np.amax(self.f_hat, axis=0)
         self.fisher_inv_sample_max = np.amax(self.fisher_inv, axis=0)
 
@@ -123,42 +179,42 @@ class SingleAgentSim(Sim):
 
         # Compute the denominator term for the estimated fill ratio calculation
         denom = self.b_prob + self.w_prob - 1.0
-        
-        for cycle_ind in range(self.num_cycles):
+
+        for exp_ind in range(self.num_exp):
             prev_obs = 0
             curr_obs = 0
 
-            tiles = self.generate_tiles() # generate a new set of tiles for the current agent/cycle
+            tiles = self.generate_tiles() # generate a new set of tiles for the current agent/experiment
 
             for tile_ind, tile_color in enumerate(tiles):
-                
+
                 if tile_color == 1:
                     curr_obs = self.observe_color(tile_color, self.b_prob)
                 else:
                     curr_obs = self.observe_color(tile_color, self.w_prob)
 
                 # Store observations
-                self.agent_obs[cycle_ind][tile_ind] = curr_obs
-                self.agent_avg_black_obs[cycle_ind][tile_ind] = (prev_obs + curr_obs) / (tile_ind + 1) # tile number in the denom
+                self.agent_obs[exp_ind][tile_ind] = curr_obs
+                self.agent_avg_black_obs[exp_ind][tile_ind] = (prev_obs + curr_obs) / (tile_ind + 1) # tile number in the denom
                 prev_obs += curr_obs
 
                 # Compute estimated fill ratio
-                if self.agent_avg_black_obs[cycle_ind][tile_ind] <= 1 - self.w_prob:
-                    self.f_hat[cycle_ind][tile_ind] = 0.0
-                elif self.agent_avg_black_obs[cycle_ind][tile_ind] >= self.b_prob:
-                    self.f_hat[cycle_ind][tile_ind] = 1.0
+                if self.agent_avg_black_obs[exp_ind][tile_ind] <= 1 - self.w_prob:
+                    self.f_hat[exp_ind][tile_ind] = 0.0
+                elif self.agent_avg_black_obs[exp_ind][tile_ind] >= self.b_prob:
+                    self.f_hat[exp_ind][tile_ind] = 1.0
                 else:
-                    self.f_hat[cycle_ind][tile_ind] = (self.agent_avg_black_obs[cycle_ind][tile_ind] + self.w_prob - 1.0) / denom
+                    self.f_hat[exp_ind][tile_ind] = (self.agent_avg_black_obs[exp_ind][tile_ind] + self.w_prob - 1.0) / denom
 
-                # Compute Fisher information
-                h = np.sum(self.agent_obs[cycle_ind][0:tile_ind+1])
-                self.fisher_inv[cycle_ind][tile_ind] = self.compute_fisher_inv(h, tile_ind + 1, self.b_prob, self.w_prob)
+                # Compute the inverse Fisher information (variance)
+                h = np.sum(self.agent_obs[exp_ind][0:tile_ind+1])
+                self.fisher_inv[exp_ind][tile_ind] = self.compute_fisher_inv(h, tile_ind + 1, self.b_prob, self.w_prob)
 
             # Store the tile config
-            self.tiles_record[cycle_ind] = tiles
+            self.tiles_record[exp_ind] = tiles
 
-            # Compute the average tile ratio up to this siimulation cycle
-            self.avg_fill_ratio =  (cycle_ind)/(cycle_ind+1) * self.avg_fill_ratio + 1/(cycle_ind+1) * sum(tiles)/self.num_obs
+            # Compute the average tile ratio up to this simulation experiment
+            self.avg_fill_ratio =  (exp_ind)/(exp_ind+1) * self.avg_fill_ratio + 1/(exp_ind+1) * sum(tiles)/self.num_obs
 
     def write_data_to_csv(self):
         """Write simulation data to CSV files.
@@ -170,13 +226,410 @@ class SingleAgentSim(Sim):
 
         self._write_data_to_csv( self.f_hat, self.fisher_inv, suffix )
 
+# TODO: should i create a subclass that inherits from graph_tool.Graph that stores the agents and their comm probabilities? called CommGraph?
+
+class MultiAgentSim(Sim):
+
+    def __init__(self, num_agents, num_exp, num_obs, des_fill_ratio, b_prob, w_prob, main_f_suffix):
+
+        super().__init__(num_exp, num_obs, des_fill_ratio, main_f_suffix)
+
+        self.b_prob = b_prob # P(black|black)
+        self.w_prob = w_prob # P(white|white)
+        self.agent_obs = np.zeros( (num_exp, num_agents, num_obs) )
+        self.agent_avg_black_obs = np.zeros( (num_exp, num_agents, num_obs) )
+        self.num_agents = num_agents
+
+        # Define data members
+        self.f_hat = np.zeros( (num_exp, num_agents, num_obs) )
+        self.fisher_inv = np.zeros( (num_exp, num_agents, num_obs) )
+        self.f_hat_sample_mean = np.zeros( num_exp, num_obs )
+        self.fisher_inv_sample_mean = np.zeros( num_exp, num_obs )
+        self.f_hat_sample_std = np.zeros( num_exp, num_obs )
+        self.fisher_inv_sample_std = np.zeros( num_exp, num_obs )
+        self.f_hat_sample_min = np.zeros( num_exp, num_obs )
+        self.fisher_inv_sample_min = np.zeros( num_exp, num_obs )
+        self.f_hat_sample_max = np.zeros( num_exp, num_obs )
+        self.fisher_inv_sample_max = np.zeros( num_exp, num_obs )
+
+        self.f_bar = np.zeros( (num_exp, num_agents, num_obs) )
+        self.rho = np.zeros( (num_exp, num_agents, num_obs) )
+        self.f_bar_sample_mean = np.zeros( num_exp, num_obs )
+        self.rho_sample_mean = np.zeros( num_exp, num_obs )
+        self.f_bar_sample_std = np.zeros( num_exp, num_obs )
+        self.rho_sample_std = np.zeros( num_exp, num_obs )
+        self.f_bar_sample_min = np.zeros( num_exp, num_obs )
+        self.rho_sample_min = np.zeros( num_exp, num_obs )
+        self.f_bar_sample_max = np.zeros( num_exp, num_obs )
+        self.rho_sample_max = np.zeros( num_exp, num_obs )
+
+        self.x = np.zeros( (num_exp, num_agents, num_obs) )
+        self.fisher_inv = np.zeros( (num_exp, num_agents, num_obs) )
+        self.x_sample_mean = np.zeros( num_exp, num_obs )
+        self.fisher_inv_sample_mean = np.zeros( num_exp, num_obs )
+        self.x_sample_std = np.zeros( num_exp, num_obs )
+        self.fisher_inv_sample_std = np.zeros( num_exp, num_obs )
+        self.x_sample_min = np.zeros( num_exp, num_obs )
+        self.fisher_inv_sample_min = np.zeros( num_exp, num_obs )
+        self.x_sample_max = np.zeros( num_exp, num_obs )
+        self.fisher_inv_sample_max = np.zeros( num_exp, num_obs )
+
+        # Setup up graph
+        self.setup_comms_graph()
+
+        self._create_agents()
+        pass
+
+    def setup_comms_graph(self):
+
+        # Add edges depending on the type of graph desired
+        self.comms_graph = self._create_complete_graph() # TODO: use the complete graph as a test case for now but should have parameter here
+
+        # Add a new property map for communication probabilities
+        comms_prob_eprop = self.comms_graph.new_edge_property("double") # returns an EdgePropertyMap object pointing to the comms_graph
+
+        # TODO: allow for different comm probabilities
+        comms_prob_eprop.get_array()[:] = 1.0 # assign a probability of 1.0 to each edge
+
+        # Internalize the property
+        self.comms_graph.edge_properties["comms_prob"] = comms_prob_eprop
+
+    def _create_complete_graph(self):
+        """Create a fully-connected graph.
+        """
+        return gt_gen.complete_graph(self.num_agents, directed=False)
+
+    def _create_ring_graph(self):
+        """Create a ring graph.
+        """
+        return gt_gen.circular_graph(self.num_agents, k=1, directed=False)
+
+    def _create_line_graph(self):
+        """Create a line graph.
+        """
+        pass
+
+    def _create_scale_free_graph(self):
+        """Create a scale-free graph.
+        """
+        pass
+
+    def _create_agents(self):
+
+        # Create agent objects
+        agents_vprop = self.comms_graph.new_vertex_property("object") # need to populate agents into the vertices
+
+        for vertex in self.comms_graph.get_vertices():
+            agents_vprop[vertex] = Agent(self.b_prob, self.w_prob,
+                                         (self.compute_x_hat, self.compute_fisher),
+                                         (self.compute_x_bar, self.compute_fisher_bar),
+                                         self.compute_x)
+
+        self.comms_graph.vertex_properties["agents"] = agents_vprop # store into the comms graph
+
+    def run(self, data_flag = False):
+        self.run_sim()
+
+        self.compute_sample_mean()
+
+        self.compute_sample_std()
+
+        self.compute_sample_min()
+
+        self.compute_sample_max()
+
+        if data_flag: self.write_data_to_csv()
+
+    def compute_sample_mean(self):
+
+        self.f_hat_sample_mean = np.mean(self.f_hat, axis=0)
+        self.fisher_inv_sample_mean = np.mean(self.fisher_inv, axis=0)
+
+    def compute_sample_std(self):
+
+        # TODO: should i be using the biased or unbiased variance here? sticking with the unbiased for now
+        self.f_hat_sample_std = np.std(self.f_hat, axis=0, ddof=1)
+        self.fisher_inv_sample_std = np.std(self.fisher_inv, axis=0, ddof=1)
+
+    def compute_sample_min(self):
+
+        self.f_hat_sample_min = np.amin(self.f_hat, axis=0)
+        self.fisher_inv_sample_min = np.amin(self.fisher_inv, axis=0)
+
+    def compute_sample_max(self):
+
+        self.f_hat_sample_max = np.amax(self.f_hat, axis=0)
+        self.fisher_inv_sample_max = np.amax(self.fisher_inv, axis=0)
+
+    def run_sim(self):
+
+        # TODO can use parallel here?
+        for exp_ind in range(self.num_exp):
+
+            # Generate tiles (bernoulli instances for each agent
+            tiles = self.generate_tiles()
+
+            # Need period timing condition here to decide when to switch
+            # between observation and communication
+            comms_period = 5
+            curr_iteration = 0
+            observation_complete = False
+
+            while curr_iteration < len(tiles[0]):
+
+                # Execute observation phase
+                local_values = self.run_observation_phase(tiles[:, curr_iteration])
+
+                # Execute communication phase
+                if curr_iteration % comms_period == 0:
+                    self.run_communication_phase()
+                    pass
+
+                # Store collected data
+
+                curr_iteration += 1
+
+
+            # Collect mean x_hat and std dev values
+            np.mean()
+
+            # Collect mean alpha and std dev values
+
+            # Collect mean x_bar and std dev values
+
+            # Reset agents
+            for v in self.comms_graph.vertices():
+                self.comms_graph.agents[v].reset()
+
+    def run_communication_phase(self):
+        """Make agents communicate.
+        """
+
+        social_values = {"x": [], "conf": []}
+        informed_values = {"x": []}
+
+        # Make agents communicate
+        for e in self.comms_graph.edges():
+
+            # Apply probabilistic communication (currently only applicable to undirected graphs)
+            if random.random() < self.comms_graph.comms_prob[e]:
+                a1 = self.comms_graph.agents(e.source())
+                a2 = self.comms_graph.agents(e.target())
+
+                a1.communicate_rx( a2.communicate_tx() )
+                a2.communicate_rx( a1.communicate_tx() )
+
+        # Make the agents perform social (dual) and primal computation
+        for v in self.comms_graph.vertices():
+            agent = self.comms_graph.agents[v]
+
+            agent.solve_social()
+            agent.solve_primal()
+
+            social_values["x"].append(agent.get_x_bar())
+            social_values["conf"].append(agent.get_rho())
+            informed_values["x"].append(agent.get_x())
+
+        return social_values, informed_values
+
+    def run_observation_phase(self, tiles):
+        """Make agents observe their tiles.
+
+        Returns:
+            A dict containing a record of agent estimations after local observations.
+        """
+
+        local_values = {"x": [], "conf": []}
+
+        # Iterate through each agent to observe
+        for ind, v in enumerate(self.comms_graph.vertices()):
+
+            agent = self.comms_graph.agents[v]
+
+            agent.observe(tiles[ind], self.observe_color)
+
+            # Collect local agent values
+            local_values["x"].append(agent.get_x_hat())
+            local_values["conf"].append(agent.get_alpha())
+
+        return local_values
+
+class Agent:
+
+    def __init__(self, p_b_b, p_w_w, local_functions, social_functions, primal_function):
+
+        self.b_prob = p_b_b
+        self.w_prob = p_w_w
+
+        self.obs_lst = [] # should the agent remember the entire history of its observations...?
+        self.total_b_tiles_obs = 0
+        self.total_obs = 0
+
+        self.comms_round_collected_est = []
+        self.comms_round_collected_conf = []
+
+        self.local_solver = self.LocalSolver(*local_functions)
+        self.social_solver = self.SocialSolver(*social_functions)
+        self.primal_solver = self.PrimalSolver(primal_function)
+
+    def reset(self):
+
+        self.obs_lst = [] # should the agent remember the entire history of its observations...?
+        self.total_b_tiles_obs = 0
+        self.total_obs = 0
+
+        self.comms_round_collected_est = []
+        self.comms_round_collected_conf = []
+
+        self.local_solver = self.local_solver.reset()
+        self.social_solver = self.social_solver.reset()
+        self.primal_solver = self.primal_solver.reset()
+
+        pass
+
+    def observe(self, encounter, obs_function):
+
+        # Check if the encounter is black or white
+        if encounter == WHITE_TILE:
+            sensor_prob = self.w_prob
+        elif encounter == BLACK_TILE:
+            sensor_prob = self.b_prob
+        else: # error catching
+            print("Error: invalid tile encounter!")
+            exit()
+
+        # Record sensor observation of the encounter
+        obs = obs_function(encounter, sensor_prob)
+
+        self.curr_obs = obs
+        self.obs_lst.append(obs)
+        self.total_b_tiles_obs += obs
+        self.total_obs += 1
+
+        # Update local estimation
+        self.solve_local()
+
+    def communicate_tx(self):
+        """Transmit estimates and confidences.
+
+        Returns:
+            A tuple of estimate and confidence
+        """
+
+        return (self.local_solver.x, self.local_solver.conf)
+
+    def communicate_rx(self, packet):
+        """Receive estimates and confidences.
+
+        Args:
+            packet: A tuple of estimate and confdence.
+        """
+
+        self.comms_round_collected_est.append(packet[0])
+        self.comms_round_collected_conf.append(packet[1])
+
+    def solve_local(self):
+        """Compute the local estimate and confidence.
+        """
+        self.local_solver.solve(self.total_b_tiles_obs,
+                                self.total_obs,
+                                self.b_prob,
+                                self.w_prob)
+
+    def solve_social(self):
+        """Compute the social estimate and confidence.
+        """
+        self.social_solver.solve(self.comms_round_collected_est, self.comms_round_collected_conf)
+
+        # Clear collected estimates and confidences since social estimate is computed
+        self.comms_round_collected_est = []
+        self.comms_round_collected_conf = []
+
+    def solve_primal(self):
+        """Compute the final estimate using the primal function.
+        """
+        self.primal_solver.solve(self.local_solver.x, self.local_solver.conf,
+                                 self.social_solver.x, self.social_solver.conf)
+
+    def get_x_hat(self): return self.local_solver.x
+
+    def get_alpha(self): return self.local_solver.conf
+
+    def get_x_bar(self): return self.social_solver.x
+
+    def get_rho(self): return self.social_solver.conf
+
+    def get_x(self): return self.primal_solver.x
+
+    class LocalSolver:
+
+        def __init__(self, est_func, conf_func):
+            self.x = 0.0
+            self.conf = 0.0
+
+            self.est_func = est_func
+            self.conf_func = conf_func
+
+        def reset(self):
+            self.x = 0.0
+            self.conf = 0.0
+
+        def solve(self, h, t, b, w):
+            """Compute the local estimate and confidence.
+            """
+
+            # Compute the local estimate
+            self.x = self.est_func(h, t, b, w)
+
+            # Compute the local confidence
+            self.conf = self.conf_func(h, t, b, w)
+
+    class SocialSolver:
+
+        def __init__(self, est_func, conf_func):
+            self.x = 0.0
+            self.conf = 0.0
+
+            self.est_func = est_func
+            self.conf_func = conf_func
+
+        def reset(self):
+            self.x = 0.0
+            self.conf = 0.0
+
+        def solve(self, x_arr, conf_arr):
+            """Compute the social estimate and confidence.
+            """
+
+            # Compute the social estimate
+            self.x = self.est_func(x_arr)
+
+            # Compute the social confidence
+            self.conf = self.conf_func(conf_arr)
+
+    class PrimalSolver:
+
+        def __init__(self, primal_func):
+            self.x = 0.0
+            self.primal_func = primal_func
+
+        def reset(self):
+            self.x = 0.0
+
+        def solve(self, local_est, local_conf, social_est, social_conf):
+            """Compute the combined estimate.
+            """
+
+            # Compute the informed estimate
+            self.x = self.primal_func(local_est, local_conf, social_est, social_conf)
+
 class HeatmapData:
     """Class to store and process heatmap data
     """
 
     def __init__(self, sim_param_obj):
 
-        self.num_cycle = sim_param_obj.num_cycle
+        self.num_exp = sim_param_obj.num_exp
         self.num_obs = sim_param_obj.num_obs
         self.sensor_prob_range = sim_param_obj.sp_range
         self.fill_ratio_range = sim_param_obj.dfr_range
@@ -189,10 +642,10 @@ class HeatmapData:
     def compile_data(self, heatmap_row_obj):
         """Compile and organize heatmap data.
         """
-            
+
         self.f_hat_data["mean"].append(heatmap_row_obj.f_hat_mean)
         self.f_hat_data["min"].append(heatmap_row_obj.f_hat_min)
-        self.f_hat_data["max"].append(heatmap_row_obj.f_hat_max)            
+        self.f_hat_data["max"].append(heatmap_row_obj.f_hat_max)
         self.fisher_inv_data["mean"].append(heatmap_row_obj.fisher_inv_mean)
         self.fisher_inv_data["min"].append(heatmap_row_obj.fisher_inv_min)
         self.fisher_inv_data["max"].append(heatmap_row_obj.fisher_inv_max)
@@ -202,7 +655,7 @@ class HeatmapData:
     def write_data_to_csv(self):
         """Write completed heatmap data to CSV files.
         """
-        
+
         # Write heatmap data
         f_hat_mean_filename = "f_hat_heatmap_mean" + self.main_filename_suffix + ".csv"
         f_hat_min_filename = "f_hat_heatmap_min" + self.main_filename_suffix + ".csv"
@@ -255,7 +708,7 @@ class HeatmapRow:
         self.fisher_inv_min = []
         self.fisher_inv_max = []
 
-    def populate(self, single_agent_sim_obj):
+    def populate(self, single_agent_sim_obj: SingleAgentSim):
         """Populate data given SingleAgentSim object.
         """
 
@@ -269,10 +722,24 @@ class HeatmapRow:
 
         self.avg_f = single_agent_sim_obj.avg_fill_ratio
 
+    def populate(self, multi_agent_sim_obj: MultiAgentSim):
+
+        self.f_hat_mean.append( multi_agent_sim_obj.f_hat_sample_mean[-1] )
+        self.f_hat_min.append( multi_agent_sim_obj.f_hat_sample_min[-1] )
+        self.f_hat_max.append( multi_agent_sim_obj.f_hat_sample_max[-1] )
+
+        self.fisher_inv_mean.append( multi_agent_sim_obj.fisher_inv_sample_mean[-1] )
+        self.fisher_inv_min.append( multi_agent_sim_obj.fisher_inv_sample_min[-1] )
+        self.fisher_inv_max.append( multi_agent_sim_obj.fisher_inv_sample_max[-1] )
+
+        self.avg_f = multi_agent_sim_obj.avg_fill_ratio
+        pass
+
 class SimParam:
 
     def __init__(self, yaml_config):
 
+        # Common parameters
         dfr_min = yaml_config["desFillRatios"]["min"]
         dfr_max = yaml_config["desFillRatios"]["max"]
         dfr_inc = yaml_config["desFillRatios"]["incSteps"]
@@ -282,10 +749,17 @@ class SimParam:
         sp_inc = yaml_config["sensorProb"]["incSteps"]
 
         self.sp_range  = np.round(np.linspace(sp_min, sp_max, sp_inc), 3)
-        self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3)        
+        self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3)
         self.num_obs = yaml_config["numObs"]
-        self.num_cycle = yaml_config["numCycle"]
+        self.num_exp = yaml_config["numExperiments"]
         self.write_all = yaml_config["writeAllData"]
+
+        # Multi-agent simulation parameters
+        try:
+            self.num_agents = int(yaml_config["numAgents"])
+            self.comms_graph_str = yaml_config["commsGraph"]["type"]
+        except Exception as e:
+            pass
 
         self.create_filename_descriptors()
 
@@ -296,13 +770,13 @@ class SimParam:
         # Compute increment step sizes
         sensor_prob_inc = self.sp_range[1] - self.sp_range[0]
         fill_ratio_inc = self.dfr_range[1] - self.dfr_range[0]
-        
+
         # Define filename descriptors
         min_sensor_prob, max_sensor_prob = int(self.sp_range[0]*1e2), int(self.sp_range[-1]*1e2)
         min_des_fill_ratio, max_des_fill_ratio = int(self.dfr_range[0]*1e2), int(self.dfr_range[-1]*1e2)
         p_inc, f_inc = int(sensor_prob_inc*1e2), int(fill_ratio_inc*1e2)
 
-        self.filename_suffix_1 = "_c" +str(self.num_cycle) + "_o" + str(self.num_obs) # describing number of cycles and observations
+        self.filename_suffix_1 = "_c" +str(self.num_exp) + "_o" + str(self.num_obs) # describing number of experiments and observations
 
         prob_suffix = "_p" + str(min_sensor_prob) + "-" + str(p_inc) + "-" + str(max_sensor_prob)
         f_suffix = "_f" + str(min_des_fill_ratio) + "-" + str(f_inc) + "-" + str(max_des_fill_ratio)
