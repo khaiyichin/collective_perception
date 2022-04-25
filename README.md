@@ -114,8 +114,8 @@ desFillRatios:
   min: <FLOAT> # min desired fill ratio
   max: <FLOAT> # max desired fill ratio
   incSteps: <INT> # number of steps from min to max inclusive
-numCycle: <INT> # number of cycles to run
-numObs: <INT> # number of observations per cycle/agent
+numExperiments: <INT> # number of experiments to run
+numObs: <INT> # number of observations per experiment/agent
 writeAllData: <BOOL> # whether to write data from every single experiment
 ... # document end marker
 ```
@@ -126,7 +126,7 @@ If `writeAllData` is set to `True`, then the additional output files look someti
 - `f_hat_c200_o100_b57w57_df85af85.csv`, entire history of `f_hat` for the current experiment
 
 where the current experiment parameters are described by the flags and their values (separated by underscores) in the filenames:
-- `c` = total number of cycles `<numCycle>`,
+- `c` = total number of experiments `<numExperiments>`,
 - `o` = total number of observations `<numObs>`,
 - `b` = `w` = current sensor probability simulated * 100 (rounded to closest 1),
 - `df` = current desired fill ratio simulated * 100 (rounded to closest 1),

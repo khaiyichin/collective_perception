@@ -9,7 +9,7 @@ desFillRatios:
   max: 0.95
   incSteps: 19
   # incSteps: 5
-numCycle: 200
+numExperiments: 200
 numObs: 1000
 writeAllData: False
 ...

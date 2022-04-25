@@ -11,7 +11,7 @@ Assumptions:
 
 %% Parameters
 
-n_agents = 50;                  % number of agents
+n_agents = 5;                  % number of agents
 n_obs = 1000;                       % total number of observations
 obs_comms_ratio = 1;            % ratio of observations per communication round
 b = 0.65;                        % sensor probability to black tile
@@ -90,7 +90,7 @@ for exp_ind = 1:n_experiments
         for agt_ind = 1:n_agents
             [x_bar(agt_ind, obs_ind, exp_ind),...
                 fisher_inv_bar(agt_ind, obs_ind, exp_ind)] = ...
-                    solve_g_x( x(1:end ~= agt_ind, obs_ind, exp_ind),...
+                    solve_g_x( x_hat(1:end ~= agt_ind, obs_ind, exp_ind),...
                                fisher_inv(1:end ~= agt_ind, obs_ind, exp_ind) );
         end
 
@@ -114,6 +114,8 @@ x_trajectories_avg = zeros(n_experiments, n_obs);
 x_trajectories_std = zeros(n_experiments, n_obs);
 alpha_trajectories_avg = zeros(n_experiments, n_obs);
 alpha_trajectories_std = zeros(n_experiments, n_obs);
+rho_trajectories_avg = zeros(n_experiments, n_obs);
+rho_trajectories_std = zeros(n_experiments, n_obs);
 
 for i = 1:n_experiments
     x_hat_trajectories_avg(i, :) = mean(x_hat(:, :, i), 1);
@@ -122,6 +124,8 @@ for i = 1:n_experiments
     x_trajectories_std(i, :) = std(x(:, :, i), 0, 1);
     alpha_trajectories_avg(i, :) = mean(1./fisher_inv(:, :, i), 1);
     alpha_trajectories_std(i, :) = std(1./fisher_inv(:, :, i), 0, 1);
+    rho_trajectories_avg(i, :) = mean(1./fisher_inv_bar(:, :, i), 1);
+    rho_trajectories_std(i, :) = std(1./fisher_inv_bar(:, :, i), 0, 1);
 end
 
 %% Plot data
@@ -143,6 +147,19 @@ end
 % ylabel('$x$', 'Interpreter', 'latex', 'Fontsize', 14)
 % grid on
 % hold off
+
+% Plot rho trajectories
+figure
+for i = 1:n_agents
+    semilogy(1:n_obs, fisher_inv_bar(i, 1:end, 1));
+    hold on
+end
+title("Fisher_inv_bar across for agent 1",...
+    'Interpreter', 'latex', 'Fontsize', 14)
+xlabel('Number of observations', 'Interpreter', 'latex', 'Fontsize', 14)
+ylabel('$x$', 'Interpreter', 'latex', 'Fontsize', 14)
+grid on
+hold off
 
 % Plot x trajectories across different experiments
 figure
