@@ -44,7 +44,7 @@ class Sim:
             tiles = np.random.binomial(1, self.des_fill_ratio * np.ones((num_agents, self.num_obs)))
 
             # For debugging purposes; should be removed in the future
-            assert(tiles.shape[1] == self.num_obs)
+            assert(tiles.shape[0] == self.num_agents)
             assert(tiles.shape[1] == self.num_obs)
 
         else:
@@ -74,7 +74,7 @@ class Sim:
         else:
             return (h/t + w - 1.0) / (b + w -1)
 
-    def compute_fisher_inv(self, h, t, b, w):
+    def compute_fisher_hat_inv(self, h, t, b, w):
         """Compute the inverse Fisher information (variance) for one agent.
         """
 
@@ -85,20 +85,23 @@ class Sim:
         else:
             return h * (t-h) / ( np.power(t, 3) * np.square(b+w-1.0) )
 
-    def compute_fisher(self, h, t, b, w):
+    def compute_fisher_hat(self, h, t, b, w):
         """Compute the Fisher information for one agent.
         """
 
-        return np.reciprocal( self.compute_fisher_inv(h, t, b, w) )
+        return np.reciprocal( self.compute_fisher_hat_inv(h, t, b, w) )
 
-    def compute_x_bar(self, x_arr):
+    def compute_x_bar(self, x_arr): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same social function)
         return np.mean(x_arr)
 
     def compute_fisher_bar(self, fisher_arr):
         return np.mean( np.reciprocal( fisher_arr ) )
 
-    def compute_x(self, x_hat, x_bar, alpha, rho):
+    def compute_x(self, x_hat, x_bar, alpha, rho): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
         return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
+
+    def compute_fisher(self, alpha, rho):
+        return np.reciprocal( 1 / (alpha + rho) ) # alpha^-1 and rho^-1 are variances
 
     def _write_data_to_csv(self, f_hat_data, fisher_inv_data, suffix=""):
 
@@ -208,7 +211,7 @@ class SingleAgentSim(Sim):
 
                 # Compute the inverse Fisher information (variance)
                 h = np.sum(self.agent_obs[exp_ind][0:tile_ind+1])
-                self.fisher_inv[exp_ind][tile_ind] = self.compute_fisher_inv(h, tile_ind + 1, self.b_prob, self.w_prob)
+                self.fisher_inv[exp_ind][tile_ind] = self.compute_fisher_hat_inv(h, tile_ind + 1, self.b_prob, self.w_prob)
 
             # Store the tile config
             self.tiles_record[exp_ind] = tiles
@@ -230,51 +233,57 @@ class SingleAgentSim(Sim):
 
 class MultiAgentSim(Sim):
 
-    def __init__(self, num_agents, num_exp, num_obs, des_fill_ratio, b_prob, w_prob, main_f_suffix):
+    def __init__(self, num_agents, num_exp, num_obs, des_fill_ratio, b_prob, w_prob, comms_period, comms_prob, main_f_suffix):
 
         super().__init__(num_exp, num_obs, des_fill_ratio, main_f_suffix)
 
+        # Define fixed parameters for the MultiAgentSim instance
         self.b_prob = b_prob # P(black|black)
         self.w_prob = w_prob # P(white|white)
-        self.agent_obs = np.zeros( (num_exp, num_agents, num_obs) )
-        self.agent_avg_black_obs = np.zeros( (num_exp, num_agents, num_obs) )
+        self.tiles = np.zeros( (num_exp, num_agents, num_obs) )
         self.num_agents = num_agents
 
-        # Define data members
-        self.f_hat = np.zeros( (num_exp, num_agents, num_obs) )
-        self.fisher_inv = np.zeros( (num_exp, num_agents, num_obs) )
-        self.f_hat_sample_mean = np.zeros( num_exp, num_obs )
-        self.fisher_inv_sample_mean = np.zeros( num_exp, num_obs )
-        self.f_hat_sample_std = np.zeros( num_exp, num_obs )
-        self.fisher_inv_sample_std = np.zeros( num_exp, num_obs )
-        self.f_hat_sample_min = np.zeros( num_exp, num_obs )
-        self.fisher_inv_sample_min = np.zeros( num_exp, num_obs )
-        self.f_hat_sample_max = np.zeros( num_exp, num_obs )
-        self.fisher_inv_sample_max = np.zeros( num_exp, num_obs )
+        # Define data storage containers
+        self.agent_obs = np.zeros( (num_exp, num_agents, num_obs) )
+        self.agent_avg_black_obs = np.zeros( (num_exp, num_agents, num_obs) )
 
-        self.f_bar = np.zeros( (num_exp, num_agents, num_obs) )
+        # doesn't seem useful to store variances, let's just define everything by fisher info (i.e., confidences)
+        self.x_hat = np.zeros( (num_exp, num_agents, num_obs) )
+        self.alpha = np.zeros( (num_exp, num_agents, num_obs) )
+        self.x_hat_sample_mean = np.zeros( (num_exp, num_obs) )
+        self.alpha_sample_mean = np.zeros( (num_exp, num_obs) )
+        self.x_hat_sample_std = np.zeros( (num_exp, num_obs) )
+        self.alpha_sample_std = np.zeros( (num_exp, num_obs) )
+        self.x_hat_sample_min = np.zeros( (num_exp, num_obs) )
+        self.alpha_sample_min = np.zeros( (num_exp, num_obs) )
+        self.x_hat_sample_max = np.zeros( (num_exp, num_obs) )
+        self.alpha_sample_max = np.zeros( (num_exp, num_obs) )
+
+        self.x_bar = np.zeros( (num_exp, num_agents, num_obs) )
         self.rho = np.zeros( (num_exp, num_agents, num_obs) )
-        self.f_bar_sample_mean = np.zeros( num_exp, num_obs )
-        self.rho_sample_mean = np.zeros( num_exp, num_obs )
-        self.f_bar_sample_std = np.zeros( num_exp, num_obs )
-        self.rho_sample_std = np.zeros( num_exp, num_obs )
-        self.f_bar_sample_min = np.zeros( num_exp, num_obs )
-        self.rho_sample_min = np.zeros( num_exp, num_obs )
-        self.f_bar_sample_max = np.zeros( num_exp, num_obs )
-        self.rho_sample_max = np.zeros( num_exp, num_obs )
+        self.x_bar_sample_mean = np.zeros( (num_exp, num_obs) )
+        self.rho_sample_mean = np.zeros( (num_exp, num_obs) )
+        self.x_bar_sample_std = np.zeros( (num_exp, num_obs) )
+        self.rho_sample_std = np.zeros( (num_exp, num_obs) )
+        self.x_bar_sample_min = np.zeros( (num_exp, num_obs) )
+        self.rho_sample_min = np.zeros( (num_exp, num_obs) )
+        self.x_bar_sample_max = np.zeros( (num_exp, num_obs) )
+        self.rho_sample_max = np.zeros( (num_exp, num_obs) )
 
         self.x = np.zeros( (num_exp, num_agents, num_obs) )
-        self.fisher_inv = np.zeros( (num_exp, num_agents, num_obs) )
-        self.x_sample_mean = np.zeros( num_exp, num_obs )
-        self.fisher_inv_sample_mean = np.zeros( num_exp, num_obs )
-        self.x_sample_std = np.zeros( num_exp, num_obs )
-        self.fisher_inv_sample_std = np.zeros( num_exp, num_obs )
-        self.x_sample_min = np.zeros( num_exp, num_obs )
-        self.fisher_inv_sample_min = np.zeros( num_exp, num_obs )
-        self.x_sample_max = np.zeros( num_exp, num_obs )
-        self.fisher_inv_sample_max = np.zeros( num_exp, num_obs )
+        self.gamma = np.zeros( (num_exp, num_agents, num_obs) )
+        self.x_sample_mean = np.zeros( (num_exp, num_obs) )
+        self.gamma_sample_mean = np.zeros( (num_exp, num_obs) )
+        self.x_sample_std = np.zeros( (num_exp, num_obs) )
+        self.gamma_sample_std = np.zeros( (num_exp, num_obs) )
+        self.x_sample_min = np.zeros( (num_exp, num_obs) )
+        self.gamma_sample_min = np.zeros( (num_exp, num_obs) )
+        self.x_sample_max = np.zeros( (num_exp, num_obs) )
+        self.gamma_sample_max = np.zeros( (num_exp, num_obs) )
 
         # Setup up graph
+        self.comms_period = comms_period
+        self.comms_prob = comms_prob
         self.setup_comms_graph()
 
         self._create_agents()
@@ -289,10 +298,10 @@ class MultiAgentSim(Sim):
         comms_prob_eprop = self.comms_graph.new_edge_property("double") # returns an EdgePropertyMap object pointing to the comms_graph
 
         # TODO: allow for different comm probabilities
-        comms_prob_eprop.get_array()[:] = 1.0 # assign a probability of 1.0 to each edge
+        comms_prob_eprop.get_array()[:] = self.comms_prob # assign a probability of 1.0 to each edge
 
         # Internalize the property
-        self.comms_graph.edge_properties["comms_prob"] = comms_prob_eprop
+        self.comms_graph.comms_prob = comms_prob_eprop
 
     def _create_complete_graph(self):
         """Create a fully-connected graph.
@@ -321,11 +330,11 @@ class MultiAgentSim(Sim):
 
         for vertex in self.comms_graph.get_vertices():
             agents_vprop[vertex] = Agent(self.b_prob, self.w_prob,
-                                         (self.compute_x_hat, self.compute_fisher),
+                                         (self.compute_x_hat, self.compute_fisher_hat),
                                          (self.compute_x_bar, self.compute_fisher_bar),
-                                         self.compute_x)
+                                         (self.compute_x, self.compute_fisher))
 
-        self.comms_graph.vertex_properties["agents"] = agents_vprop # store into the comms graph
+        self.comms_graph.agents = agents_vprop # store into the comms graph
 
     def run(self, data_flag = False):
         self.run_sim()
@@ -340,81 +349,168 @@ class MultiAgentSim(Sim):
 
         if data_flag: self.write_data_to_csv()
 
-    def compute_sample_mean(self):
+    def compute_sample_mean(self, experiment_index):
+        """Compute the sample mean for the results per experiment.
 
-        self.f_hat_sample_mean = np.mean(self.f_hat, axis=0)
-        self.fisher_inv_sample_mean = np.mean(self.fisher_inv, axis=0)
+        Args:
+            experiment_index: Index of the experiment.
+        """
 
-    def compute_sample_std(self):
+        self.x_hat_sample_mean[experiment_index] = np.mean(self.x_hat[experiment_index], axis=0)
+        self.alpha_sample_mean[experiment_index] = np.mean(self.alpha[experiment_index], axis=0)
 
-        # TODO: should i be using the biased or unbiased variance here? sticking with the unbiased for now
-        self.f_hat_sample_std = np.std(self.f_hat, axis=0, ddof=1)
-        self.fisher_inv_sample_std = np.std(self.fisher_inv, axis=0, ddof=1)
+        self.x_bar_sample_mean[experiment_index] = np.mean(self.x_bar[experiment_index], axis=0)
+        self.rho_sample_mean[experiment_index] = np.mean(self.rho[experiment_index], axis=0)
 
-    def compute_sample_min(self):
+        self.x_sample_mean[experiment_index] = np.mean(self.x[experiment_index], axis=0)
+        self.gamma_sample_mean[experiment_index] = np.mean(self.gamma[experiment_index], axis=0)
 
-        self.f_hat_sample_min = np.amin(self.f_hat, axis=0)
-        self.fisher_inv_sample_min = np.amin(self.fisher_inv, axis=0)
+    def compute_sample_std(self, experiment_index):
+        """Compute the sample standard deviation for the results per experiment.
 
-    def compute_sample_max(self):
+        Args:
+            experiment_index: Index of the experiment.
+        """
 
-        self.f_hat_sample_max = np.amax(self.f_hat, axis=0)
-        self.fisher_inv_sample_max = np.amax(self.fisher_inv, axis=0)
+        self.x_hat_sample_std[experiment_index] = np.std(self.x_hat[experiment_index], axis=0, ddof=1)
+        self.alpha_sample_std[experiment_index] = np.std(self.alpha[experiment_index], axis=0, ddof=1)
 
-    def run_sim(self):
+        self.x_bar_sample_std[experiment_index] = np.std(self.x_bar[experiment_index], axis=0, ddof=1)
+        self.rho_sample_std[experiment_index] = np.std(self.rho[experiment_index], axis=0, ddof=1)
 
-        # TODO can use parallel here?
-        for exp_ind in range(self.num_exp):
+        self.x_sample_std[experiment_index] = np.std(self.x[experiment_index], axis=0, ddof=1)
+        self.gamma_sample_std[experiment_index] = np.std(self.gamma[experiment_index], axis=0, ddof=1)
 
-            # Generate tiles (bernoulli instances for each agent
-            tiles = self.generate_tiles()
+    def compute_sample_min(self, experiment_index):
+        """Compute the sample minimum for the results per experiment.
 
-            # Need period timing condition here to decide when to switch
-            # between observation and communication
-            comms_period = 5
-            curr_iteration = 0
-            observation_complete = False
+        Args:
+            experiment_index: Index of the experiment.
+        """
 
-            while curr_iteration < len(tiles[0]):
+        self.x_hat_sample_min[experiment_index] = np.amin(self.x_hat[experiment_index], axis=0)
+        self.alpha_sample_min[experiment_index] = np.amin(self.alpha[experiment_index], axis=0)
 
-                # Execute observation phase
-                local_values = self.run_observation_phase(tiles[:, curr_iteration])
+        self.x_bar_sample_min[experiment_index] = np.amin(self.x_bar[experiment_index], axis=0)
+        self.rho_sample_min[experiment_index] = np.amin(self.rho[experiment_index], axis=0)
 
-                # Execute communication phase
-                if curr_iteration % comms_period == 0:
-                    self.run_communication_phase()
-                    pass
+        self.x_sample_min[experiment_index] = np.amin(self.x[experiment_index], axis=0)
+        self.gamma_sample_min[experiment_index] = np.amin(self.gamma[experiment_index], axis=0)
 
-                # Store collected data
+    def compute_sample_max(self, experiment_index):
+        """Compute the sample maximum for the results per experiment.
 
-                curr_iteration += 1
+        Args:
+            experiment_index: Index of the experiment.
+        """
 
+        self.x_hat_sample_max[experiment_index] = np.amax(self.x_hat[experiment_index], axis=0)
+        self.alpha_sample_max[experiment_index] = np.amax(self.alpha[experiment_index], axis=0)
 
-            # Collect mean x_hat and std dev values
-            np.mean()
+        self.x_bar_sample_max[experiment_index] = np.amax(self.x_bar[experiment_index], axis=0)
+        self.rho_sample_max[experiment_index] = np.amax(self.rho[experiment_index], axis=0)
 
-            # Collect mean alpha and std dev values
+        self.x_sample_max[experiment_index] = np.amax(self.x[experiment_index], axis=0)
+        self.gamma_sample_max[experiment_index] = np.amax(self.gamma[experiment_index], axis=0)
 
-            # Collect mean x_bar and std dev values
+    def run(self, data_flag=False):
 
-            # Reset agents
-            for v in self.comms_graph.vertices():
-                self.comms_graph.agents[v].reset()
+        # TODO can i use parallel here?
+        for e in range(self.num_exp):
+            self.run_sim(e)
+
+            self.compute_sample_mean(e)
+
+            self.compute_sample_std(e)
+
+            self.compute_sample_min(e)
+
+            self.compute_sample_max(e)
+
+            self.reset_agents()
+
+            # if data_flag: self.write_data_to_csv()
+
+    def run_sim(self, experiment_index):
+
+        # Generate tiles (bernoulli instances for each agent
+        self.tiles[experiment_index] = self.generate_tiles(self.num_agents)
+
+        # Need period timing condition here to decide when to switch
+        # between observation and communication
+        curr_iteration = 0
+
+        # Temporary data storage
+        local_obs = []
+        local_avg_black_obs = []
+
+        local_x = []
+        local_conf = []
+
+        social_x = []
+        social_conf = []
+
+        informed_x = []
+        informed_conf = []
+
+        # Go through each tile observation
+        while curr_iteration < self.num_obs:
+
+            # Execute observation phase
+            local_obs_dict, local_val_dict = self.run_observation_phase(self.tiles[experiment_index][:, curr_iteration])
+
+            local_obs.append(local_obs_dict["curr_obs"])
+            local_avg_black_obs.append(local_obs_dict["avg_black_obs"])
+
+            local_x.append(local_val_dict["x"])
+            local_conf.append(local_val_dict["conf"])
+
+            # Execute communication phase
+            if curr_iteration % self.comms_period == 0:
+                social_val_dict, informed_val_dict = self.run_communication_phase()
+
+                social_x.append(social_val_dict["x"])
+                social_conf.append(social_val_dict["x"])
+
+                informed_x.append(informed_val_dict["x"])
+                informed_conf.append(informed_val_dict["x"])
+
+            curr_iteration += 1
+
+        # Store observations and average black tile observations into log
+        self.agent_obs[experiment_index] = np.asarray(local_obs).T
+        self.agent_avg_black_obs[experiment_index] = np.asarray(local_avg_black_obs).T
+
+        # Store of local estimates and confidences into log
+        self.x_hat[experiment_index] = np.asarray(local_x).T
+        self.alpha[experiment_index] = np.asarray(local_conf).T
+
+        # Store social estimates and confidences into log
+        self.x_bar[experiment_index] = np.asarray(local_x).T
+        self.rho[experiment_index] = np.asarray(local_conf).T
+
+        # Store informed estimates and confidences into log
+        self.x[experiment_index] = np.asarray(local_x).T
+        self.gamma[experiment_index] = np.asarray(local_conf).T
 
     def run_communication_phase(self):
-        """Make agents communicate.
+        """Execute one round of communication for all agents.
+
+        Returns:
+            A dict containing a record of social estimations and confidences 
+            and a dict containing a record of informed estimations and confidences.
         """
 
         social_values = {"x": [], "conf": []}
-        informed_values = {"x": []}
+        informed_values = {"x": [], "conf": []}
 
         # Make agents communicate
         for e in self.comms_graph.edges():
 
             # Apply probabilistic communication (currently only applicable to undirected graphs)
             if random.random() < self.comms_graph.comms_prob[e]:
-                a1 = self.comms_graph.agents(e.source())
-                a2 = self.comms_graph.agents(e.target())
+                a1 = self.comms_graph.agents[e.source()]
+                a2 = self.comms_graph.agents[e.target()]
 
                 a1.communicate_rx( a2.communicate_tx() )
                 a2.communicate_rx( a1.communicate_tx() )
@@ -429,16 +525,21 @@ class MultiAgentSim(Sim):
             social_values["x"].append(agent.get_x_bar())
             social_values["conf"].append(agent.get_rho())
             informed_values["x"].append(agent.get_x())
+            informed_values["conf"].append(agent.get_gamma())
 
         return social_values, informed_values
 
     def run_observation_phase(self, tiles):
-        """Make agents observe their tiles.
+        """Execute one round of observation for all agents.
+
+        Each agents will observe one tile from their observation reel.
 
         Returns:
-            A dict containing a record of agent estimations after local observations.
+            A dict containing a record of observations and a dict containing a record of
+            agent estimations after local observations.
         """
 
+        local_obs = {"curr_obs": [], "avg_black_obs": []}
         local_values = {"x": [], "conf": []}
 
         # Iterate through each agent to observe
@@ -449,19 +550,27 @@ class MultiAgentSim(Sim):
             agent.observe(tiles[ind], self.observe_color)
 
             # Collect local agent values
+            local_obs["curr_obs"].append(agent.get_curr_obs())
+            local_obs["avg_black_obs"].append(agent.get_avg_black_obs())
+
             local_values["x"].append(agent.get_x_hat())
             local_values["conf"].append(agent.get_alpha())
 
-        return local_values
+        return local_obs, local_values
+
+    def reset_agents(self):
+
+        # Reset agents
+        for v in self.comms_graph.vertices():
+            self.comms_graph.agents[v].reset()
 
 class Agent:
 
-    def __init__(self, p_b_b, p_w_w, local_functions, social_functions, primal_function):
+    def __init__(self, p_b_b, p_w_w, local_functions, social_functions, primal_functions):
 
         self.b_prob = p_b_b
         self.w_prob = p_w_w
 
-        self.obs_lst = [] # should the agent remember the entire history of its observations...?
         self.total_b_tiles_obs = 0
         self.total_obs = 0
 
@@ -470,11 +579,10 @@ class Agent:
 
         self.local_solver = self.LocalSolver(*local_functions)
         self.social_solver = self.SocialSolver(*social_functions)
-        self.primal_solver = self.PrimalSolver(primal_function)
+        self.primal_solver = self.PrimalSolver(*primal_functions)
 
     def reset(self):
 
-        self.obs_lst = [] # should the agent remember the entire history of its observations...?
         self.total_b_tiles_obs = 0
         self.total_obs = 0
 
@@ -484,8 +592,6 @@ class Agent:
         self.local_solver = self.local_solver.reset()
         self.social_solver = self.social_solver.reset()
         self.primal_solver = self.primal_solver.reset()
-
-        pass
 
     def observe(self, encounter, obs_function):
 
@@ -502,7 +608,6 @@ class Agent:
         obs = obs_function(encounter, sensor_prob)
 
         self.curr_obs = obs
-        self.obs_lst.append(obs)
         self.total_b_tiles_obs += obs
         self.total_obs += 1
 
@@ -561,6 +666,12 @@ class Agent:
 
     def get_x(self): return self.primal_solver.x
 
+    def get_gamma(self): return self.primal_solver.conf
+
+    def get_curr_obs(self): return self.curr_obs
+
+    def get_avg_black_obs(self): return self.total_b_tiles_obs / self.total_obs
+
     class LocalSolver:
 
         def __init__(self, est_func, conf_func):
@@ -609,19 +720,24 @@ class Agent:
 
     class PrimalSolver:
 
-        def __init__(self, primal_func):
+        def __init__(self, primal_est_func, primal_conf_func):
             self.x = 0.0
-            self.primal_func = primal_func
+            self.conf = 0.0
+
+            self.primal_est_func = primal_est_func
+            self.primal_conf_func = primal_conf_func
 
         def reset(self):
             self.x = 0.0
+            self.conf = 0.0
 
         def solve(self, local_est, local_conf, social_est, social_conf):
             """Compute the combined estimate.
             """
 
             # Compute the informed estimate
-            self.x = self.primal_func(local_est, local_conf, social_est, social_conf)
+            self.x = self.primal_est_func(local_est, local_conf, social_est, social_conf)
+            self.conf = self.primal_conf_func(local_conf, social_conf)
 
 class HeatmapData:
     """Class to store and process heatmap data
@@ -708,6 +824,7 @@ class HeatmapRow:
         self.fisher_inv_min = []
         self.fisher_inv_max = []
 
+    # TODO: update variable names to use alpha instead of fisher_inv
     def populate(self, single_agent_sim_obj: SingleAgentSim):
         """Populate data given SingleAgentSim object.
         """
@@ -724,13 +841,32 @@ class HeatmapRow:
 
     def populate(self, multi_agent_sim_obj: MultiAgentSim):
 
-        self.f_hat_mean.append( multi_agent_sim_obj.f_hat_sample_mean[-1] )
-        self.f_hat_min.append( multi_agent_sim_obj.f_hat_sample_min[-1] )
-        self.f_hat_max.append( multi_agent_sim_obj.f_hat_sample_max[-1] )
+        # Collect local analytics
+        self.x_hat_mean.append( multi_agent_sim_obj.x_hat_sample_mean[-1] )
+        self.x_hat_min.append( multi_agent_sim_obj.x_hat_sample_min[-1] )
+        self.x_hat_max.append( multi_agent_sim_obj.x_hat_sample_max[-1] )
 
-        self.fisher_inv_mean.append( multi_agent_sim_obj.fisher_inv_sample_mean[-1] )
-        self.fisher_inv_min.append( multi_agent_sim_obj.fisher_inv_sample_min[-1] )
-        self.fisher_inv_max.append( multi_agent_sim_obj.fisher_inv_sample_max[-1] )
+        self.alpha_mean.append( multi_agent_sim_obj.alpha_sample_mean[-1] )
+        self.alpha_min.append( multi_agent_sim_obj.alpha_sample_min[-1] )
+        self.alpha_max.append( multi_agent_sim_obj.alpha_sample_max[-1] )
+
+        # Collect social analytics
+        self.x_bar_mean.append( multi_agent_sim_obj.x_bar_sample_mean[-1] )
+        self.x_bar_min.append( multi_agent_sim_obj.x_bar_sample_min[-1] )
+        self.x_bar_max.append( multi_agent_sim_obj.x_bar_sample_max[-1] )
+
+        self.rho_mean.append( multi_agent_sim_obj.rho_sample_mean[-1] )
+        self.rho_min.append( multi_agent_sim_obj.rho_sample_min[-1] )
+        self.rho_max.append( multi_agent_sim_obj.rho_sample_max[-1] )
+
+        # Collect informed analytics
+        self.x_mean.append( multi_agent_sim_obj.x_sample_mean[-1] )
+        self.x_min.append( multi_agent_sim_obj.x_sample_min[-1] )
+        self.x_max.append( multi_agent_sim_obj.x_sample_max[-1] )
+
+        self.gamma_mean.append( multi_agent_sim_obj.gamma_sample_mean[-1] )
+        self.gamma_min.append( multi_agent_sim_obj.gamma_sample_min[-1] )
+        self.gamma_max.append( multi_agent_sim_obj.gamma_sample_max[-1] )
 
         self.avg_f = multi_agent_sim_obj.avg_fill_ratio
         pass
@@ -758,6 +894,8 @@ class SimParam:
         try:
             self.num_agents = int(yaml_config["numAgents"])
             self.comms_graph_str = yaml_config["commsGraph"]["type"]
+            self.comms_period = yaml_config["commsGraph"]["commsPeriod"]
+            self.comms_prob = yaml_config["commsGraph"]["commsProb"]
         except Exception as e:
             pass
 

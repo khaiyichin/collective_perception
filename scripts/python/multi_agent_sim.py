@@ -13,6 +13,9 @@ Want to test/break the following assumptions:
 - communicate after each observation
 """
 
+# TODO:
+# pickling files vs protobuf vs csv? (you can serialize then write to csv also)
+
 def create_data_folder():
     """Create a folder named data and use it as the working directory.
     """
@@ -81,17 +84,17 @@ def parse_yaml_param_file(yaml_filepath):
 
 if __name__ == "__main__":
 
-    # 'num_agents', 'num_exp', 'num_obs', 'des_fill_ratio', 'b_prob', 'w_prob', and 'main_f_suffix'
-    sample_init_params = [4, 2, 10, 0.75, 0.9, 0.9, 'dummy-debug']
+    # 'num_agents', 'num_exp', 'num_obs', 'des_fill_ratio', 'b_prob', 'w_prob', 'comms_period', and 'main_f_suffix'
+    # sample_init_params = [4, 2, 10, 0.75, 0.9, 0.9, 1, 'dummy-debug']
 
     # Parse simulation parameters
-    param_obj = parse_yaml_param_file("param_single_agent_sim.yaml")
+    param_obj = parse_yaml_param_file("param_multi_agent_sim.yaml")
 
     # Create a folder to store simulation data
     create_simulation_folder(param_obj.full_suffix)
 
     # Create a HeatmapData object to process heatmap data
-    hm = HeatmapData(param_obj)
+    # hm = HeatmapData(param_obj)
 
     for f in param_obj.dfr_range: # iterate through each desired fill ratio
 
@@ -105,18 +108,16 @@ if __name__ == "__main__":
             s = MultiAgentSim(param_obj.num_agents,
                               param_obj.num_exp,
                               param_obj.num_obs,
-                              f, p, p, param_obj.filename_suffix_1)
+                              f, p, p, 1, 1.0, param_obj.filename_suffix_1)
             s.run(param_obj.write_all) # run the single agent simulation
 
-            hr.populate(s) # populate one heatmap row for both f_hat and fisher_inv
+            # hr.populate(s) # populate one heatmap row for both f_hat and fisher_inv
 
             print("Done!")
             
-        hm.compile_data(hr)
+        # hm.compile_data(hr)
 
     # Write completed heatmap data to CSV files
-    hm.write_data_to_csv()
+    # hm.write_data_to_csv()
 
     print("\nSimulation complete!")
-
-    s = MultiAgentSim(*sample_init_params)
