@@ -95,13 +95,11 @@ for exp_ind = 1:n_experiments
         end
 
         % Solve primal function (analytical form exists)
-        if obs_ind ~= n_obs
-            x(:, obs_ind+1, exp_ind) = ...
-                solve_f_x(x_hat(:, obs_ind, exp_ind),... % local estimate
-                          x_bar(:, obs_ind, exp_ind),... % social estimate
-                          1./fisher_inv(:, obs_ind, exp_ind),... % local fisher info (alpha)
-                          1./fisher_inv_bar(:, obs_ind, exp_ind)); % social fisher info (rho)
-        end
+        x(:, obs_ind, exp_ind) = ...
+            solve_f_x(x_hat(:, obs_ind, exp_ind),... % local estimate
+                      x_bar(:, obs_ind, exp_ind),... % social estimate
+                      1./fisher_inv(:, obs_ind, exp_ind),... % local fisher info (alpha)
+                      1./fisher_inv_bar(:, obs_ind, exp_ind)); % social fisher info (rho)
     end
 end
 

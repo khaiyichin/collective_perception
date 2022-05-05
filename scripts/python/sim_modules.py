@@ -97,9 +97,9 @@ class Sim:
         return np.mean(x_arr)
 
     def compute_fisher_bar(self, fisher_arr):
-        return np.mean( np.reciprocal( fisher_arr ) )
+        return np.reciprocal( np.mean( np.reciprocal( fisher_arr ) ) )
 
-    def compute_x(self, x_hat, x_bar, alpha, rho): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
+    def compute_x(self, x_hat, alpha, x_bar, rho): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
         return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
 
     def compute_fisher(self, alpha, rho):
@@ -473,10 +473,10 @@ class MultiAgentSim(Sim):
                 social_val_dict, informed_val_dict = self.run_communication_phase()
 
                 social_x.append(social_val_dict["x"])
-                social_conf.append(social_val_dict["x"])
+                social_conf.append(social_val_dict["conf"])
 
                 informed_x.append(informed_val_dict["x"])
-                informed_conf.append(informed_val_dict["x"])
+                informed_conf.append(informed_val_dict["conf"])
 
             curr_iteration += 1
 
@@ -489,12 +489,12 @@ class MultiAgentSim(Sim):
         self.alpha[experiment_index] = np.asarray(local_conf).T
 
         # Store social estimates and confidences into log
-        self.x_bar[experiment_index] = np.asarray(local_x).T
-        self.rho[experiment_index] = np.asarray(local_conf).T
+        self.x_bar[experiment_index] = np.asarray(social_x).T
+        self.rho[experiment_index] = np.asarray(social_conf).T
 
         # Store informed estimates and confidences into log
-        self.x[experiment_index] = np.asarray(local_x).T
-        self.gamma[experiment_index] = np.asarray(local_conf).T
+        self.x[experiment_index] = np.asarray(informed_x).T
+        self.gamma[experiment_index] = np.asarray(informed_conf).T
 
     def run_communication_phase(self):
         """Execute one round of communication for all agents.
