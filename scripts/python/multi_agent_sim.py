@@ -1,4 +1,4 @@
-from sim_modules import MultiAgentSim, Agent, HeatmapData, HeatmapRow, SimParam
+from sim_modules import MultiAgentSim, MultiAgentSimData, SimParam
 
 import numpy as np
 import os
@@ -33,7 +33,7 @@ def create_data_folder():
         except Exception:
             pass
 
-def create_simulation_folder(suffix):
+def create_simulation_folder(suffix, curr_time):
     """Create a simulation folder within the `data` directory.
     """
 
@@ -41,7 +41,6 @@ def create_simulation_folder(suffix):
     create_data_folder()
 
     # Define folder name
-    curr_time = datetime.now().strftime("%m%d%Y_%H%M%S")
     folder_name = curr_time + suffix
 
     # Create folder to store simulation data based on current datetime if doesn't exist (shouldn't exist, really)
@@ -87,37 +86,33 @@ if __name__ == "__main__":
     # 'num_agents', 'num_exp', 'num_obs', 'des_fill_ratio', 'b_prob', 'w_prob', 'comms_period', and 'main_f_suffix'
     # sample_init_params = [4, 2, 10, 0.75, 0.9, 0.9, 1, 'dummy-debug']
 
+    # Obtain timestamp
+    curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
+
     # Parse simulation parameters
     param_obj = parse_yaml_param_file("param_multi_agent_sim.yaml")
 
     # Create a folder to store simulation data
-    create_simulation_folder(param_obj.full_suffix)
+    create_simulation_folder(param_obj.full_suffix, curr_time)
 
     # Create a HeatmapData object to process heatmap data
-    # hm = HeatmapData(param_obj)
+    data = MultiAgentSimData(param_obj)
 
     for f in param_obj.dfr_range: # iterate through each desired fill ratio
 
-        # Create HeatmapRow object
-        hr = HeatmapRow()
         print("\nRunning cases with fill ratio = " + str(f))
         
         for p in param_obj.sp_range: # iterate through each sensor probabilities
             print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
 
-            s = MultiAgentSim(param_obj.num_agents,
-                              param_obj.num_exp,
-                              param_obj.num_obs,
-                              f, p, p, 1, 1.0, param_obj.filename_suffix_1)
-            s.run(param_obj.write_all) # run the single agent simulation
+            s = MultiAgentSim(param_obj, f, p)
+            s.run() # run the single agent simulation
 
             # hr.populate(s) # populate one heatmap row for both f_hat and fisher_inv
+            data.insert_sim_obj(f, p, s) # store completed simulation object into
 
             print("Done!")
-            
-        # hm.compile_data(hr)
 
-    # Write completed heatmap data to CSV files
-    # hm.write_data_to_csv()
+    data.save(curr_time) # serialize and store data
 
     print("\nSimulation complete!")

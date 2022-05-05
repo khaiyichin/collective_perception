@@ -6,6 +6,8 @@ import graph_tool as gt
 import graph_tool.generation as gt_gen
 import graph_tool.stats as gt_stats
 import random
+import pickle
+import os
 
 BLACK_TILE = 1
 WHITE_TILE = 0
@@ -233,13 +235,17 @@ class SingleAgentSim(Sim):
 
 class MultiAgentSim(Sim):
 
-    def __init__(self, num_agents, num_exp, num_obs, des_fill_ratio, b_prob, w_prob, comms_period, comms_prob, main_f_suffix):
+    def __init__(self, sim_param_obj, des_fill_ratio, sensor_prob):
 
-        super().__init__(num_exp, num_obs, des_fill_ratio, main_f_suffix)
+        num_agents = sim_param_obj.num_agents
+        num_exp = sim_param_obj.num_exp
+        num_obs = sim_param_obj.num_obs
+
+        super().__init__(num_exp, num_obs, des_fill_ratio, sim_param_obj.filename_suffix_1)
 
         # Define fixed parameters for the MultiAgentSim instance
-        self.b_prob = b_prob # P(black|black)
-        self.w_prob = w_prob # P(white|white)
+        self.b_prob = sensor_prob # P(black|black)
+        self.w_prob = sensor_prob # P(white|white)
         self.tiles = np.zeros( (num_exp, num_agents, num_obs) )
         self.num_agents = num_agents
 
@@ -282,12 +288,11 @@ class MultiAgentSim(Sim):
         self.gamma_sample_max = np.zeros( (num_exp, num_obs) )
 
         # Setup up graph
-        self.comms_period = comms_period
-        self.comms_prob = comms_prob
+        self.comms_period = sim_param_obj.comms_period
+        self.comms_prob = sim_param_obj.comms_prob
         self.setup_comms_graph()
 
         self._create_agents()
-        pass
 
     def setup_comms_graph(self):
 
@@ -336,7 +341,7 @@ class MultiAgentSim(Sim):
 
         self.comms_graph.agents = agents_vprop # store into the comms graph
 
-    def run(self, data_flag = False):
+    def run(self):
         self.run_sim()
 
         self.compute_sample_mean()
@@ -346,8 +351,6 @@ class MultiAgentSim(Sim):
         self.compute_sample_min()
 
         self.compute_sample_max()
-
-        if data_flag: self.write_data_to_csv()
 
     def compute_sample_mean(self, experiment_index):
         """Compute the sample mean for the results per experiment.
@@ -589,9 +592,9 @@ class Agent:
         self.comms_round_collected_est = []
         self.comms_round_collected_conf = []
 
-        self.local_solver = self.local_solver.reset()
-        self.social_solver = self.social_solver.reset()
-        self.primal_solver = self.primal_solver.reset()
+        self.local_solver.reset()
+        self.social_solver.reset()
+        self.primal_solver.reset()
 
     def observe(self, encounter, obs_function):
 
@@ -738,6 +741,71 @@ class Agent:
             # Compute the informed estimate
             self.x = self.primal_est_func(local_est, local_conf, social_est, social_conf)
             self.conf = self.primal_conf_func(local_conf, social_conf)
+
+class MultiAgentSimData:
+    """Class to store multi-agent simulations.
+
+    An instance of this class stores multi-agent simulation objects that span all the desired
+    fill ratio range and the desired sensor probabilities.
+    """
+
+    def __init__(self, sim_param_obj):
+
+        self.num_agents = sim_param_obj.num_agents
+        self.num_exp = sim_param_obj.num_exp
+        self.num_obs = sim_param_obj.num_obs
+        self.comms_period = sim_param_obj.comms_period
+        self.comms_prob = sim_param_obj.comms_prob
+        self.dfr_range = sim_param_obj.dfr_range
+        self.sp_range = sim_param_obj.sp_range
+        self.sim_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range]
+
+    def insert_sim_obj(self, des_fill_ratio, sensor_prob, sim_obj):
+
+        ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
+        ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
+
+        self.sim_obj_lst[ind_dfr][ind_sp] = sim_obj
+
+    def get_sim_obj(self, des_fill_ratio, sensor_prob):
+
+        ind_dfr = np.where(self.dfr_range == des_fill_ratio)
+        ind_sp =  np.where(self.sp_range == sensor_prob)
+
+        return self.sim_obj_lst[ind_dfr][ind_sp]
+
+    # TODO: protobuf maybe? since the argos implementation will need that?
+    def save(self, curr_time=None, filepath=None):
+        """Serialize and save data.
+        """
+
+        # Get current time
+        if curr_time is None:
+            curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
+
+        if filepath:
+            root, ext = os.path.splitext(filepath)
+            save_path = root + "_" + curr_time + ext
+        else:
+            save_path = "multi_agent_sim_data_" + curr_time + ".pkl"
+
+        with open(save_path, "wb") as fopen:
+            pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
+
+        print( "\nSaved multi-agent sim data at: {0}.\n".format( os.path.abspath(save_path) ) )
+
+    @classmethod
+    def load(cls, filepath):
+        """Load serialized data.
+        """
+
+        with open(filepath, 'rb') as fopen:
+            obj = pickle.load(fopen)
+
+        # Verify the unpickled object
+        assert isinstance(obj, cls)
+
+        return obj
 
 class HeatmapData:
     """Class to store and process heatmap data
@@ -906,15 +974,22 @@ class SimParam:
         """
 
         # Compute increment step sizes
-        sensor_prob_inc = self.sp_range[1] - self.sp_range[0]
-        fill_ratio_inc = self.dfr_range[1] - self.dfr_range[0]
+        if len(self.sp_range) == 1:
+            sensor_prob_inc = 0
+        else:
+            sensor_prob_inc = self.sp_range[1] - self.sp_range[0]
+
+        if len(self.dfr_range) == 1:
+            fill_ratio_inc = 0
+        else:
+            fill_ratio_inc = self.dfr_range[1] - self.dfr_range[0]
 
         # Define filename descriptors
         min_sensor_prob, max_sensor_prob = int(self.sp_range[0]*1e2), int(self.sp_range[-1]*1e2)
         min_des_fill_ratio, max_des_fill_ratio = int(self.dfr_range[0]*1e2), int(self.dfr_range[-1]*1e2)
         p_inc, f_inc = int(sensor_prob_inc*1e2), int(fill_ratio_inc*1e2)
 
-        self.filename_suffix_1 = "_c" +str(self.num_exp) + "_o" + str(self.num_obs) # describing number of experiments and observations
+        self.filename_suffix_1 = "_e" +str(self.num_exp) + "_o" + str(self.num_obs) # describing number of experiments and observations
 
         prob_suffix = "_p" + str(min_sensor_prob) + "-" + str(p_inc) + "-" + str(max_sensor_prob)
         f_suffix = "_f" + str(min_des_fill_ratio) + "-" + str(f_inc) + "-" + str(max_des_fill_ratio)
