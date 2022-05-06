@@ -240,6 +240,7 @@ class MultiAgentSim(Sim):
         num_agents = sim_param_obj.num_agents
         num_exp = sim_param_obj.num_exp
         num_obs = sim_param_obj.num_obs
+        comms_period = sim_param_obj.comms_period
 
         super().__init__(num_exp, num_obs, des_fill_ratio, sim_param_obj.filename_suffix_1)
 
@@ -265,31 +266,31 @@ class MultiAgentSim(Sim):
         self.x_hat_sample_max = np.zeros( (num_exp, num_obs) )
         self.alpha_sample_max = np.zeros( (num_exp, num_obs) )
 
-        self.x_bar = np.zeros( (num_exp, num_agents, num_obs) )
-        self.rho = np.zeros( (num_exp, num_agents, num_obs) )
-        self.x_bar_sample_mean = np.zeros( (num_exp, num_obs) )
-        self.rho_sample_mean = np.zeros( (num_exp, num_obs) )
-        self.x_bar_sample_std = np.zeros( (num_exp, num_obs) )
-        self.rho_sample_std = np.zeros( (num_exp, num_obs) )
-        self.x_bar_sample_min = np.zeros( (num_exp, num_obs) )
-        self.rho_sample_min = np.zeros( (num_exp, num_obs) )
-        self.x_bar_sample_max = np.zeros( (num_exp, num_obs) )
-        self.rho_sample_max = np.zeros( (num_exp, num_obs) )
+        self.x_bar = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
+        self.rho = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
+        self.x_bar_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
+        self.rho_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
+        self.x_bar_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+        self.rho_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+        self.x_bar_sample_min = np.zeros( (num_exp, num_obs//comms_period) )
+        self.rho_sample_min = np.zeros( (num_exp, num_obs//comms_period) )
+        self.x_bar_sample_max = np.zeros( (num_exp, num_obs//comms_period) )
+        self.rho_sample_max = np.zeros( (num_exp, num_obs//comms_period) )
 
-        self.x = np.zeros( (num_exp, num_agents, num_obs) )
-        self.gamma = np.zeros( (num_exp, num_agents, num_obs) )
-        self.x_sample_mean = np.zeros( (num_exp, num_obs) )
-        self.gamma_sample_mean = np.zeros( (num_exp, num_obs) )
-        self.x_sample_std = np.zeros( (num_exp, num_obs) )
-        self.gamma_sample_std = np.zeros( (num_exp, num_obs) )
-        self.x_sample_min = np.zeros( (num_exp, num_obs) )
-        self.gamma_sample_min = np.zeros( (num_exp, num_obs) )
-        self.x_sample_max = np.zeros( (num_exp, num_obs) )
-        self.gamma_sample_max = np.zeros( (num_exp, num_obs) )
+        self.x = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
+        self.gamma = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
+        self.x_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
+        self.gamma_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
+        self.x_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+        self.gamma_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+        self.x_sample_min = np.zeros( (num_exp, num_obs//comms_period) )
+        self.gamma_sample_min = np.zeros( (num_exp, num_obs//comms_period) )
+        self.x_sample_max = np.zeros( (num_exp, num_obs//comms_period) )
+        self.gamma_sample_max = np.zeros( (num_exp, num_obs//comms_period) )
 
         # Setup up graph
         self.graph_type = sim_param_obj.comms_graph_str
-        self.comms_period = sim_param_obj.comms_period
+        self.comms_period = comms_period
         self.comms_prob = sim_param_obj.comms_prob
         self.setup_comms_graph()
 
@@ -477,7 +478,7 @@ class MultiAgentSim(Sim):
             local_conf.append(local_val_dict["conf"])
 
             # Execute communication phase
-            if curr_iteration % self.comms_period == 0:
+            if (curr_iteration+1) % self.comms_period == 0:
                 social_val_dict, informed_val_dict = self.run_communication_phase()
 
                 social_x.append(social_val_dict["x"])

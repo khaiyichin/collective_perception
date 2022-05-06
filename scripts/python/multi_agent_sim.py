@@ -106,7 +106,7 @@ if __name__ == "__main__":
             print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
 
             s = MultiAgentSim(param_obj, f, p)
-            s.run() # run the single agent simulation
+            s.run() # run the multi agent simulation
 
             # hr.populate(s) # populate one heatmap row for both f_hat and fisher_inv
             data.insert_sim_obj(f, p, s) # store completed simulation object into
