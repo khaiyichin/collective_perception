@@ -288,6 +288,7 @@ class MultiAgentSim(Sim):
         self.gamma_sample_max = np.zeros( (num_exp, num_obs) )
 
         # Setup up graph
+        self.graph_type = sim_param_obj.comms_graph_str
         self.comms_period = sim_param_obj.comms_period
         self.comms_prob = sim_param_obj.comms_prob
         self.setup_comms_graph()
@@ -297,7 +298,14 @@ class MultiAgentSim(Sim):
     def setup_comms_graph(self):
 
         # Add edges depending on the type of graph desired
-        self.comms_graph = self._create_complete_graph() # TODO: use the complete graph as a test case for now but should have parameter here
+        if self.graph_type == "full":
+            self.comms_graph = self._create_complete_graph() # TODO: use the complete graph as a test case for now but should have parameter here
+        elif self.graph_type == "line":
+            self.comms_graph = self._create_line_graph()
+        elif self.graph_type == "ring":
+            self.comms_graph = self._create_ring_graph()
+        elif self.graph_type == "scale-free":
+            self.comms_graph = self._create_scale_free_graph()
 
         # Add a new property map for communication probabilities
         comms_prob_eprop = self.comms_graph.new_edge_property("double") # returns an EdgePropertyMap object pointing to the comms_graph
@@ -754,6 +762,7 @@ class MultiAgentSimData:
         self.num_agents = sim_param_obj.num_agents
         self.num_exp = sim_param_obj.num_exp
         self.num_obs = sim_param_obj.num_obs
+        self.graph_type = sim_param_obj.comms_graph_str
         self.comms_period = sim_param_obj.comms_period
         self.comms_prob = sim_param_obj.comms_prob
         self.dfr_range = sim_param_obj.dfr_range
@@ -944,26 +953,26 @@ class SimParam:
     def __init__(self, yaml_config):
 
         # Common parameters
-        dfr_min = yaml_config["desFillRatios"]["min"]
-        dfr_max = yaml_config["desFillRatios"]["max"]
-        dfr_inc = yaml_config["desFillRatios"]["incSteps"]
+        dfr_min = float(yaml_config["desFillRatios"]["min"])
+        dfr_max = float(yaml_config["desFillRatios"]["max"])
+        dfr_inc = int(yaml_config["desFillRatios"]["incSteps"])
 
-        sp_min = yaml_config["sensorProb"]["min"]
-        sp_max = yaml_config["sensorProb"]["max"]
-        sp_inc = yaml_config["sensorProb"]["incSteps"]
+        sp_min = float(yaml_config["sensorProb"]["min"])
+        sp_max = float(yaml_config["sensorProb"]["max"])
+        sp_inc = int(yaml_config["sensorProb"]["incSteps"])
 
         self.sp_range  = np.round(np.linspace(sp_min, sp_max, sp_inc), 3)
         self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3)
-        self.num_obs = yaml_config["numObs"]
-        self.num_exp = yaml_config["numExperiments"]
+        self.num_obs = int(yaml_config["numObs"])
+        self.num_exp = int(yaml_config["numExperiments"])
         self.write_all = yaml_config["writeAllData"]
 
         # Multi-agent simulation parameters
         try:
             self.num_agents = int(yaml_config["numAgents"])
             self.comms_graph_str = yaml_config["commsGraph"]["type"]
-            self.comms_period = yaml_config["commsGraph"]["commsPeriod"]
-            self.comms_prob = yaml_config["commsGraph"]["commsProb"]
+            self.comms_period = int(yaml_config["commsGraph"]["commsPeriod"])
+            self.comms_prob = float(yaml_config["commsGraph"]["commsProb"])
         except Exception as e:
             pass
 
