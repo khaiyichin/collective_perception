@@ -778,8 +778,8 @@ class MultiAgentSimData:
 
     def get_sim_obj(self, des_fill_ratio, sensor_prob):
 
-        ind_dfr = np.where(self.dfr_range == des_fill_ratio)
-        ind_sp =  np.where(self.sp_range == sensor_prob)
+        ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
+        ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
 
         return self.sim_obj_lst[ind_dfr][ind_sp]
 
