@@ -19,9 +19,6 @@ if __name__ == "__main__":
         # for future loading of other types of data
         pass
 
-    # Verify that the data is correct
-    assert( len(data.sim_obj_lst[0])*len(data.sim_obj_lst) == len(data.dfr_range)*len(data.sp_range) )
-
     print("\nSerialized Data Properties:\n")
     
     print("\tType:\t\t\t\t\t{0}".format(data_type))

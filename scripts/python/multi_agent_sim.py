@@ -4,17 +4,9 @@ import numpy as np
 import os
 import yaml
 from datetime import datetime
-
-
-"""
-Want to test/break the following assumptions:
-- full communication with all agents (graph comm probability =/= 1.0)
-- same sensor quality among all agents
-- communicate after each observation
-"""
-
-# TODO:
-# pickling files vs protobuf vs csv? (you can serialize then write to csv also)
+from joblib import Parallel, delayed
+import timeit
+import argparse
 
 def create_data_folder():
     """Create a folder named data and use it as the working directory.
@@ -81,10 +73,24 @@ def parse_yaml_param_file(yaml_filepath):
 
     return param_obj
 
+def run_sim_parallel(param_obj, target_fill_ratio):
+    print("\nRunning cases with fill ratio = " + str(target_fill_ratio))
+
+    outputs = []
+
+    for p in param_obj.sp_range: # iterate through each sensor probabilities
+        s = MultiAgentSim(param_obj, target_fill_ratio, p)
+        s.run() # run the multi agent simulation
+
+        outputs.append((target_fill_ratio, p, s))
+
+    return outputs
+
 if __name__ == "__main__":
 
-    # 'num_agents', 'num_exp', 'num_obs', 'des_fill_ratio', 'b_prob', 'w_prob', 'comms_period', and 'main_f_suffix'
-    # sample_init_params = [4, 2, 10, 0.75, 0.9, 0.9, 1, 'dummy-debug']
+    parser = argparse.ArgumentParser(description="Visualize multi-agent simulation data")
+    parser.add_argument("-p", action="store_true", help="flag to use cores to run simulations in parallel.")
+    args = parser.parse_args()
 
     # Obtain timestamp
     curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
@@ -98,20 +104,33 @@ if __name__ == "__main__":
     # Create a HeatmapData object to process heatmap data
     data = MultiAgentSimData(param_obj)
 
-    for f in param_obj.dfr_range: # iterate through each desired fill ratio
+    if args.p:
+        lst_of_lst_outputs = Parallel(n_jobs=-1, verbose=100)(delayed(run_sim_parallel)(param_obj, f) for f in param_obj.dfr_range)
+        outputs = [output_tup for target_fill_ratio_outputs_lst in lst_of_lst_outputs
+                   for output_tup in target_fill_ratio_outputs_lst]
 
-        print("\nRunning cases with fill ratio = " + str(f))
-        
-        for p in param_obj.sp_range: # iterate through each sensor probabilities
-            print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
+        # Insert the simulation object into the data object
+        [data.insert_sim_obj(o[0], o[1], o[2]) for o in outputs]
 
-            s = MultiAgentSim(param_obj, f, p)
-            s.run() # run the multi agent simulation
+    else:
+        start = timeit.default_timer()
+        for f in param_obj.dfr_range: # iterate through each desired fill ratio
 
-            # hr.populate(s) # populate one heatmap row for both f_hat and fisher_inv
-            data.insert_sim_obj(f, p, s) # store completed simulation object into
+            print("\nRunning cases with fill ratio = " + str(f))
 
-            print("Done!")
+            for p in param_obj.sp_range: # iterate through each sensor probabilities
+                print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
+
+                s = MultiAgentSim(param_obj, f, p)
+                s.run() # run the multi agent simulation
+
+                data.insert_sim_obj(f, p, s) # store completed simulation object into
+
+                print("Done!")
+
+        end = timeit.default_timer()
+
+        print('Elapsed time:', end-start)
 
     data.save(curr_time) # serialize and store data
 
