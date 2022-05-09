@@ -17,10 +17,54 @@ WHITE_TILE = 0
 # HeatmapRow and HeatmapData.
 # run for fully connected data and compare with matlab
 # Create abstract functions in Sim to have the child class implement
-# use parallel processing to run experiments
-# from joblib import Parallel, delayed
 
 class Sim:
+    """Top level simulation class.
+    """
+
+    class SimData:
+        """Class for storing simulation data that can be used emulate experiments.
+        """
+
+        def __init__(self, sim_type, num_exp, num_agents, num_obs, sensor_prob):
+            self.b_prob = sensor_prob # P(black|black)
+            self.w_prob = sensor_prob # P(white|white)
+
+            if sim_type == "single":
+                self.tiles = np.zeros( (num_exp, num_obs) )
+                self.agent_obs = np.zeros( (num_exp, num_obs) )
+
+            elif sim_type == "multi":
+                self.tiles = np.zeros( (num_exp, num_agents, num_obs) )
+                self.agent_obs = np.zeros( (num_exp, num_agents, num_obs) )
+
+    class SimStats:
+        """Class for storing statistics of simulation experiments.
+        """
+
+        def __init__(self, sim_type, num_exp, num_obs, comms_period):
+
+            if sim_type == "single":
+                self.x_hat_sample_mean = np.zeros( (num_exp, num_obs) )
+                self.alpha_sample_mean = np.zeros( (num_exp, num_obs) )
+                self.x_hat_sample_std = np.zeros( (num_exp, num_obs) )
+                self.alpha_sample_std = np.zeros( (num_exp, num_obs) )
+
+            elif sim_type == "multi":
+                self.x_hat_sample_mean = np.zeros( (num_exp, num_obs) )
+                self.alpha_sample_mean = np.zeros( (num_exp, num_obs) )
+                self.x_hat_sample_std = np.zeros( (num_exp, num_obs) )
+                self.alpha_sample_std = np.zeros( (num_exp, num_obs) )
+
+                self.x_bar_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
+                self.rho_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
+                self.x_bar_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+                self.rho_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+
+                self.x_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
+                self.gamma_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
+                self.x_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+                self.gamma_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
 
     def __init__(self, num_exp, num_obs, des_fill_ratio, main_filename_suffix):
         self.num_exp = num_exp
@@ -231,8 +275,6 @@ class SingleAgentSim(Sim):
 
         self._write_data_to_csv( self.f_hat, self.fisher_inv, suffix )
 
-# TODO: should i create a subclass that inherits from graph_tool.Graph that stores the agents and their comm probabilities? called CommGraph?
-
 class MultiAgentSim(Sim):
 
     def __init__(self, sim_param_obj, des_fill_ratio, sensor_prob):
@@ -244,51 +286,21 @@ class MultiAgentSim(Sim):
 
         super().__init__(num_exp, num_obs, des_fill_ratio, sim_param_obj.filename_suffix_1)
 
-        # Define fixed parameters for the MultiAgentSim instance
-        self.b_prob = sensor_prob # P(black|black)
-        self.w_prob = sensor_prob # P(white|white)
-        self.tiles = np.zeros( (num_exp, num_agents, num_obs) )
-        self.num_agents = num_agents
+        # Initialize data containers
+        self.stats = self.SimStats("multi", num_exp, num_obs, comms_period)
+        self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, sensor_prob)
 
-        # Define data storage containers
-        self.agent_obs = np.zeros( (num_exp, num_agents, num_obs) )
-        self.agent_avg_black_obs = np.zeros( (num_exp, num_agents, num_obs) )
-
-        # doesn't seem useful to store variances, let's just define everything by fisher info (i.e., confidences)
+        # Initialize temporary simulation data
         self.x_hat = np.zeros( (num_exp, num_agents, num_obs) )
         self.alpha = np.zeros( (num_exp, num_agents, num_obs) )
-        self.x_hat_sample_mean = np.zeros( (num_exp, num_obs) )
-        self.alpha_sample_mean = np.zeros( (num_exp, num_obs) )
-        self.x_hat_sample_std = np.zeros( (num_exp, num_obs) )
-        self.alpha_sample_std = np.zeros( (num_exp, num_obs) )
-        self.x_hat_sample_min = np.zeros( (num_exp, num_obs) )
-        self.alpha_sample_min = np.zeros( (num_exp, num_obs) )
-        self.x_hat_sample_max = np.zeros( (num_exp, num_obs) )
-        self.alpha_sample_max = np.zeros( (num_exp, num_obs) )
-
         self.x_bar = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
         self.rho = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
-        self.x_bar_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
-        self.rho_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
-        self.x_bar_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
-        self.rho_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
-        self.x_bar_sample_min = np.zeros( (num_exp, num_obs//comms_period) )
-        self.rho_sample_min = np.zeros( (num_exp, num_obs//comms_period) )
-        self.x_bar_sample_max = np.zeros( (num_exp, num_obs//comms_period) )
-        self.rho_sample_max = np.zeros( (num_exp, num_obs//comms_period) )
-
         self.x = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
         self.gamma = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
-        self.x_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
-        self.gamma_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
-        self.x_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
-        self.gamma_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
-        self.x_sample_min = np.zeros( (num_exp, num_obs//comms_period) )
-        self.gamma_sample_min = np.zeros( (num_exp, num_obs//comms_period) )
-        self.x_sample_max = np.zeros( (num_exp, num_obs//comms_period) )
-        self.gamma_sample_max = np.zeros( (num_exp, num_obs//comms_period) )
 
-        # Setup up graph
+        self.num_agents = num_agents
+
+        # Setup up communication graph
         self.graph_type = sim_param_obj.comms_graph_str
         self.comms_period = comms_period
         self.comms_prob = sim_param_obj.comms_prob
@@ -300,7 +312,7 @@ class MultiAgentSim(Sim):
 
         # Add edges depending on the type of graph desired
         if self.graph_type == "full":
-            self.comms_graph = self._create_complete_graph() # TODO: use the complete graph as a test case for now but should have parameter here
+            self.comms_graph = self._create_complete_graph()
         elif self.graph_type == "line":
             self.comms_graph = self._create_line_graph()
         elif self.graph_type == "ring":
@@ -343,23 +355,12 @@ class MultiAgentSim(Sim):
         agents_vprop = self.comms_graph.new_vertex_property("object") # need to populate agents into the vertices
 
         for vertex in self.comms_graph.get_vertices():
-            agents_vprop[vertex] = Agent(self.b_prob, self.w_prob,
+            agents_vprop[vertex] = Agent(self.sim_data.b_prob, self.sim_data.w_prob,
                                          (self.compute_x_hat, self.compute_fisher_hat),
                                          (self.compute_x_bar, self.compute_fisher_bar),
                                          (self.compute_x, self.compute_fisher))
 
         self.comms_graph.agents = agents_vprop # store into the comms graph
-
-    def run(self):
-        self.run_sim()
-
-        self.compute_sample_mean()
-
-        self.compute_sample_std()
-
-        self.compute_sample_min()
-
-        self.compute_sample_max()
 
     def compute_sample_mean(self, experiment_index):
         """Compute the sample mean for the results per experiment.
@@ -368,14 +369,14 @@ class MultiAgentSim(Sim):
             experiment_index: Index of the experiment.
         """
 
-        self.x_hat_sample_mean[experiment_index] = np.mean(self.x_hat[experiment_index], axis=0)
-        self.alpha_sample_mean[experiment_index] = np.mean(self.alpha[experiment_index], axis=0)
+        self.stats.x_hat_sample_mean[experiment_index] = np.mean(self.x_hat[experiment_index], axis=0)
+        self.stats.alpha_sample_mean[experiment_index] = np.mean(self.alpha[experiment_index], axis=0)
 
-        self.x_bar_sample_mean[experiment_index] = np.mean(self.x_bar[experiment_index], axis=0)
-        self.rho_sample_mean[experiment_index] = np.mean(self.rho[experiment_index], axis=0)
+        self.stats.x_bar_sample_mean[experiment_index] = np.mean(self.x_bar[experiment_index], axis=0)
+        self.stats.rho_sample_mean[experiment_index] = np.mean(self.rho[experiment_index], axis=0)
 
-        self.x_sample_mean[experiment_index] = np.mean(self.x[experiment_index], axis=0)
-        self.gamma_sample_mean[experiment_index] = np.mean(self.gamma[experiment_index], axis=0)
+        self.stats.x_sample_mean[experiment_index] = np.mean(self.x[experiment_index], axis=0)
+        self.stats.gamma_sample_mean[experiment_index] = np.mean(self.gamma[experiment_index], axis=0)
 
     def compute_sample_std(self, experiment_index):
         """Compute the sample standard deviation for the results per experiment.
@@ -384,50 +385,17 @@ class MultiAgentSim(Sim):
             experiment_index: Index of the experiment.
         """
 
-        self.x_hat_sample_std[experiment_index] = np.std(self.x_hat[experiment_index], axis=0, ddof=1)
-        self.alpha_sample_std[experiment_index] = np.std(self.alpha[experiment_index], axis=0, ddof=1)
+        self.stats.x_hat_sample_std[experiment_index] = np.std(self.x_hat[experiment_index], axis=0, ddof=1)
+        self.stats.alpha_sample_std[experiment_index] = np.std(self.alpha[experiment_index], axis=0, ddof=1)
 
-        self.x_bar_sample_std[experiment_index] = np.std(self.x_bar[experiment_index], axis=0, ddof=1)
-        self.rho_sample_std[experiment_index] = np.std(self.rho[experiment_index], axis=0, ddof=1)
+        self.stats.x_bar_sample_std[experiment_index] = np.std(self.x_bar[experiment_index], axis=0, ddof=1)
+        self.stats.rho_sample_std[experiment_index] = np.std(self.rho[experiment_index], axis=0, ddof=1)
 
-        self.x_sample_std[experiment_index] = np.std(self.x[experiment_index], axis=0, ddof=1)
-        self.gamma_sample_std[experiment_index] = np.std(self.gamma[experiment_index], axis=0, ddof=1)
+        self.stats.x_sample_std[experiment_index] = np.std(self.x[experiment_index], axis=0, ddof=1)
+        self.stats.gamma_sample_std[experiment_index] = np.std(self.gamma[experiment_index], axis=0, ddof=1)
 
-    def compute_sample_min(self, experiment_index):
-        """Compute the sample minimum for the results per experiment.
+    def run(self):
 
-        Args:
-            experiment_index: Index of the experiment.
-        """
-
-        self.x_hat_sample_min[experiment_index] = np.amin(self.x_hat[experiment_index], axis=0)
-        self.alpha_sample_min[experiment_index] = np.amin(self.alpha[experiment_index], axis=0)
-
-        self.x_bar_sample_min[experiment_index] = np.amin(self.x_bar[experiment_index], axis=0)
-        self.rho_sample_min[experiment_index] = np.amin(self.rho[experiment_index], axis=0)
-
-        self.x_sample_min[experiment_index] = np.amin(self.x[experiment_index], axis=0)
-        self.gamma_sample_min[experiment_index] = np.amin(self.gamma[experiment_index], axis=0)
-
-    def compute_sample_max(self, experiment_index):
-        """Compute the sample maximum for the results per experiment.
-
-        Args:
-            experiment_index: Index of the experiment.
-        """
-
-        self.x_hat_sample_max[experiment_index] = np.amax(self.x_hat[experiment_index], axis=0)
-        self.alpha_sample_max[experiment_index] = np.amax(self.alpha[experiment_index], axis=0)
-
-        self.x_bar_sample_max[experiment_index] = np.amax(self.x_bar[experiment_index], axis=0)
-        self.rho_sample_max[experiment_index] = np.amax(self.rho[experiment_index], axis=0)
-
-        self.x_sample_max[experiment_index] = np.amax(self.x[experiment_index], axis=0)
-        self.gamma_sample_max[experiment_index] = np.amax(self.gamma[experiment_index], axis=0)
-
-    def run(self, data_flag=False):
-
-        # TODO can i use parallel here?
         for e in range(self.num_exp):
             self.run_sim(e)
 
@@ -435,18 +403,12 @@ class MultiAgentSim(Sim):
 
             self.compute_sample_std(e)
 
-            self.compute_sample_min(e)
-
-            self.compute_sample_max(e)
-
             self.reset_agents()
-
-            # if data_flag: self.write_data_to_csv()
 
     def run_sim(self, experiment_index):
 
         # Generate tiles (bernoulli instances for each agent
-        self.tiles[experiment_index] = self.generate_tiles(self.num_agents)
+        self.sim_data.tiles[experiment_index] = self.generate_tiles(self.num_agents)
 
         # Need period timing condition here to decide when to switch
         # between observation and communication
@@ -469,7 +431,7 @@ class MultiAgentSim(Sim):
         while curr_iteration < self.num_obs:
 
             # Execute observation phase
-            local_obs_dict, local_val_dict = self.run_observation_phase(self.tiles[experiment_index][:, curr_iteration])
+            local_obs_dict, local_val_dict = self.run_observation_phase(self.sim_data.tiles[experiment_index][:, curr_iteration])
 
             local_obs.append(local_obs_dict["curr_obs"])
             local_avg_black_obs.append(local_obs_dict["avg_black_obs"])
@@ -490,8 +452,7 @@ class MultiAgentSim(Sim):
             curr_iteration += 1
 
         # Store observations and average black tile observations into log
-        self.agent_obs[experiment_index] = np.asarray(local_obs).T
-        self.agent_avg_black_obs[experiment_index] = np.asarray(local_avg_black_obs).T
+        self.sim_data.agent_obs[experiment_index] = np.asarray(local_obs).T
 
         # Store of local estimates and confidences into log
         self.x_hat[experiment_index] = np.asarray(local_x).T
@@ -751,15 +712,14 @@ class Agent:
             self.x = self.primal_est_func(local_est, local_conf, social_est, social_conf)
             self.conf = self.primal_conf_func(local_conf, social_conf)
 
-class MultiAgentSimData:
-    """Class to store multi-agent simulations.
+class ExperimentData:
+    """Class to store simulated experiment data.
 
-    An instance of this class stores multi-agent simulation objects that span all the desired
+    An instance of this class stores multi-agent simulation data that span all the desired
     fill ratio range and the desired sensor probabilities.
     """
 
     def __init__(self, sim_param_obj):
-
         self.num_agents = sim_param_obj.num_agents
         self.num_exp = sim_param_obj.num_exp
         self.num_obs = sim_param_obj.num_obs
@@ -768,21 +728,48 @@ class MultiAgentSimData:
         self.comms_prob = sim_param_obj.comms_prob
         self.dfr_range = sim_param_obj.dfr_range
         self.sp_range = sim_param_obj.sp_range
-        self.sim_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range]
+        self.stats_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range ]
+        self.sim_data_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range ]
 
-    def insert_sim_obj(self, des_fill_ratio, sensor_prob, sim_obj):
-
-        ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
-        ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
-
-        self.sim_obj_lst[ind_dfr][ind_sp] = sim_obj
-
-    def get_sim_obj(self, des_fill_ratio, sensor_prob):
+    def insert_sim_obj(self, des_fill_ratio, sensor_prob, stats_obj: Sim.SimStats, sim_data_obj: Sim.SimData):
 
         ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
         ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
 
-        return self.sim_obj_lst[ind_dfr][ind_sp]
+        self.stats_obj_lst[ind_dfr][ind_sp] = stats_obj
+        self.sim_data_obj_lst[ind_dfr][ind_sp] = sim_data_obj
+
+    def get_stats_obj(self, des_fill_ratio, sensor_prob) -> Sim.SimStats:
+        """Get the statistics based on the target fill ratio and sensor probability.
+
+        Args:
+            des_fill_ratio: Target fill ratio.
+            sensor_prob: Sensor probability.
+
+        Returns:
+            A Sim.SimStats object containing the statistics for the simulation based on the target fill ratio and sensor probability.
+        """
+
+        ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
+        ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
+
+        return self.stats_obj_lst[ind_dfr][ind_sp]
+
+    def get_sim_data_obj(self, des_fill_ratio, sensor_prob) -> Sim.SimData:
+        """Get the simulation data based on the target fill ratio and sensor probability.
+
+        Args:
+            des_fill_ratio: Target fill ratio.
+            sensor_prob: Sensor probability.
+
+        Returns:
+            A Sim.SimData object containing the data for the simulation based on the target fill ratio and sensor probability.
+        """
+
+        ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
+        ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
+
+        return self.sim_data_obj_lst[ind_dfr][ind_sp]
 
     # TODO: protobuf maybe? since the argos implementation will need that?
     def save(self, curr_time=None, filepath=None):

@@ -1,4 +1,4 @@
-from sim_modules import MultiAgentSim, MultiAgentSimData, SimParam
+from sim_modules import MultiAgentSim, ExperimentData, SimParam
 
 import numpy as np
 import os
@@ -82,7 +82,7 @@ def run_sim_parallel(param_obj, target_fill_ratio):
         s = MultiAgentSim(param_obj, target_fill_ratio, p)
         s.run() # run the multi agent simulation
 
-        outputs.append((target_fill_ratio, p, s))
+        outputs.append((target_fill_ratio, p, s.stats, s.sim_data))
 
     return outputs
 
@@ -102,17 +102,18 @@ if __name__ == "__main__":
     create_simulation_folder(param_obj.full_suffix, curr_time)
 
     # Create a HeatmapData object to process heatmap data
-    data = MultiAgentSimData(param_obj)
+    data = ExperimentData(param_obj)
 
-    if args.p:
+    # Execute simulated experiments
+    if args.p: # parallel simulation runs
         lst_of_lst_outputs = Parallel(n_jobs=-1, verbose=100)(delayed(run_sim_parallel)(param_obj, f) for f in param_obj.dfr_range)
         outputs = [output_tup for target_fill_ratio_outputs_lst in lst_of_lst_outputs
                    for output_tup in target_fill_ratio_outputs_lst]
 
         # Insert the simulation object into the data object
-        [data.insert_sim_obj(o[0], o[1], o[2]) for o in outputs]
+        [data.insert_sim_obj(o[0], o[1], o[2], o[3]) for o in outputs]
 
-    else:
+    else: # sequential simulation runs
         start = timeit.default_timer()
         for f in param_obj.dfr_range: # iterate through each desired fill ratio
 
@@ -124,7 +125,7 @@ if __name__ == "__main__":
                 s = MultiAgentSim(param_obj, f, p)
                 s.run() # run the multi agent simulation
 
-                data.insert_sim_obj(f, p, s) # store completed simulation object into
+                data.insert_sim_obj(f, p, s.stats, s.sim_data)
 
                 print("Done!")
 

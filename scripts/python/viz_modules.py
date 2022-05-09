@@ -2,12 +2,12 @@
 """
 import numpy as np
 import matplotlib.pyplot as plt
-from sim_modules import MultiAgentSimData
+from sim_modules import ExperimentData
 
 def plot_heatmap():
     pass
 
-def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: MultiAgentSimData):
+def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: ExperimentData):
     """Plot the time series data.
 
     Create data visualization for local, social, and informed values for a simulation with a
@@ -16,7 +16,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: MultiAgentSimData)
     Args:
         target_fill_ratio: The target fill ratio used in the simulation data.
         sensor_prob: The sensor probability used in the simulation data.
-        data_obj: A MultiAgentSimData object containing all the simulation data.
+        data_obj: A ExperimentData object containing all the simulation data.
     """
 
     # Create figure and axes handles
@@ -33,8 +33,9 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: MultiAgentSimData)
     abscissa_values_x_bar = list(range(0, data_obj.num_obs, data_obj.comms_period))
     abscissa_values_x = list(range(0, data_obj.num_obs, data_obj.comms_period))
 
+    # Plot for all experiments
     for n in range(data_obj.num_exp):
-        sim_obj = data_obj.get_sim_obj(target_fill_ratio, sensor_prob)
+        sim_obj = data_obj.get_stats_obj(target_fill_ratio, sensor_prob)
 
         # Plot time evolution of local estimates and confidences
         x_hat_bounds = compute_std_bounds(sim_obj.x_hat_sample_mean[n], sim_obj.x_hat_sample_std[n])
@@ -67,21 +68,21 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: MultiAgentSimData)
         ax_x[1].fill_between(abscissa_values_x, gamma_bounds[0], gamma_bounds[1], alpha=0.2)
 
     # Set axis properties
-    ax_x_hat[0].set_title("Average of {0} agents' local values with 1\u03c3 bounds".format(data_obj.num_agents))
+    ax_x_hat[0].set_title("Average of {0} agents' local values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x_hat[0].set_ylabel("Local estimates")
     ax_x_hat[0].set_ylim(0, 1.0)
     ax_x_hat[1].set_ylabel("Local confidences")
     ax_x_hat[1].set_xlabel("Observations")
     ax_x_hat[1].set_yscale("log")
 
-    ax_x_bar[0].set_title("Average of {0} agents' social values with 1\u03c3 bounds".format(data_obj.num_agents))
+    ax_x_bar[0].set_title("Average of {0} agents' social values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x_bar[0].set_ylabel("Social estimates")
     ax_x_bar[0].set_ylim(0, 1.0)
     ax_x_bar[1].set_ylabel("Social confidences")
     ax_x_bar[1].set_xlabel("Observations")
     ax_x_bar[1].set_yscale("log")
 
-    ax_x[0].set_title("Average of {0} agents' informed values with 1\u03c3 bounds".format(data_obj.num_agents))
+    ax_x[0].set_title("Average of {0} agents' informed values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x[0].set_ylabel("Informed estimates")
     ax_x[0].set_ylim(0, 1.0)
     ax_x[1].set_ylabel("Informed confidences")
