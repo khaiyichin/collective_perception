@@ -11,9 +11,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load data
-    data = ExperimentData.load(args.DATA)
     try:
-        data = ExperimentData.load(args.DATA)
+        data = ExperimentData.load(args.DATA, False)
         data_type = "MultiAgentSimData"
 
     except Exception as e:
@@ -26,8 +25,8 @@ if __name__ == "__main__":
     print("\tNumber of agents:\t\t\t{0}".format(data.num_agents))
     print("\tNumber of experiments:\t\t\t{0}".format(data.num_exp))
     print("\tNumber of observations:\t\t\t{0}".format(data.num_obs))
-    print("\tSimulated target fill ratios:\t\t{0}".format(data.dfr_range.tolist()))
-    print("\tSimulated sensor probabilities:\t\t{0}".format(data.sp_range.tolist()))
+    print("\tSimulated target fill ratios:\t\t{0}".format(data.dfr_range))
+    print("\tSimulated sensor probabilities:\t\t{0}".format(data.sp_range))
     print("\tCommunication properties:")
     print("\t\tGraph type:\t\t\t{0}".format(data.graph_type))
     print("\t\tCommunication period:\t\t{0}".format(data.comms_period))

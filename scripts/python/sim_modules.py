@@ -728,16 +728,15 @@ class ExperimentData:
         self.comms_prob = sim_param_obj.comms_prob
         self.dfr_range = sim_param_obj.dfr_range
         self.sp_range = sim_param_obj.sp_range
-        self.stats_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range ]
-        self.sim_data_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range ]
+        self.stats_obj_dict = {i: {j: None for j in self.sp_range} for i in self.dfr_range}
+        self.sim_data_obj_dict = {i: {j: None for j in self.sp_range} for i in self.dfr_range}
+        # self.stats_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range ]
+        # self.sim_data_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range ]
 
     def insert_sim_obj(self, des_fill_ratio, sensor_prob, stats_obj: Sim.SimStats, sim_data_obj: Sim.SimData):
 
-        ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
-        ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
-
-        self.stats_obj_lst[ind_dfr][ind_sp] = stats_obj
-        self.sim_data_obj_lst[ind_dfr][ind_sp] = sim_data_obj
+        self.stats_obj_dict[des_fill_ratio][sensor_prob] = stats_obj
+        self.sim_data_obj_dict[des_fill_ratio][sensor_prob] = sim_data_obj
 
     def get_stats_obj(self, des_fill_ratio, sensor_prob) -> Sim.SimStats:
         """Get the statistics based on the target fill ratio and sensor probability.
@@ -750,10 +749,7 @@ class ExperimentData:
             A Sim.SimStats object containing the statistics for the simulation based on the target fill ratio and sensor probability.
         """
 
-        ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
-        ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
-
-        return self.stats_obj_lst[ind_dfr][ind_sp]
+        return self.stats_obj_dict[des_fill_ratio][sensor_prob]
 
     def get_sim_data_obj(self, des_fill_ratio, sensor_prob) -> Sim.SimData:
         """Get the simulation data based on the target fill ratio and sensor probability.
@@ -766,10 +762,7 @@ class ExperimentData:
             A Sim.SimData object containing the data for the simulation based on the target fill ratio and sensor probability.
         """
 
-        ind_dfr = np.where(self.dfr_range == des_fill_ratio)[0][0]
-        ind_sp =  np.where(self.sp_range == sensor_prob)[0][0]
-
-        return self.sim_data_obj_lst[ind_dfr][ind_sp]
+        return self.sim_data_obj_dict[des_fill_ratio][sensor_prob]
 
     # TODO: protobuf maybe? since the argos implementation will need that?
     def save(self, curr_time=None, filepath=None):
@@ -792,7 +785,7 @@ class ExperimentData:
         print( "\nSaved multi-agent sim data at: {0}.\n".format( os.path.abspath(save_path) ) )
 
     @classmethod
-    def load(cls, filepath):
+    def load(cls, filepath, debug=False):
         """Load serialized data.
         """
 
@@ -801,6 +794,12 @@ class ExperimentData:
 
         # Verify the unpickled object
         assert isinstance(obj, cls)
+
+        # Remove objects to save RAM
+        if debug:
+            obj.stats_obj_dict = {}
+        else:
+            obj.sim_data_obj_dict = {}
 
         return obj
 
@@ -949,8 +948,8 @@ class SimParam:
         sp_max = float(yaml_config["sensorProb"]["max"])
         sp_inc = int(yaml_config["sensorProb"]["incSteps"])
 
-        self.sp_range  = np.round(np.linspace(sp_min, sp_max, sp_inc), 3)
-        self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3)
+        self.sp_range  = np.round(np.linspace(sp_min, sp_max, sp_inc), 3).tolist()
+        self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3).tolist()
         self.num_obs = int(yaml_config["numObs"])
         self.num_exp = int(yaml_config["numExperiments"])
         self.write_all = yaml_config["writeAllData"]
