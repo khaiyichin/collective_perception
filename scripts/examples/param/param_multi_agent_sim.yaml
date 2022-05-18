@@ -1,0 +1,18 @@
+---
+numAgents: 5 # number of agents
+commsGraph:
+  type: "full" # communications graph type: full, line, ring, scale-free
+  commsPeriod: 5 # in units of observation rounds
+  commsProb: 1.0 # communication probability
+sensorProb: # sensor probability range (inclusive) to simulate
+  min: 0.55
+  max: 1.0
+  incSteps: 19
+desFillRatios: # target fill ratio range (inclusive) to simulate
+  min: 0.05
+  max: 0.95
+  incSteps: 19
+numExperiments: 1 # number of experiments to run for each parameter
+numObs: 1000 # number of observations (timesteps)
+writeAllData: False
+...
