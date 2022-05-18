@@ -8,6 +8,7 @@ import graph_tool.stats as gt_stats
 import random
 import pickle
 import os
+import warnings
 
 BLACK_TILE = 1
 WHITE_TILE = 0
@@ -23,12 +24,18 @@ class Sim:
     """
 
     class SimData:
-        """Class for storing simulation data that can be used emulate experiments.
+        """Class for storing simulation data that can be used replicate experimental results.
         """
 
-        def __init__(self, sim_type, num_exp, num_agents, num_obs, sensor_prob):
+        def __init__(self, sim_type, num_exp, num_agents, num_obs, sensor_prob, comms_period):
+            self.sim_type = sim_type
+            self.num_exp = num_exp
+            self.num_agents = num_agents
+            self.num_obs = num_obs
             self.b_prob = sensor_prob # P(black|black)
             self.w_prob = sensor_prob # P(white|white)
+            self.comms_graph = None
+            self.comms_period = comms_period
 
             if sim_type == "single":
                 self.tiles = np.zeros( (num_exp, num_obs) )
@@ -89,10 +96,6 @@ class Sim:
         if num_agents > 1:
             tiles = np.random.binomial(1, self.des_fill_ratio * np.ones((num_agents, self.num_obs)))
 
-            # For debugging purposes; should be removed in the future
-            assert(tiles.shape[0] == self.num_agents)
-            assert(tiles.shape[1] == self.num_obs)
-
         else:
             tiles = np.random.binomial(1, self.des_fill_ratio * np.ones(self.num_obs) )
 
@@ -123,6 +126,7 @@ class Sim:
     def compute_fisher_hat_inv(self, h, t, b, w):
         """Compute the inverse Fisher information (variance) for one agent.
         """
+        warnings.filterwarnings("ignore", category=RuntimeWarning) # suppress warnings since division by small numbers occur frequently here
 
         if h <= (1.0 - w) * t:
             return np.square(w) * np.square(w-1.0) / ( np.square(b+w-1.0) * (t*np.square(w) - 2*(t-h)*w + (t-h)) )
@@ -286,11 +290,11 @@ class MultiAgentSim(Sim):
 
         super().__init__(num_exp, num_obs, des_fill_ratio, sim_param_obj.filename_suffix_1)
 
-        # Initialize data containers
+        # Initialize data containers (to be serialized)
         self.stats = self.SimStats("multi", num_exp, num_obs, comms_period)
-        self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, sensor_prob)
+        self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, sensor_prob, comms_period)
 
-        # Initialize temporary simulation data
+        # Initialize non-persistent simulation data
         self.x_hat = np.zeros( (num_exp, num_agents, num_obs) )
         self.alpha = np.zeros( (num_exp, num_agents, num_obs) )
         self.x_bar = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
@@ -298,69 +302,68 @@ class MultiAgentSim(Sim):
         self.x = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
         self.gamma = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
 
-        self.num_agents = num_agents
-
         # Setup up communication graph
-        self.graph_type = sim_param_obj.comms_graph_str
-        self.comms_period = comms_period
-        self.comms_prob = sim_param_obj.comms_prob
-        self.setup_comms_graph()
+        self.setup_comms_graph(sim_param_obj.comms_graph_str, sim_param_obj.comms_prob)
+        self.create_agents()
 
-        self._create_agents()
-
-    def setup_comms_graph(self):
+    def setup_comms_graph(self, graph_type, comms_prob):
 
         # Add edges depending on the type of graph desired
-        if self.graph_type == "full":
-            self.comms_graph = self._create_complete_graph()
-        elif self.graph_type == "line":
-            self.comms_graph = self._create_line_graph()
-        elif self.graph_type == "ring":
-            self.comms_graph = self._create_ring_graph()
-        elif self.graph_type == "scale-free":
-            self.comms_graph = self._create_scale_free_graph()
+        if graph_type == "full":
+            self.sim_data.comms_network = self._create_complete_graph()
+        elif graph_type == "line":
+            self.sim_data.comms_network = self._create_line_graph()
+        elif graph_type == "ring":
+            self.sim_data.comms_network = self._create_ring_graph()
+        elif graph_type == "scale-free":
+            self.sim_data.comms_network = self._create_scale_free_graph()
 
         # Add a new property map for communication probabilities
-        comms_prob_eprop = self.comms_graph.new_edge_property("double") # returns an EdgePropertyMap object pointing to the comms_graph
+        comms_prob_eprop = self.sim_data.comms_network.graph.new_edge_property("double") # returns an EdgePropertyMap object pointing to the comms_graph
 
         # TODO: allow for different comm probabilities
-        comms_prob_eprop.get_array()[:] = self.comms_prob # assign a probability of 1.0 to each edge
+        comms_prob_eprop.get_array()[:] = comms_prob # assign a probability of 1.0 to each edge for now
 
-        # Internalize the property
-        self.comms_graph.comms_prob = comms_prob_eprop
+        # Store the communication probabilities into the CommsNetwork object
+        self.sim_data.comms_network.comms_prob_ep = comms_prob_eprop
 
     def _create_complete_graph(self):
         """Create a fully-connected graph.
         """
-        return gt_gen.complete_graph(self.num_agents, directed=False)
+        return CommsNetwork(gt_gen.complete_graph(self.sim_data.num_agents, directed=False))
 
     def _create_ring_graph(self):
         """Create a ring graph.
         """
-        return gt_gen.circular_graph(self.num_agents, k=1, directed=False)
+        return CommsNetwork(gt_gen.circular_graph(self.sim_data.num_agents, k=1, directed=False))
 
     def _create_line_graph(self):
         """Create a line graph.
         """
-        pass
+        g, _ = gt_gen.geometric_graph([[i] for i in range(self.sim_data.num_agents)], 1)
+        return CommsNetwork(g)
 
     def _create_scale_free_graph(self):
         """Create a scale-free graph.
-        """
-        pass
 
-    def _create_agents(self):
+        The graph is generated based on the Barabási-Albert network model with gamma = 1.
+        Therefore, the degree distribution has the following form: Prob ~ k^-3, where k
+        is the degree of a node/vertex.
+        """
+        return CommsNetwork(gt_gen.price_network(self.sim_data.num_agents, directed=False))
+
+    def create_agents(self):
 
         # Create agent objects
-        agents_vprop = self.comms_graph.new_vertex_property("object") # need to populate agents into the vertices
+        agents_vprop = self.sim_data.comms_network.graph.new_vertex_property("object") # need to populate agents into the vertices
 
-        for vertex in self.comms_graph.get_vertices():
+        for vertex in self.sim_data.comms_network.graph.get_vertices():
             agents_vprop[vertex] = Agent(self.sim_data.b_prob, self.sim_data.w_prob,
                                          (self.compute_x_hat, self.compute_fisher_hat),
                                          (self.compute_x_bar, self.compute_fisher_bar),
                                          (self.compute_x, self.compute_fisher))
 
-        self.comms_graph.agents = agents_vprop # store into the comms graph
+        self.sim_data.comms_network.agents_vp = agents_vprop
 
     def compute_sample_mean(self, experiment_index):
         """Compute the sample mean for the results per experiment.
@@ -408,7 +411,7 @@ class MultiAgentSim(Sim):
     def run_sim(self, experiment_index):
 
         # Generate tiles (bernoulli instances for each agent
-        self.sim_data.tiles[experiment_index] = self.generate_tiles(self.num_agents)
+        self.sim_data.tiles[experiment_index] = self.generate_tiles(self.sim_data.num_agents)
 
         # Need period timing condition here to decide when to switch
         # between observation and communication
@@ -440,7 +443,7 @@ class MultiAgentSim(Sim):
             local_conf.append(local_val_dict["conf"])
 
             # Execute communication phase
-            if (curr_iteration+1) % self.comms_period == 0:
+            if (curr_iteration+1) % self.sim_data.comms_period == 0:
                 social_val_dict, informed_val_dict = self.run_communication_phase()
 
                 social_x.append(social_val_dict["x"])
@@ -454,7 +457,7 @@ class MultiAgentSim(Sim):
         # Store observations and average black tile observations into log
         self.sim_data.agent_obs[experiment_index] = np.asarray(local_obs).T
 
-        # Store of local estimates and confidences into log
+        # Store local estimates and confidences into log
         self.x_hat[experiment_index] = np.asarray(local_x).T
         self.alpha[experiment_index] = np.asarray(local_conf).T
 
@@ -478,19 +481,19 @@ class MultiAgentSim(Sim):
         informed_values = {"x": [], "conf": []}
 
         # Make agents communicate
-        for e in self.comms_graph.edges():
+        for e in self.sim_data.comms_network.graph.edges():
 
             # Apply probabilistic communication (currently only applicable to undirected graphs)
-            if random.random() < self.comms_graph.comms_prob[e]:
-                a1 = self.comms_graph.agents[e.source()]
-                a2 = self.comms_graph.agents[e.target()]
+            if random.random() < self.sim_data.comms_network.comms_prob_ep[e]:
+                a1 = self.sim_data.comms_network.agents_vp[e.source()]
+                a2 = self.sim_data.comms_network.agents_vp[e.target()]
 
                 a1.communicate_rx( a2.communicate_tx() )
                 a2.communicate_rx( a1.communicate_tx() )
 
         # Make the agents perform social (dual) and primal computation
-        for v in self.comms_graph.vertices():
-            agent = self.comms_graph.agents[v]
+        for v in self.sim_data.comms_network.graph.vertices():
+            agent = self.sim_data.comms_network.agents_vp[v]
 
             agent.solve_social()
             agent.solve_primal()
@@ -516,9 +519,9 @@ class MultiAgentSim(Sim):
         local_values = {"x": [], "conf": []}
 
         # Iterate through each agent to observe
-        for ind, v in enumerate(self.comms_graph.vertices()):
+        for ind, v in enumerate(self.sim_data.comms_network.graph.vertices()):
 
-            agent = self.comms_graph.agents[v]
+            agent = self.sim_data.comms_network.agents_vp[v]
 
             agent.observe(tiles[ind], self.observe_color)
 
@@ -534,8 +537,21 @@ class MultiAgentSim(Sim):
     def reset_agents(self):
 
         # Reset agents
-        for v in self.comms_graph.vertices():
-            self.comms_graph.agents[v].reset()
+        for v in self.sim_data.comms_network.graph.vertices():
+            self.sim_data.comms_network.agents_vp[v].reset()
+
+class CommsNetwork:
+    """Class to wrap store communication network attributes.
+
+    This class was specifically created to circumvent the complications related to serializing
+    the graph-tool objects with internalized property maps. Instead, the property maps are simply
+    set as the class attributes here along with the graph object.
+    """
+
+    def __init__(self, input_graph):
+        self.graph = input_graph
+        self.agents_vp = [] # agents vertex property
+        self.comms_prob_ep = [] # communications probability edge property
 
 class Agent:
 
@@ -730,8 +746,6 @@ class ExperimentData:
         self.sp_range = sim_param_obj.sp_range
         self.stats_obj_dict = {i: {j: None for j in self.sp_range} for i in self.dfr_range}
         self.sim_data_obj_dict = {i: {j: None for j in self.sp_range} for i in self.dfr_range}
-        # self.stats_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range ]
-        # self.sim_data_obj_lst = [ [None for j in self.sp_range] for i in self.dfr_range ]
 
     def insert_sim_obj(self, des_fill_ratio, sensor_prob, stats_obj: Sim.SimStats, sim_data_obj: Sim.SimData):
 
