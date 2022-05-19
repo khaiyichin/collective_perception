@@ -28,7 +28,10 @@ sed -i "s/numObs:.*/numObs: 1000/g" param_multi_agent_sim.yaml
 
 # Run simulations
 {
-    echo -e "\n################################### EXECUTION BEGIN ###################################\n"
+    START_TIME=$(date +%m/%d/%Y-%H:%M:%S)
+
+    echo -e "\n################################### EXECUTION BEGIN ###################################"
+    echo -e "################################# ${START_TIME} #################################\n"
     for (( a = 0; a <= 3; a++ )) # comms type
     do
         comm=$(echo ${COMM[a]})
@@ -61,5 +64,7 @@ sed -i "s/numObs:.*/numObs: 1000/g" param_multi_agent_sim.yaml
             done
         done
     done
-    echo -e "\n################################### EXECUTION END ###################################\n"
+    END_TIME=$(date +%m/%d/%Y-%H:%M:%S)
+    echo -e "\n################################### EXECUTION END ###################################"
+    echo -e "################################# ${END_TIME} #################################\n"
 } > execute_multi_agent_sim.out 2> execute_multi_agent_sim.err # collect logs

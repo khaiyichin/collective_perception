@@ -7,6 +7,7 @@ from datetime import datetime
 from joblib import Parallel, delayed
 import timeit
 import argparse
+import sys
 
 def create_data_folder():
     """Create a folder named data and use it as the working directory.
@@ -121,6 +122,7 @@ if __name__ == "__main__":
 
             for p in param_obj.sp_range: # iterate through each sensor probabilities
                 print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
+                sys.stdout.flush()
 
                 s = MultiAgentSim(param_obj, f, p)
                 s.run() # run the multi agent simulation

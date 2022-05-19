@@ -12,12 +12,15 @@ import warnings
 
 BLACK_TILE = 1
 WHITE_TILE = 0
+POSINF = 1.0e+100
 
 # TODO:
 # implement run_sim() --> almost done; wanna figure out how to log the data using
 # HeatmapRow and HeatmapData.
 # run for fully connected data and compare with matlab
 # Create abstract functions in Sim to have the child class implement
+
+warnings.filterwarnings("ignore", category=RuntimeWarning) # suppress warnings since division by zero occur frequently here
 
 class Sim:
     """Top level simulation class.
@@ -126,20 +129,22 @@ class Sim:
     def compute_fisher_hat_inv(self, h, t, b, w):
         """Compute the inverse Fisher information (variance) for one agent.
         """
-        warnings.filterwarnings("ignore", category=RuntimeWarning) # suppress warnings since division by small numbers occur frequently here
 
-        if h <= (1.0 - w) * t:
-            return np.square(w) * np.square(w-1.0) / ( np.square(b+w-1.0) * (t*np.square(w) - 2*(t-h)*w + (t-h)) )
-        elif h >= b*t:
-            return np.square(b) * np.square(b-1.0) / ( np.square(b+w-1.0) * (t*np.square(b) - 2*h*b + h) )
-        else:
-            return h * (t-h) / ( np.power(t, 3) * np.square(b+w-1.0) )
+        if (b == 1.0) and (w == 1.0): output = h * (t-h) / np.power(t, 3) # perfect sensors
+        else: # noisy sensors
+            if h <= (1.0 - w) * t:
+                output = np.square(w) * np.square(w-1.0) / ( np.square(b+w-1.0) * (t*np.square(w) - 2*(t-h)*w + (t-h)) )
+            elif h >= b*t:
+                output = np.square(b) * np.square(b-1.0) / ( np.square(b+w-1.0) * (t*np.square(b) - 2*h*b + h) )
+            else:
+                output = h * (t-h) / ( np.power(t, 3) * np.square(b+w-1.0) )
+
+        return np.nan_to_num(output, posinf=POSINF) # prevent nans
 
     def compute_fisher_hat(self, h, t, b, w):
         """Compute the Fisher information for one agent.
         """
-
-        return np.reciprocal( self.compute_fisher_hat_inv(h, t, b, w) )
+        return np.nan_to_num( np.reciprocal( self.compute_fisher_hat_inv(h, t, b, w) ), posinf=POSINF ) # prevent infs
 
     def compute_x_bar(self, x_arr): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same social function)
         return np.mean(x_arr)

@@ -2,11 +2,12 @@ from sim_modules import ExperimentData
 import viz_modules as vm
 import argparse
 import numpy as np
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Visualize multi-agent simulation data")
-    parser.add_argument("DATA", nargs="*", type=str, help="filename to the data file")
+    parser.add_argument("DATA", type=str, help="folder containing the data")
     parser.add_argument("-t", nargs=2, help="flag to plot time series data for a specified selected target fill ratio and sensor probability")
     parser.add_argument("-m", action="store_true", help="flag to plot heatmap data; only useful if multiple target fill ratios and sensor probabilities are simulated in data")
     parser.add_argument("-a", action="store_true", help="flag to use aggregate data instead of data from individual experiments")
@@ -23,4 +24,6 @@ if __name__ == "__main__":
 
     # Plot heatmap for all simulation data
     if args.m:
-        pass
+        vm.plot_heatmap(data)
+
+    plt.show()

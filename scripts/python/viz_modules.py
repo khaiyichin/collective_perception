@@ -1,7 +1,10 @@
 """Visualization module
 """
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+import os
+
 from sim_modules import ExperimentData
 
 class VisualizationData:
@@ -42,7 +45,7 @@ class VisualizationData:
             self.x_bar_conv_ind = -1
             self.x_conv_ind = -1
 
-    def __init__(self, exp_data_obj_paths, difference_window_size=7, convergence_thresh=5e-3):
+    def __init__(self, exp_data_obj_folder, difference_window_size=3, convergence_thresh=5e-3):
 
         # Load experiment data statistics
         first_obj = True
@@ -50,8 +53,17 @@ class VisualizationData:
         self.difference_window_size = difference_window_size
         self.convergence_thresh = convergence_thresh
 
-        for exp_data_obj_path in exp_data_obj_paths:
-            obj = ExperimentData.load(exp_data_obj_path, False)
+        # Iterate through folder contents recursively to obtain all serialized filenames
+        exp_data_obj_paths = []
+
+        for root, _, files in os.walk(exp_data_obj_folder):
+            for f in files:
+                if os.path.splitext(f)[1] == ".pkl": # currently serialized files are pickled
+                    exp_data_obj_paths.append( os.path.join(root, f) )
+
+        # Load the files
+        for path in exp_data_obj_paths:
+            obj = ExperimentData.load(path, False)
 
             if first_obj:
                 self.num_agents = obj.num_agents
@@ -63,6 +75,7 @@ class VisualizationData:
                 self.dfr_range = obj.dfr_range
                 self.sp_range = obj.sp_range
                 self.stats_obj_dict = obj.stats_obj_dict
+                self.agg_stats_dict = {} # to be populated later
                 
                 first_obj = False
             else:
@@ -82,7 +95,26 @@ class VisualizationData:
                     self.dfr_range.extend(obj.dfr_range)
                     self.stats_obj_dict.update(obj.stats_obj_dict)
 
+        # self.preprocess_data()
         self.aggregate_statistics()
+
+    def preprocess_data(self):
+        for _, sp_dict in self.stats_obj_dict.items():
+            for _, stats_obj in sp_dict.items():
+
+                np.nan_to_num(stats_obj.x_hat_sample_mean, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.x_bar_sample_mean, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.x_sample_mean, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.alpha_sample_mean, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.rho_sample_mean, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.gamma_sample_mean, posinf=0.0, copy=False)
+
+                np.nan_to_num(stats_obj.x_hat_sample_std, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.x_bar_sample_std, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.x_sample_std, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.alpha_sample_std, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.rho_sample_std, posinf=0.0, copy=False)
+                np.nan_to_num(stats_obj.gamma_sample_std, posinf=0.0, copy=False)
 
     def aggregate_statistics(self):
         """Aggregate the statistics.
@@ -118,8 +150,13 @@ class VisualizationData:
                 gamma_std = np.sqrt( np.mean( np.square( stats_obj.gamma_sample_std ), axis=0) )
 
                 # Compute convergence for the aggregate estimates
+                if self.difference_window_size*self.comms_period % 2 == 0:
+                    x_hat_window_size = self.difference_window_size*self.comms_period + 1
+                else:
+                    x_hat_window_size = self.difference_window_size*self.comms_period
+
                 x_hat_conv_ind = self.detect_convergence(x_hat_mean,
-                                                         self.difference_window_size*self.comms_period,
+                                                         x_hat_window_size,
                                                          self.convergence_thresh)
                 x_bar_conv_ind = self.detect_convergence(x_bar_mean,
                                                          self.difference_window_size,
@@ -188,7 +225,7 @@ class VisualizationData:
         return conv_ind
 
     def compute_difference(self, curve, window_size):
-        """Compute the difference between endpoints the length of a specified window size.
+        """Compute the difference between endpoints of a specified window.
 
         The difference is computed using a two-sided method, i.e., central difference.
 
@@ -217,8 +254,81 @@ class VisualizationData:
 
         return np.asarray(dx)
 
-def plot_heatmap():
-    pass
+def plot_heatmap(data_obj: VisualizationData):
+    """Plot heatmap based on visualization data. TODO: currently only considers convergence data, should provide options
+    """
+
+    # Collect all the heatmap data into 2-D numpy array
+    heatmap_data = np.asarray([ [data_obj.agg_stats_dict[dfr][sp].x_conv_ind*data_obj.comms_period for sp in data_obj.sp_range] for dfr in data_obj.dfr_range ])
+
+    heatmap(heatmap_data, ("Black tile fill ratio", data_obj.dfr_range), ("Sensor probability, P(b|b) = P(w|w)", data_obj.sp_range), valfmt="{x:3d}")
+
+def heatmap(heatmap_data, row_labels=(), col_labels=(), cbar_kw={}, cbarlabel="", valfmt="{x:.2f}", **kwargs):
+    """Create a heatmap.
+
+    This function plots the heatmap, but doesn't display it. Use plt.show() to display the heatmap.
+    Adapted from https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html.
+
+    Args:
+        row_labels: A tuple containing a string for the axis title and a list of labels for the rows (abscissa).
+        col_labels: A tuple containing a string for the axis title and a list of labels for the columns (ordinate).
+        heatmap_data: A 2-D numpy ndarray of values.
+        cbar_kw: A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
+        cbarlabel: The label for the colorbar.  Optional.
+        **kwargs: All other arguments are forwarded to `imshow`.
+
+    Returns:
+        Heatmap figure and axis objects.
+    """
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(heatmap_data)
+
+    # Create colorbar
+    cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+
+    # Show all ticks and label them with the respective list entries.
+    ax.set_xlabel(col_labels[0])
+    ax.set_ylabel(row_labels[0])
+    ax.set_xticks(np.arange(heatmap_data.shape[1]), labels=col_labels[1])
+    ax.set_yticks(np.arange(heatmap_data.shape[0]), labels=row_labels[1])
+
+    # Let the horizontal axes labeling appear on top.
+    ax.tick_params(top=True, bottom=False,
+                   labeltop=True, labelbottom=False)
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+             rotation_mode="anchor")
+
+    # Turn spines off and create white grid.
+    ax.spines[:].set_visible(False)
+
+    ax.set_xticks(np.arange(heatmap_data.shape[1]+1)-.5, minor=True)
+    ax.set_yticks(np.arange(heatmap_data.shape[0]+1)-.5, minor=True)
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    # Loop over the data and create a `Text` for each "pixel".
+    # Change the text's color depending on the data.
+    texts = []
+    textcolors = ("white", "black")
+
+    # Get the formatter in case a string is supplied
+    if isinstance(valfmt, str):
+        valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+    # Normalize the threshold to the images color range.
+    threshold = im.norm(heatmap_data.max())/2
+
+    for i in range(heatmap_data.shape[0]):
+        for j in range(heatmap_data.shape[1]):
+            kwargs.update(color=textcolors[int(im.norm(heatmap_data[i, j]) > threshold)])
+            text = im.axes.text(j, i, valfmt(heatmap_data[i, j], None), **kwargs)
+            texts.append(text)
+
+    return fig, ax, im, cbar
 
 def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False):
     """Plot the time series data.
@@ -259,7 +369,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
             ax_x_hat[0].plot(abscissa_values_x_hat, stats_obj.x_hat_sample_mean[n], label="Exp {}".format(n))
             ax_x_hat[0].fill_between(abscissa_values_x_hat, x_hat_bounds[0], x_hat_bounds[1], alpha=0.2)
 
-            ax_x_hat[1].plot(stats_obj.alpha_sample_mean[n], label="Exp {}".format(n))
+            ax_x_hat[1].plot(abscissa_values_x_hat, stats_obj.alpha_sample_mean[n], label="Exp {}".format(n))
             ax_x_hat[1].fill_between(abscissa_values_x_hat, alpha_bounds[0], alpha_bounds[1], alpha=0.2)
 
             # Plot time evolution of social estimates and confidences
@@ -328,6 +438,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     ax_x_hat[0].set_title("Average of {0} agents' local values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x_hat[0].set_ylabel("Local estimates")
     ax_x_hat[0].set_ylim(0, 1.0)
+    ax_x_hat[1].set_ylim(10e-1, 10e5)
     ax_x_hat[1].set_ylabel("Local confidences")
     ax_x_hat[1].set_xlabel("Observations")
     ax_x_hat[1].set_yscale("log")
@@ -335,6 +446,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     ax_x_bar[0].set_title("Average of {0} agents' social values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x_bar[0].set_ylabel("Social estimates")
     ax_x_bar[0].set_ylim(0, 1.0)
+    ax_x_bar[1].set_ylim(10e-1, 10e5)
     ax_x_bar[1].set_ylabel("Social confidences")
     ax_x_bar[1].set_xlabel("Observations")
     ax_x_bar[1].set_yscale("log")
@@ -342,6 +454,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     ax_x[0].set_title("Average of {0} agents' informed values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x[0].set_ylabel("Informed estimates")
     ax_x[0].set_ylim(0, 1.0)
+    ax_x[1].set_ylim(10e-1, 10e5)
     ax_x[1].set_ylabel("Informed confidences")
     ax_x[1].set_xlabel("Observations")
     ax_x[1].set_yscale("log")
@@ -355,8 +468,6 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     adjust_subplot_legend_and_axis(fig_x_hat, ax_x_hat)
     adjust_subplot_legend_and_axis(fig_x_bar, ax_x_bar)
     adjust_subplot_legend_and_axis(fig_x, ax_x)
-
-    plt.show()
 
 def compute_std_bounds(mean_val, std_val):
     return [ np.add(mean_val, std_val),  np.subtract(mean_val, std_val) ]
