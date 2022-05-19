@@ -23,7 +23,7 @@ MAX=(0.20 0.4 0.6 0.8 0.95)
 INC=(4 4 4 4 3)
 
 # Set fixed parameters
-sed -i "s/numExperiments:.*/numExperiments: 1/g" param_multi_agent_sim.yaml
+sed -i "s/numExperiments:.*/numExperiments: 5/g" param_multi_agent_sim.yaml
 sed -i "s/numObs:.*/numObs: 10/g" param_multi_agent_sim.yaml
 
 # Run simulations
