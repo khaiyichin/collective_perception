@@ -18,9 +18,9 @@ COMM=("full" "ring" "line" "scale-free")
 PERIOD=(1 2 5 10)
 AGENTS=(5 10 50 100 200)
 
-MIN=(0.05 0.25 0.45 0.65 0.85)
-MAX=(0.20 0.4 0.6 0.8 0.95)
-INC=(4 4 4 4 3)
+MIN=(0.05 0.3 0.55 0.8)
+MAX=(0.25 0.5 0.75 0.95)
+INC=(5 5 5 4)
 
 # Set fixed parameters
 sed -i "s/numExperiments:.*/numExperiments: 5/g" param_multi_agent_sim.yaml
@@ -47,7 +47,7 @@ sed -i "s/numObs:.*/numObs: 1000/g" param_multi_agent_sim.yaml
                 agents=$(echo ${AGENTS[c]})
                 sed -i "s/numAgents:.*/numAgents: $agents/" param_multi_agent_sim.yaml
 
-                for (( d = 0; d <= 4; d++ )) # fill ratios
+                for (( d = 0; d <= 3; d++ )) # fill ratios
                 do
                     min=$(echo ${MIN[d]})
                     max=$(echo ${MAX[d]})
