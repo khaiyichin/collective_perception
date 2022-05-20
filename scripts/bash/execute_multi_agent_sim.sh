@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# Script to execute static multi agent simulation (Python-based)
+# on a machine with root privilege (i.e., graph-tool can be installed with apt),
+# which means that the Python script is run regularly.
+
+# Verify that arguments are provided
+if [ $# == 0 ]; then
+    echo "Not enough arguments provided!"
+    exit 1
+fi
+
+if [[ ! -d $1 ]]; then
+    echo "1st argument should be a working directory that exists!"
+    exit 1
+fi
+
 # Switch to working directory
 CURR_DIR=$(pwd)
 echo "Changing to working directory: $1";
@@ -18,9 +33,9 @@ COMM=("full" "ring" "line" "scale-free")
 PERIOD=(1 2 5 10)
 AGENTS=(5 10 50 100 200)
 
-MIN=(0.05 0.3 0.55 0.8)
-MAX=(0.25 0.5 0.75 0.95)
-INC=(5 5 5 4)
+MIN=(0.05 0.35 0.65 0.95)
+MAX=(0.3 0.6 0.9 0.95)
+INC=(6 6 6 1)
 
 # Set fixed parameters
 sed -i "s/numExperiments:.*/numExperiments: 5/g" param_multi_agent_sim.yaml
