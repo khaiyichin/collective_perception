@@ -76,7 +76,7 @@ sed -i "s/numObs:.*/numObs: 1000/g" param_multi_agent_sim.yaml
                 inc=$(echo ${INC[d]})
                 sed -i "/desFillRatios:/{n;N;N;d}" param_multi_agent_sim.yaml
                 sed -i "s/desFillRatios:/desFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" param_multi_agent_sim.yaml
-                apptainer run multi_agent_sim_static.sif
+                singularity run multi_agent_sim_static.sif
             done
 
             # Copy and move the data
