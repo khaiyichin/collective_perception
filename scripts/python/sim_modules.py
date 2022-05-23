@@ -55,26 +55,26 @@ class Sim:
         def __init__(self, sim_type, num_exp, num_obs, comms_period):
 
             if sim_type == "single":
-                self.x_hat_sample_mean = np.zeros( (num_exp, num_obs) )
-                self.alpha_sample_mean = np.zeros( (num_exp, num_obs) )
-                self.x_hat_sample_std = np.zeros( (num_exp, num_obs) )
-                self.alpha_sample_std = np.zeros( (num_exp, num_obs) )
+                self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
+                self.alpha_sample_mean = np.zeros( (num_exp, num_obs + 1) )
+                self.x_hat_sample_std = np.zeros( (num_exp, num_obs + 1) )
+                self.alpha_sample_std = np.zeros( (num_exp, num_obs + 1) )
 
             elif sim_type == "multi":
-                self.x_hat_sample_mean = np.zeros( (num_exp, num_obs) )
-                self.alpha_sample_mean = np.zeros( (num_exp, num_obs) )
-                self.x_hat_sample_std = np.zeros( (num_exp, num_obs) )
-                self.alpha_sample_std = np.zeros( (num_exp, num_obs) )
+                self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
+                self.alpha_sample_mean = np.zeros( (num_exp, num_obs + 1) )
+                self.x_hat_sample_std = np.zeros( (num_exp, num_obs + 1) )
+                self.alpha_sample_std = np.zeros( (num_exp, num_obs + 1) )
 
-                self.x_bar_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
-                self.rho_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
-                self.x_bar_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
-                self.rho_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+                self.x_bar_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
+                self.rho_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
+                self.x_bar_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
+                self.rho_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
 
-                self.x_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
-                self.gamma_sample_mean = np.zeros( (num_exp, num_obs//comms_period) )
-                self.x_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
-                self.gamma_sample_std = np.zeros( (num_exp, num_obs//comms_period) )
+                self.x_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
+                self.gamma_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
+                self.x_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
+                self.gamma_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
 
     def __init__(self, num_exp, num_obs, des_fill_ratio, main_filename_suffix):
         self.num_exp = num_exp
@@ -124,7 +124,7 @@ class Sim:
         elif h >= b*t:
             return 1.0
         else:
-            return (h/t + w - 1.0) / (b + w -1)
+            return (h/t + w - 1.0) / (b + w - 1)
 
     def compute_fisher_hat_inv(self, h, t, b, w):
         """Compute the inverse Fisher information (variance) for one agent.
@@ -300,12 +300,12 @@ class MultiAgentSim(Sim):
         self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, sensor_prob, comms_period)
 
         # Initialize non-persistent simulation data
-        self.x_hat = np.zeros( (num_exp, num_agents, num_obs) )
-        self.alpha = np.zeros( (num_exp, num_agents, num_obs) )
-        self.x_bar = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
-        self.rho = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
-        self.x = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
-        self.gamma = np.zeros( (num_exp, num_agents, num_obs//comms_period) )
+        self.x_hat = np.zeros( (num_exp, num_agents, num_obs + 1) )
+        self.alpha = np.zeros( (num_exp, num_agents, num_obs + 1) )
+        self.x_bar = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
+        self.rho = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
+        self.x = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
+        self.gamma = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
 
         # Setup up communication graph
         self.setup_comms_graph(sim_param_obj.comms_graph_str, sim_param_obj.comms_prob)
@@ -415,7 +415,7 @@ class MultiAgentSim(Sim):
 
     def run_sim(self, experiment_index):
 
-        # Generate tiles (bernoulli instances for each agent
+        # Generate tiles (bernoulli instances for each agent)
         self.sim_data.tiles[experiment_index] = self.generate_tiles(self.sim_data.num_agents)
 
         # Need period timing condition here to decide when to switch
@@ -434,6 +434,18 @@ class MultiAgentSim(Sim):
 
         informed_x = []
         informed_conf = []
+
+        # Obtain initial estimates (before any observations are made)
+        l, s, i = self.get_initial_estimates()
+
+        local_x.append(l["x"])
+        local_conf.append(l["conf"])
+
+        social_x.append(s["x"])
+        social_conf.append(s["conf"])
+
+        informed_x.append(i["x"])
+        informed_conf.append(i["conf"])
 
         # Go through each tile observation
         while curr_iteration < self.num_obs:
@@ -473,6 +485,29 @@ class MultiAgentSim(Sim):
         # Store informed estimates and confidences into log
         self.x[experiment_index] = np.asarray(informed_x).T
         self.gamma[experiment_index] = np.asarray(informed_conf).T
+
+    def get_initial_estimates(self):
+        """Get the initial estimates for all agents.
+
+        Returns:
+            A dict each containing a record of local estimates, social estimates, and informed estimates.
+        """
+
+        local_values = {"x": [], "conf": []}
+
+        # Iterate through each agent to collect local estimate
+        for v in self.sim_data.comms_network.graph.vertices():
+
+            agent = self.sim_data.comms_network.agents_vp[v]
+
+            # Collect local agent values
+            local_values["x"].append(agent.get_x_hat())
+            local_values["conf"].append(agent.get_alpha())
+
+        # Collect social and informed estimates
+        social_values, informed_values = self.run_communication_phase()
+
+        return local_values, social_values, informed_values
 
     def run_communication_phase(self):
         """Execute one round of communication for all agents.
@@ -595,8 +630,7 @@ class Agent:
         elif encounter == BLACK_TILE:
             sensor_prob = self.b_prob
         else: # error catching
-            print("Error: invalid tile encounter!")
-            exit()
+            raise RuntimeError("Error: invalid tile encounter!")
 
         # Record sensor observation of the encounter
         obs = obs_function(encounter, sensor_prob)
@@ -669,14 +703,14 @@ class Agent:
     class LocalSolver:
 
         def __init__(self, est_func, conf_func):
-            self.x = 0.0
+            self.x = 0.5 # initial estimate is random
             self.conf = 0.0
 
             self.est_func = est_func
             self.conf_func = conf_func
 
         def reset(self):
-            self.x = 0.0
+            self.x = 0.5
             self.conf = 0.0
 
         def solve(self, h, t, b, w):
