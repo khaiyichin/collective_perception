@@ -4,8 +4,14 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import os
+import pickle
+from datetime import datetime
 
 from sim_modules import ExperimentData
+
+# Default values
+DIFF_WINDOW_SIZE = 3
+CONV_THRESH = 5e-3
 
 class VisualizationData:
     """Class for storing simulation results for easy data analysis and visualization.
@@ -19,6 +25,16 @@ class VisualizationData:
     loaded for data visualization, which complicates the structure of the ExperimentData class if
     we were to also use it for data visualization. Thus it's easier to just create a separate class
     that takes in the paths to the multiple ExperimentData to extract the data.
+
+    This class is intended to store simulations with the same:
+        - communication network type,
+        - number of experiments,
+        - number of agents,
+        - communication period, and
+        - communication probability
+    and with varying:
+        - target fill ratios, and
+        - sensor probabilities.
     """
 
     class AggregateStats:
@@ -45,12 +61,12 @@ class VisualizationData:
             self.x_bar_conv_ind = -1
             self.x_conv_ind = -1
 
-    def __init__(self, exp_data_obj_folder, difference_window_size=3, convergence_thresh=5e-3):
+    def __init__(self, exp_data_obj_folder, diff_window_size=DIFF_WINDOW_SIZE, convergence_thresh=CONV_THRESH):
 
         # Load experiment data statistics
         first_obj = True
 
-        self.difference_window_size = difference_window_size
+        self.diff_window_size = diff_window_size
         self.convergence_thresh = convergence_thresh
 
         # Iterate through folder contents recursively to obtain all serialized filenames
@@ -150,19 +166,19 @@ class VisualizationData:
                 gamma_std = np.sqrt( np.mean( np.square( stats_obj.gamma_sample_std ), axis=0) )
 
                 # Compute convergence for the aggregate estimates
-                if self.difference_window_size*self.comms_period % 2 == 0:
-                    x_hat_window_size = self.difference_window_size*self.comms_period + 1
+                if self.diff_window_size*self.comms_period % 2 == 0:
+                    x_hat_window_size = self.diff_window_size*self.comms_period + 1
                 else:
-                    x_hat_window_size = self.difference_window_size*self.comms_period
+                    x_hat_window_size = self.diff_window_size*self.comms_period
 
                 x_hat_conv_ind = self.detect_convergence(x_hat_mean,
                                                          x_hat_window_size,
                                                          self.convergence_thresh)
                 x_bar_conv_ind = self.detect_convergence(x_bar_mean,
-                                                         self.difference_window_size,
+                                                         self.diff_window_size,
                                                          self.convergence_thresh)
                 x_conv_ind = self.detect_convergence(x_mean,
-                                                     self.difference_window_size,
+                                                     self.diff_window_size,
                                                      self.convergence_thresh)
 
                 # Store values into dictionary
@@ -253,6 +269,112 @@ class VisualizationData:
         assert( len(dx) == (len(curve) - window_size + 1) ) # ensure that the output list has the correct length
 
         return np.asarray(dx)
+
+class VisualizationDataGroup:
+    """Class to store VisualizationData objects.
+
+    The VisualizationData objects are stored by first using the VisualizationData's method
+    in loading serialized ExperimentData files. Then each VisualizationData object
+    are stored in this class.
+
+    This class is intended to store VisualizationData objects with the same:
+        - communication network type, and
+        - number of experiments,
+    and with varying:
+        - number of agents,
+        - communication period,
+        - communication probability.
+    The target fill ratios and sensor probabilities are already varied (with fixed ranges) in the
+    stored VisualizationData objects.
+
+    This class is initialized with 4 arguments:
+        data_folder: A string specifying the directory containing all the ExperimentData files.
+        diff_window_size: passed to the VisualizationData class (see the VisualizationData class).
+        convergence_thresh: passed to the VisualizationData class (see the VisualizationData class).
+    """
+
+    def __init__(self, data_folder, diff_window_size=DIFF_WINDOW_SIZE, convergence_thresh=CONV_THRESH):
+
+        self.viz_data_obj_dict = {}
+        self.stored_obj_counter = 0
+
+        # Iterate through folder contents recursively to obtain folders containing the serialized files
+        exp_data_obj_folders = []
+
+        for root, _, files in os.walk(data_folder):
+
+            # Check to see if any pickle file exist in the current directory
+            serialized_files = [f for f in files if os.path.splitext(f)[1] == ".pkl"]
+
+            if len(serialized_files) == 0: # move on to the next folder
+                continue
+            else: # pickle file found, that means the directory two levels up is needed
+                parent_folder, folder = os.path.split( os.path.abspath(root) )
+                exp_data_obj_folders.append(parent_folder)
+
+        self.folders = list(set(exp_data_obj_folders)) # store the unique values for the paths
+
+        # Load the VisualizationData objects and store them
+        for folder in self.folders:
+            v = VisualizationData(folder, diff_window_size, convergence_thresh)
+
+            # Check existence of objects in dictionary before storing
+            if v.comms_period not in self.viz_data_obj_dict:
+                self.viz_data_obj_dict[v.comms_period] = {}
+
+            if v.comms_prob not in self.viz_data_obj_dict[v.comms_period]:
+                self.viz_data_obj_dict[v.comms_period][v.comms_prob] = {}
+
+            if v.num_agents in self.viz_data_obj_dict[v.comms_period][v.comms_prob]:
+                raise ValueError("The data for period={0}, prob={1}, num_agents={2} exists already!".format(v.comms_period, v.comms_prob, v.num_agents))
+            else:
+                self.viz_data_obj_dict[v.comms_period][v.comms_prob][v.num_agents] = v
+                self.stored_obj_counter += 1
+
+    def get_viz_data_obj(self, comms_period: int, comms_prob: float, num_agents: int) -> VisualizationData:
+        """Get the VisualizationData object.
+
+        Args:
+            comms_period: The communication period.
+            comms_prob: The communication probability.
+            num_agents: The number of agents.
+
+        Returns:
+            A VisualizationData object for the specified inputs.
+        """
+        return self.viz_data_obj_dict[comms_period][comms_prob][num_agents]
+
+    def save(self, filepath=None, curr_time=None):
+        """Serialize the class into a pickle.
+        """
+
+        # Get current time
+        if curr_time is None:
+            curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
+
+        if filepath:
+            root, ext = os.path.splitext(filepath)
+            save_path = root + "_" + curr_time + ext
+        else:
+            save_path = "viz_data_group" + curr_time + ".pkl"
+
+        with open(save_path, "wb") as fopen:
+            pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
+
+        print( "\nSaved VisualizationDataGroup object containing {0} items at: {1}.\n".format( self.stored_obj_counter, os.path.abspath(save_path) ) )
+
+    @classmethod
+    def load(cls, filepath):
+        """Load pickled data.
+        """
+
+        with open(filepath, 'rb') as fopen:
+            obj = pickle.load(fopen)
+
+        # Verify the unpickled object
+        assert isinstance(obj, cls)
+
+        return obj
 
 def plot_heatmap(data_obj: VisualizationData):
     """Plot heatmap based on visualization data. TODO: currently only considers convergence data, should provide options
@@ -438,7 +560,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     ax_x_hat[0].set_title("Average of {0} agents' local values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x_hat[0].set_ylabel("Local estimates")
     ax_x_hat[0].set_ylim(0, 1.0)
-    ax_x_hat[1].set_ylim(10e-1, 10e5)
+    ax_x_hat[1].set_ylim(10e-3, 10e5)
     ax_x_hat[1].set_ylabel("Local confidences")
     ax_x_hat[1].set_xlabel("Observations")
     ax_x_hat[1].set_yscale("log")
@@ -446,7 +568,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     ax_x_bar[0].set_title("Average of {0} agents' social values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x_bar[0].set_ylabel("Social estimates")
     ax_x_bar[0].set_ylim(0, 1.0)
-    ax_x_bar[1].set_ylim(10e-1, 10e5)
+    ax_x_bar[1].set_ylim(10e-3, 10e5)
     ax_x_bar[1].set_ylabel("Social confidences")
     ax_x_bar[1].set_xlabel("Observations")
     ax_x_bar[1].set_yscale("log")
@@ -454,7 +576,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     ax_x[0].set_title("Average of {0} agents' informed values with 1\u03c3 bounds (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
     ax_x[0].set_ylabel("Informed estimates")
     ax_x[0].set_ylim(0, 1.0)
-    ax_x[1].set_ylim(10e-1, 10e5)
+    ax_x[1].set_ylim(10e-3, 10e5)
     ax_x[1].set_ylabel("Informed confidences")
     ax_x[1].set_xlabel("Observations")
     ax_x[1].set_yscale("log")

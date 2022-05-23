@@ -1,3 +1,5 @@
 *.asv
 *.pyc
 data/
+.venv/
+containers/
