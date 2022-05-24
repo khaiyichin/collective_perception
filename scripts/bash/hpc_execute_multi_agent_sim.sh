@@ -6,13 +6,8 @@
 # multi_agent_sim_static.sif.
 
 # Verify that arguments are provided
-if [ $# == 0 ] || [ $# == 1 ]; then
+if [ $# == 0 ]; then
     echo "Not enough arguments provided!"
-    exit 1
-fi
-
-if [[ ! -d $1 ]]; then
-    echo "1st argument should be a working directory that exists!"
     exit 1
 fi
 
@@ -21,26 +16,16 @@ s2="ring"
 s3="line"
 s4="scale-free"
 
-if [ $2 != $s1 ] && [ $2 != $s2 ] && [ $2 != $s3 ] && [ $2 != $s4 ]; then
-    echo "2nd argument should be one of the following: \"full\", \"ring\", \"line\", \"scale-free\"!"
+if [ $1 != $s1 ] && [ $1 != $s2 ] && [ $1 != $s3 ] && [ $1 != $s4 ]; then
+    echo "1st argument should be one of the following: \"full\", \"ring\", \"line\", \"scale-free\"!"
     exit 1
 fi
 
-# Switch to working directory
-CURR_DIR=$(pwd)
-echo "Changing to working directory: $1";
-pushd $1
-
-# Copy scripts
-cp $CURR_DIR/../examples/param/param_multi_agent_sim.yaml .
-cp $CURR_DIR/../python/multi_agent_sim.py .
-cp $CURR_DIR/../python/sim_modules.py .
-
 # Iterate and run scripts for different param cases
 # COMM=("full" "ring" "line" "scale-free")
-COMM=$2 # when run in the cluster different communication graph parameters are run with separate nodes for increased efficiency
+COMM=$1 # when run in the cluster different communication graph parameters are run with separate nodes for increased efficiency
 PERIOD=(1 2 5 10)
-AGENTS=(5 10 50 100 200)
+AGENTS=(10 50 100 200)
 
 MIN=(0.05)
 MAX=(0.95)
@@ -48,7 +33,7 @@ INC=(19)
 
 # Set fixed parameters
 sed -i "s/numExperiments:.*/numExperiments: 5/g" param_multi_agent_sim.yaml
-sed -i "s/numObs:.*/numObs: 1000/g" param_multi_agent_sim.yaml
+sed -i "s/numObs:.*/numObs: 1500/g" param_multi_agent_sim.yaml
 
 # Run simulations
 {

@@ -150,13 +150,13 @@ class Sim:
         return np.mean(x_arr)
 
     def compute_fisher_bar(self, fisher_arr):
-        return np.reciprocal( np.mean( np.reciprocal( fisher_arr ) ) )
+        return np.nan_to_num(np.reciprocal( np.mean( np.reciprocal( fisher_arr ) ) ), posinf=POSINF) # prevent infs
 
     def compute_x(self, x_hat, alpha, x_bar, rho): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
         return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
 
     def compute_fisher(self, alpha, rho):
-        return np.reciprocal( 1 / (alpha + rho) ) # alpha^-1 and rho^-1 are variances
+        return np.nan_to_num(np.reciprocal( 1 / (alpha + rho) ), posinf=POSINF) # alpha^-1 and rho^-1 are variances; prevent infs
 
     def _write_data_to_csv(self, f_hat_data, fisher_inv_data, suffix=""):
 
