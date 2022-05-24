@@ -3,8 +3,8 @@
 #SBATCH -n 40
 #SBATCH --mem=128G
 #SBATCH -p short
-#SBATCH -o log%x%j.out
-#SBATCH -e log%x%j.err
+#SBATCH -o log_%x_%j.out
+#SBATCH -e log_%x_%j.err
 #SBATCH -t 02:00:00
 #SBATCH --mail-user=kchin@wpi.edu
 #SBATCH --mail-type=all

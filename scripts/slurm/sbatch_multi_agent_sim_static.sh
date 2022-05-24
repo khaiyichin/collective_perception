@@ -3,8 +3,8 @@
 #SBATCH -n 20
 #SBATCH --mem=128G
 #SBATCH -p short
-#SBATCH -o log%x%j.out
-#SBATCH -e log%x%j.err
+#SBATCH -o log_%x_%j.out
+#SBATCH -e log_%x_%j.err
 #SBATCH -t 24:00:00
 #SBATCH --mail-user=kchin@wpi.edu
 #SBATCH --mail-type=all
@@ -20,7 +20,7 @@ module load singularity/3.6.2
 cp $1/examples/param/param_multi_agent_sim.yaml .
 cp $1/python/multi_agent_sim.py .
 cp $1/python/sim_modules.py .
-cp $1/bash/hpc_execute_multi_agent_sim.sh
+cp $1/bash/hpc_execute_multi_agent_sim.sh .
 
 # Run simulation
 ./hpc_execute_multi_agent_sim.sh $2
