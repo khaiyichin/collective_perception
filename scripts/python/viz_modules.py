@@ -6,12 +6,15 @@ import matplotlib.pyplot as plt
 import os
 import pickle
 from datetime import datetime
+import warnings
 
 from sim_modules import ExperimentData
 
 # Default values
 DIFF_WINDOW_SIZE = 3
 CONV_THRESH = 5e-3
+
+warnings.filterwarnings("ignore", category=UserWarning) # ignore UserWarning type warnings
 
 class VisualizationData:
     """Class for storing simulation results for easy data analysis and visualization.
@@ -111,26 +114,7 @@ class VisualizationData:
                     self.dfr_range.extend(obj.dfr_range)
                     self.stats_obj_dict.update(obj.stats_obj_dict)
 
-        # self.preprocess_data()
         self.aggregate_statistics()
-
-    def preprocess_data(self):
-        for _, sp_dict in self.stats_obj_dict.items():
-            for _, stats_obj in sp_dict.items():
-
-                np.nan_to_num(stats_obj.x_hat_sample_mean, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.x_bar_sample_mean, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.x_sample_mean, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.alpha_sample_mean, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.rho_sample_mean, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.gamma_sample_mean, posinf=0.0, copy=False)
-
-                np.nan_to_num(stats_obj.x_hat_sample_std, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.x_bar_sample_std, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.x_sample_std, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.alpha_sample_std, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.rho_sample_std, posinf=0.0, copy=False)
-                np.nan_to_num(stats_obj.gamma_sample_std, posinf=0.0, copy=False)
 
     def aggregate_statistics(self):
         """Aggregate the statistics.
@@ -368,7 +352,7 @@ class VisualizationDataGroup:
         """Load pickled data.
         """
 
-        with open(filepath, 'rb') as fopen:
+        with open(filepath, "rb") as fopen:
             obj = pickle.load(fopen)
 
         # Verify the unpickled object
@@ -376,16 +360,96 @@ class VisualizationDataGroup:
 
         return obj
 
-def plot_heatmap(data_obj: VisualizationData):
-    """Plot heatmap based on visualization data. TODO: currently only considers convergence data, should provide options
+def plot_heatmap_vdg(data_obj: VisualizationDataGroup, row_keys: list, col_keys: list, outer_grid_row_labels: list, outer_grid_col_labels: list):
+    """Plot heatmap based on a VisualizationDataGroupt object. TODO: currently only considers convergence data, should provide options
     """
 
+    # Create 2 subfigures, one for the actual grid of heatmaps while the other for the colorbar
+    fig_size = (16, 12)
+    fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
+    subfigs = fig.subfigures(1, 2, wspace=0.05, width_ratios=[10, 1.5])
+    ax_lst = subfigs[0].subplots(
+        nrows=len(outer_grid_row_labels),
+        ncols=len(outer_grid_col_labels),
+        sharex=True,
+        sharey=True,
+        gridspec_kw = {"wspace":0.001}
+    )
+
+    # Find heatmap minimum and maximum to create a standard range for color bar later
+    minimum = np.inf
+    maximum = -np.inf
+
+    for ind_r, row in enumerate(row_keys):
+        for ind_c, col in enumerate(col_keys):
+
+            v = data_obj.get_viz_data_obj(comms_period=row, comms_prob=1.0, num_agents=col)
+            convergence_vals = \
+                [ [v.agg_stats_dict[dfr][sp].x_conv_ind*v.comms_period for sp in v.sp_range] for dfr in v.dfr_range ]
+
+            minimum = np.amin([minimum, np.amin(convergence_vals)])
+            maximum = np.amax([maximum, np.amax(convergence_vals)])
+    
+    print("Heatmap minimum: {0}, maximum: {1}".format(minimum, maximum))
+
     # Collect all the heatmap data into 2-D numpy array
-    heatmap_data = np.asarray([ [data_obj.agg_stats_dict[dfr][sp].x_conv_ind*data_obj.comms_period for sp in data_obj.sp_range] for dfr in data_obj.dfr_range ])
+    for ind_r, row in enumerate(row_keys):
+        for ind_c, col in enumerate(col_keys):
 
-    heatmap(heatmap_data, ("Black tile fill ratio", data_obj.dfr_range), ("Sensor probability, P(b|b) = P(w|w)", data_obj.sp_range), valfmt="{x:3d}")
+            v = data_obj.get_viz_data_obj(comms_period=row, comms_prob=1.0, num_agents=col)
+            tup = plot_heatmap_vd(
+                v,
+                ax=ax_lst[ind_r][ind_c],
+                row_label=outer_grid_row_labels[ind_r],
+                col_label=outer_grid_col_labels[ind_c],
+                vmin=minimum,
+                vmax=maximum,
+                activate_outer_grid_xlabel=True if ind_r == len(outer_grid_row_labels) - 1 else False,
+                activate_outer_grid_ylabel=True if ind_c == 0 else False
+            )
 
-def heatmap(heatmap_data, row_labels=(), col_labels=(), cbar_kw={}, cbarlabel="", valfmt="{x:.2f}", **kwargs):
+    # Add inner grid labels
+    ax_lst[-1][-1].text(19.5, 19.5, "Sensor probability\nP(b|b) = P(w|w)") # sensor probability as x label
+    ax_lst[0][0].text(-5, -2, "Black tile fill ratio") # fill ratio as y label
+
+    # Add color bar
+    cbar_ax = subfigs[1].add_axes([0, 0.15, .07, 0.7]) # [left, bottom, width, height]
+    cbar = plt.colorbar(tup[2], cax=cbar_ax)
+    cbar.ax.set_ylabel("Convergence timestep (# of observations)") # TODO: need to have a general version
+    cbar.ax.set_yticks( [minimum, *cbar.ax.get_yticks()[1:-1], maximum] )
+
+    # Save the heatmap
+    fig.set_size_inches(*fig_size)
+    fig.savefig("/home/khaiyichin/heatmap.png", bbox_inches="tight", dpi=300)
+
+def plot_heatmap_vd(data_obj: VisualizationData, row_label="infer", col_label="infer", xticks="infer", yticks="infer", ax=None, **kwargs):
+    """Plot heatmap based on a VisualizationData object. TODO: currently only considers convergence data, should provide options
+    """
+
+    # Define the labels and ticks (TODO: need to create a more generalized form)
+    if row_label == "infer": row_label = "Black tile fill ratio"
+    if col_label == "infer": col_label = "Sensor probability, P(b|b) = P(w|w)"
+
+    if xticks == "infer": xticks = data_obj.sp_range
+    if yticks == "infer": yticks = data_obj.dfr_range
+
+    # Collect all the heatmap data into 2-D numpy array (for informed estimates' convergence only currently)
+    heatmap_data = np.asarray(
+        [ [data_obj.agg_stats_dict[dfr][sp].x_conv_ind*data_obj.comms_period for sp in data_obj.sp_range] for dfr in data_obj.dfr_range ]
+    )
+
+    return heatmap(
+        heatmap_data,
+        row_label=row_label,
+        col_label=col_label,
+        xticks=xticks,
+        yticks=yticks,
+        ax=ax,
+        valfmt="{x:3d}",
+        **kwargs
+    )
+
+def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=None, cbar_kw={}, cbarlabel="", valfmt="{x:.2f}", **kwargs):
     """Create a heatmap.
 
     This function plots the heatmap, but doesn't display it. Use plt.show() to display the heatmap.
@@ -397,60 +461,83 @@ def heatmap(heatmap_data, row_labels=(), col_labels=(), cbar_kw={}, cbarlabel=""
         heatmap_data: A 2-D numpy ndarray of values.
         cbar_kw: A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
         cbarlabel: The label for the colorbar.  Optional.
-        **kwargs: All other arguments are forwarded to `imshow`.
+        **kwargs: All other arguments.
 
     Returns:
         Heatmap figure and axis objects.
     """
 
-    fig, ax = plt.subplots()
-    im = ax.imshow(heatmap_data)
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
 
-    # Create colorbar
-    cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
-    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+    # Initialize values for keyword arguments if non-existent
+    if ("activate_outer_grid_xlabel" not in kwargs) or ("activate_outer_grid_ylabel" not in kwargs): # draw labels anyway
+        kwargs["activate_outer_grid_xlabel"] = True
+        kwargs["activate_outer_grid_ylabel"] = True
 
-    # Show all ticks and label them with the respective list entries.
-    ax.set_xlabel(col_labels[0])
-    ax.set_ylabel(row_labels[0])
-    ax.set_xticks(np.arange(heatmap_data.shape[1]), labels=col_labels[1])
-    ax.set_yticks(np.arange(heatmap_data.shape[0]), labels=row_labels[1])
+    # Plot the heatmap
+    im = ax.imshow(heatmap_data, vmin=kwargs["vmin"], vmax=kwargs["vmax"], cmap="jet")
 
-    # Let the horizontal axes labeling appear on top.
-    ax.tick_params(top=True, bottom=False,
-                   labeltop=True, labelbottom=False)
+    # Show all ticks and label them with the respective list entries
+    if kwargs["activate_outer_grid_xlabel"]:
+        ax.set_xlabel(col_label)
+        ax.xaxis.labelpad = 25
 
-    # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+    if kwargs["activate_outer_grid_ylabel"]:
+        ax.set_ylabel(row_label)
+        ax.yaxis.labelpad = 25
+
+    ax.set_xticks(np.arange(heatmap_data.shape[1]), labels=xticks)
+    ax.set_yticks(np.arange(heatmap_data.shape[0]), labels=yticks)
+
+    # Rotate the tick labels and set their alignment
+    plt.setp(ax.get_xticklabels(), rotation=60, ha="right",
              rotation_mode="anchor")
 
-    # Turn spines off and create white grid.
-    ax.spines[:].set_visible(False)
+    # Reduce the number of visible tick labels
+    len_xticks = len( ax.get_xticks() )
+    if len_xticks%2 != 0: new_len_xticks = len_xticks//2 + 1
+    else: new_len_xticks = len_xticks//2
 
-    ax.set_xticks(np.arange(heatmap_data.shape[1]+1)-.5, minor=True)
-    ax.set_yticks(np.arange(heatmap_data.shape[0]+1)-.5, minor=True)
-    ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
-    ax.tick_params(which="minor", bottom=False, left=False)
+    len_yticks = len( ax.get_yticks() )
+    if len_yticks%2 != 0: new_len_yticks = len_yticks//2 + 1
+    else: new_len_yticks = len_yticks//2
+
+    ax.xaxis.set_major_locator( plt.MaxNLocator( new_len_xticks ) )
+    ax.yaxis.set_major_locator( plt.MaxNLocator( new_len_yticks ) )
+
+    ax.set_xticks(np.arange(heatmap_data.shape[1]), minor=True)
+    ax.set_yticks(np.arange(heatmap_data.shape[0]), minor=True)
+
+    # Create grid lines
+    ax.grid(True, which="both")
+    ax.grid(which="both", color="#999999", linestyle=":")
+
+    """
+    The code below is unused for now, but useful in the future
+    """
 
     # Loop over the data and create a `Text` for each "pixel".
     # Change the text's color depending on the data.
-    texts = []
-    textcolors = ("white", "black")
+    # texts = []
+    # textcolors = ("white", "black")
 
     # Get the formatter in case a string is supplied
-    if isinstance(valfmt, str):
-        valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+    # if isinstance(valfmt, str):
+    #     valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
 
     # Normalize the threshold to the images color range.
-    threshold = im.norm(heatmap_data.max())/2
+    # threshold = im.norm(heatmap_data.max())/2
 
-    for i in range(heatmap_data.shape[0]):
-        for j in range(heatmap_data.shape[1]):
-            kwargs.update(color=textcolors[int(im.norm(heatmap_data[i, j]) > threshold)])
-            text = im.axes.text(j, i, valfmt(heatmap_data[i, j], None), **kwargs)
-            texts.append(text)
+    # for i in range(heatmap_data.shape[0]):
+    #     for j in range(heatmap_data.shape[1]):
+    #         kwargs.update(color=textcolors[int(im.norm(heatmap_data[i, j]) > threshold)])
+    #         text = im.axes.text(j, i, valfmt(heatmap_data[i, j], None), **kwargs)
+    #         texts.append(text)
 
-    return fig, ax, im, cbar
+    return fig, ax, im
 
 def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False):
     """Plot the time series data.
@@ -475,9 +562,9 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     fig_x, ax_x = plt.subplots(2)
     fig_x.set_size_inches(8,6)
 
-    abscissa_values_x_hat = list(range(data_obj.num_obs))
-    abscissa_values_x_bar = list(range(0, data_obj.num_obs, data_obj.comms_period))
-    abscissa_values_x = list(range(0, data_obj.num_obs, data_obj.comms_period))
+    abscissa_values_x_hat = list(range(data_obj.num_obs + 1))
+    abscissa_values_x_bar = list(range(0, data_obj.num_obs + 1*data_obj.comms_period, data_obj.comms_period))
+    abscissa_values_x = list(range(0, data_obj.num_obs + 1*data_obj.comms_period, data_obj.comms_period))
 
     # Plot for all experiments
     if not agg_data:
@@ -607,4 +694,4 @@ def adjust_subplot_legend_and_axis(subplot_fig, subplot_ax):
     subplot_ax[1].set_position([box_2.x0, box_2.y0, box_2.width * 0.9, box_2.height])
 
     handles, labels = subplot_ax[1].get_legend_handles_labels()
-    subplot_fig.legend(handles, labels, loc='center right', bbox_to_anchor=(box_2.width*1.25, 0.5))
+    subplot_fig.legend(handles, labels, loc="center right", bbox_to_anchor=(box_2.width*1.25, 0.5))
