@@ -16,4 +16,7 @@ module load singularity/3.6.2
 # $1: argument for path to the directory containing all the bash scripts
 # $2: argument for the type of communication network to simulate: "full", "ring", "line", "scale-free"
 
-$1/hpc_execute_multi_agent_sim.sh $(pwd) $2
+# Run simulation
+DIR=$(pwd)
+cd $1
+./hpc_execute_multi_agent_sim.sh $DIR $2
