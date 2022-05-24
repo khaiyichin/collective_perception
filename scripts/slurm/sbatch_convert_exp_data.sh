@@ -10,10 +10,9 @@
 #SBATCH --mail-type=all
 
 # This sbatch script should be run in the directory containing the .sif file.
-
 # $1: argument for path to the directory containing all the python scripts
-# $2: argument for top-level directory containing all the sim data for a type of communication network
-# $3: argument for VisualizationDataGroup save location
+# $2: argument for path to the top-level directory containing all the sim data for one type of communication network
+# $3: argument for path to the converted VisualizationDataGroup save location
 
 # Load required modules
 module load singularity/3.6.2

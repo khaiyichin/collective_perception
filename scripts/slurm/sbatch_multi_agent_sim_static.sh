@@ -10,6 +10,10 @@
 #SBATCH --mail-type=all
 
 # Load required modules
-singularity/3.6.2
+module load singularity/3.6.2
 
-./hpc_execute_multi_agent_sim.sh $1 $2
+# This sbatch script should be run in the directory containing the .sif file
+# $1: argument for path to the directory containing all the bash scripts
+# $2: argument for the type of communication network to simulate: "full", "ring", "line", "scale-free"
+
+$1/hpc_execute_multi_agent_sim.sh $(pwd) $2
