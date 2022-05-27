@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH -N 1
-#SBATCH -n 40
-#SBATCH --mem=128G
+#SBATCH -n 30
+#SBATCH --mem=512G
 #SBATCH -p short
 #SBATCH -o log_%x_%j.out
 #SBATCH -e log_%x_%j.err
-#SBATCH -t 02:00:00
+#SBATCH -t 04:00:00
 #SBATCH --mail-user=kchin@wpi.edu
 #SBATCH --mail-type=all
 

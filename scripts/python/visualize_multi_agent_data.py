@@ -3,8 +3,11 @@ import viz_modules as vm
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import timeit
 
 if __name__ == "__main__":
+
+    start = timeit.default_timer()
 
     parser = argparse.ArgumentParser(description="Visualize multi-agent simulation data")
     parser.add_argument("FILE", type=str, help="path to folder containing serialized ExperimentData files or path to a VisualizationDataGroup pickle file (see the \"g\" flag")
@@ -52,5 +55,9 @@ if __name__ == "__main__":
             ["Comms. Period = 1", "Comms. Period = 2", "Comms. Period = 5", "Comms. Period = 10"],
             ["Num. Agents = 10", "Num. Agents = 50", "Num. Agents = 100", "Num. Agents = 200"]
         )
+
+    end = timeit.default_timer()
+
+    print('Elapsed time:', end-start)
 
     plt.show()

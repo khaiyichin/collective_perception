@@ -1,17 +1,17 @@
 """Visualization module
 """
 import numpy as np
-import matplotlib
+from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 import os
 import pickle
 from datetime import datetime
 import warnings
+from joblib import Parallel, delayed
 
 from sim_modules import ExperimentData
 
 # Default values
-DIFF_WINDOW_SIZE = 3
 CONV_THRESH = 5e-3
 
 warnings.filterwarnings("ignore", category=UserWarning) # ignore UserWarning type warnings
@@ -60,17 +60,10 @@ class VisualizationData:
             self.rho_std = []
             self.gamma_std = []
 
-            self.x_hat_conv_ind = -1
-            self.x_bar_conv_ind = -1
-            self.x_conv_ind = -1
-
-    def __init__(self, exp_data_obj_folder, diff_window_size=DIFF_WINDOW_SIZE, convergence_thresh=CONV_THRESH):
+    def __init__(self, exp_data_obj_folder):
 
         # Load experiment data statistics
         first_obj = True
-
-        self.diff_window_size = diff_window_size
-        self.convergence_thresh = convergence_thresh
 
         # Iterate through folder contents recursively to obtain all serialized filenames
         exp_data_obj_paths = []
@@ -109,7 +102,7 @@ class VisualizationData:
 
                 # Only the target fill ratio range can be different (highest level)
                 if not similarity_bool:
-                    raise Exception("The ExperimentData objects do not have the same parameters.")
+                    raise RuntimeError("The ExperimentData objects in the \"{0}\" directory do not have the same parameters.".format(exp_data_obj_paths))
                 else:
                     self.dfr_range.extend(obj.dfr_range)
                     self.stats_obj_dict.update(obj.stats_obj_dict)
@@ -149,22 +142,6 @@ class VisualizationData:
                 rho_std = np.sqrt( np.mean( np.square( stats_obj.rho_sample_std ), axis=0) )
                 gamma_std = np.sqrt( np.mean( np.square( stats_obj.gamma_sample_std ), axis=0) )
 
-                # Compute convergence for the aggregate estimates
-                if self.diff_window_size*self.comms_period % 2 == 0:
-                    x_hat_window_size = self.diff_window_size*self.comms_period + 1
-                else:
-                    x_hat_window_size = self.diff_window_size*self.comms_period
-
-                x_hat_conv_ind = self.detect_convergence(x_hat_mean,
-                                                         x_hat_window_size,
-                                                         self.convergence_thresh)
-                x_bar_conv_ind = self.detect_convergence(x_bar_mean,
-                                                         self.diff_window_size,
-                                                         self.convergence_thresh)
-                x_conv_ind = self.detect_convergence(x_mean,
-                                                     self.diff_window_size,
-                                                     self.convergence_thresh)
-
                 # Store values into dictionary
                 agg_stats_obj = self.AggregateStats()
 
@@ -180,79 +157,59 @@ class VisualizationData:
                 agg_stats_obj.alpha_std = alpha_std
                 agg_stats_obj.rho_std = rho_std
                 agg_stats_obj.gamma_std = gamma_std
-                agg_stats_obj.x_hat_conv_ind = x_hat_conv_ind
-                agg_stats_obj.x_bar_conv_ind = x_bar_conv_ind
-                agg_stats_obj.x_conv_ind = x_conv_ind
 
                 temp_dict[sp_key] = agg_stats_obj
 
             self.agg_stats_dict[dfr_key] = temp_dict
 
-    def detect_convergence(self, curve, window_size, threshold):
+    def detect_convergence(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH):
         """Compute the point in time when convergence is achieved.
 
+        This computes the convergence timestep (# of observations) for the local, social,
+        and informed estimates. If the returned value is equal to the number of observations,
+        that means convergence was not achieved.
+
         Args:
-            curve: A numpy array of points.
-            window_size: An integer parametrizing the window size for convergence evaluation.
+            target_fill_ratio: The target fill ratio used in the simulation.
+            sensor_prob: The sensor probability used in the simulation.
             threshold: A float parametrizing the difference threshold.
 
         Returns:
-            The index at which convergence criterion is achieved.
+            The 3 indices at which convergence criterion is achieved.
         """
 
-        # Compute the difference curve
-        difference_curve = self.compute_difference(curve, window_size)
+        curves = [
+            self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean, # length of self.num_obs + 1
+            self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean, # length of self.num_obs / self.comms_period + 1
+            self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean, # length of self.num_obs / self.comms_period + 1
+        ]
 
-        # Find the convergence index
-        indices = np.argwhere(abs(difference_curve) <= threshold).T[0]
-        candidate = -window_size # arbitrary negative number to ensure that if convergence criterion isn't met then output is negative
-
-        for ind, val in enumerate(indices):
-
-            # Assign candidate value
-            if candidate == -window_size:
-                candidate = val
-
-            # Verify that the candidate has converged
-            if (ind+1 != len(indices)):
-                if (val+1 == indices[ind+1]):
-                    continue
-                else:
-                    candidate = -window_size
-
-        conv_ind = candidate + window_size//2 # TODO: need to verify that the index is indeed correct (central, or first occurrence?)
-
-        return conv_ind
-
-    def compute_difference(self, curve, window_size):
-        """Compute the difference between endpoints of a specified window.
-
-        The difference is computed using a two-sided method, i.e., central difference.
-
-        Args:
-            curve: A numpy array of points.
-            window_size: An integer parametrizing the window size for central difference calculation.
+        """
+        Methodology in computing convergence:
+        Anchor to one point and check all later values to see if difference exceeds threshold,
+        repeat until the earliest anchor point reaches the end uninterrupted.
         """
 
-        assert(window_size%2 != 0) # window size must be odd
+        # Define local function used for processing the inner for loop in parallel
+        def parallel_inner_loop(curve):
 
-        dx = []
+            # Iterate through each point in the curve as reference
+            for ref_ind, ref in enumerate(curve):
 
-        side_len = window_size//2
+                running_ind = ref_ind
 
-        for ind in range(len(curve)):
+                # Compute the difference between the reference point and each of the points following it
+                while ( running_ind < len(curve) ) and ( abs(ref - curve[running_ind]) < threshold ): running_ind += 1
 
-            start_ind = ind - side_len
-            end_ind = ind + side_len
+                # Return the reference point index
+                # True only if convergence is early or the entire curve has been traversed, which means the index of the last point is used
+                if running_ind == len(curve): # found it or it's the last point
+                    return ref_ind
 
-            if (start_ind < 0): continue
-            elif (end_ind >= len(curve)): break
-            else:
-                dx.append( curve[start_ind] - curve[end_ind] )
+        # Go through all the curves
+        conv_ind = Parallel(n_jobs=3, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves)
 
-        assert( len(dx) == (len(curve) - window_size + 1) ) # ensure that the output list has the correct length
-
-        return np.asarray(dx)
+        return conv_ind[0], conv_ind[1], conv_ind[2]
 
 class VisualizationDataGroup:
     """Class to store VisualizationData objects.
@@ -271,13 +228,11 @@ class VisualizationDataGroup:
     The target fill ratios and sensor probabilities are already varied (with fixed ranges) in the
     stored VisualizationData objects.
 
-    This class is initialized with 4 arguments:
+    This class is initialized with 1 argument:
         data_folder: A string specifying the directory containing all the ExperimentData files.
-        diff_window_size: passed to the VisualizationData class (see the VisualizationData class).
-        convergence_thresh: passed to the VisualizationData class (see the VisualizationData class).
     """
 
-    def __init__(self, data_folder, diff_window_size=DIFF_WINDOW_SIZE, convergence_thresh=CONV_THRESH):
+    def __init__(self, data_folder):
 
         self.viz_data_obj_dict = {}
         self.stored_obj_counter = 0
@@ -300,7 +255,7 @@ class VisualizationDataGroup:
 
         # Load the VisualizationData objects and store them
         for folder in self.folders:
-            v = VisualizationData(folder, diff_window_size, convergence_thresh)
+            v = VisualizationData(folder)
 
             # Check existence of objects in dictionary before storing
             if v.comms_period not in self.viz_data_obj_dict:
@@ -384,15 +339,23 @@ def plot_heatmap_vdg(data_obj: VisualizationDataGroup, row_keys: list, col_keys:
         for ind_c, col in enumerate(col_keys):
 
             v = data_obj.get_viz_data_obj(comms_period=row, comms_prob=1.0, num_agents=col)
+
+            # Compute the convergence timestamps
             convergence_vals = \
-                [ [v.agg_stats_dict[dfr][sp].x_conv_ind*v.comms_period for sp in v.sp_range] for dfr in v.dfr_range ]
+                [
+                    [
+                        v.detect_convergence(dfr, sp, CONV_THRESH)[2]
+                            for sp in v.sp_range
+                    ]
+                    for dfr in v.dfr_range
+                ]
 
             minimum = np.amin([minimum, np.amin(convergence_vals)])
             maximum = np.amax([maximum, np.amax(convergence_vals)])
     
     print("Heatmap minimum: {0}, maximum: {1}".format(minimum, maximum))
 
-    # Collect all the heatmap data into 2-D numpy array
+    # Plot heatmap data
     for ind_r, row in enumerate(row_keys):
         for ind_c, col in enumerate(col_keys):
 
@@ -416,7 +379,6 @@ def plot_heatmap_vdg(data_obj: VisualizationDataGroup, row_keys: list, col_keys:
     cbar_ax = subfigs[1].add_axes([0, 0.15, .07, 0.7]) # [left, bottom, width, height]
     cbar = plt.colorbar(tup[2], cax=cbar_ax)
     cbar.ax.set_ylabel("Convergence timestep (# of observations)") # TODO: need to have a general version
-    cbar.ax.set_yticks( [minimum, *cbar.ax.get_yticks()[1:-1], maximum] )
 
     # Save the heatmap
     fig.set_size_inches(*fig_size)
@@ -478,7 +440,7 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
         kwargs["activate_outer_grid_ylabel"] = True
 
     # Plot the heatmap
-    im = ax.imshow(heatmap_data, vmin=kwargs["vmin"], vmax=kwargs["vmax"], cmap="jet")
+    im = ax.imshow(heatmap_data, norm=LogNorm(vmin=kwargs["vmin"], vmax=kwargs["vmax"]), cmap="jet")
 
     # Show all ticks and label them with the respective list entries
     if kwargs["activate_outer_grid_xlabel"]:
@@ -539,7 +501,7 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
 
     return fig, ax, im
 
-def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False):
+def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False, convergence_thresh=CONV_THRESH):
     """Plot the time series data.
 
     Create data visualization for local, social, and informed values for a simulation with a
@@ -553,13 +515,13 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     """
 
     # Create figure and axes handles
-    fig_x_hat, ax_x_hat = plt.subplots(2)
+    fig_x_hat, ax_x_hat = plt.subplots(2, sharex=True)
     fig_x_hat.set_size_inches(8,6)
 
-    fig_x_bar, ax_x_bar = plt.subplots(2)
+    fig_x_bar, ax_x_bar = plt.subplots(2, sharex=True)
     fig_x_bar.set_size_inches(8,6)
 
-    fig_x, ax_x = plt.subplots(2)
+    fig_x, ax_x = plt.subplots(2, sharex=True)
     fig_x.set_size_inches(8,6)
 
     abscissa_values_x_hat = list(range(data_obj.num_obs + 1))
@@ -602,19 +564,25 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
             ax_x[1].fill_between(abscissa_values_x, gamma_bounds[0], gamma_bounds[1], alpha=0.2)
 
     else:
+
+        # Aggregate statistics
         agg_stats_obj = data_obj.agg_stats_dict[target_fill_ratio][sensor_prob]
+
+        # Compute the convergence timestamps
+        conv_ind_x_hat, conv_ind_x_bar, conv_ind_x = \
+            data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh)
 
         # Plot time evolution of local estimates and confidences
         x_hat_bounds = compute_std_bounds(agg_stats_obj.x_hat_mean, agg_stats_obj.x_hat_std)
         alpha_bounds = compute_std_bounds(agg_stats_obj.alpha_mean, agg_stats_obj.alpha_std)
 
         ax_x_hat[0].plot(abscissa_values_x_hat, agg_stats_obj.x_hat_mean)
-        ax_x_hat[0].axvline(abscissa_values_x_hat[agg_stats_obj.x_hat_conv_ind], color="black", linestyle=":")
+        ax_x_hat[0].axvline(abscissa_values_x_hat[conv_ind_x_hat], color="black", linestyle=":")
         ax_x_hat[0].axhline(target_fill_ratio, color="black", linestyle="--")
         ax_x_hat[0].fill_between(abscissa_values_x_hat, x_hat_bounds[0], x_hat_bounds[1], alpha=0.2)
 
         ax_x_hat[1].plot(agg_stats_obj.alpha_mean)
-        ax_x_hat[1].axvline(abscissa_values_x_hat[agg_stats_obj.x_hat_conv_ind], color="black", linestyle=":")
+        ax_x_hat[1].axvline(abscissa_values_x_hat[conv_ind_x_hat], color="black", linestyle=":")
         ax_x_hat[1].fill_between(abscissa_values_x_hat, alpha_bounds[0], alpha_bounds[1], alpha=0.2)
 
         # Plot time evolution of social estimates and confidences
@@ -622,12 +590,12 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
         rho_bounds = compute_std_bounds(agg_stats_obj.rho_mean, agg_stats_obj.rho_std)
 
         ax_x_bar[0].plot(abscissa_values_x_bar, agg_stats_obj.x_bar_mean)
-        ax_x_bar[0].axvline(abscissa_values_x_bar[agg_stats_obj.x_bar_conv_ind], color="black", linestyle=":")
+        ax_x_bar[0].axvline(abscissa_values_x_bar[conv_ind_x_bar], color="black", linestyle=":")
         ax_x_bar[0].axhline(target_fill_ratio, color="black", linestyle="--")
         ax_x_bar[0].fill_between(abscissa_values_x_bar, x_bar_bounds[0], x_bar_bounds[1], alpha=0.2)
 
         ax_x_bar[1].plot(abscissa_values_x_bar, agg_stats_obj.rho_mean)
-        ax_x_bar[1].axvline(abscissa_values_x_bar[agg_stats_obj.x_bar_conv_ind], color="black", linestyle=":")
+        ax_x_bar[1].axvline(abscissa_values_x_bar[conv_ind_x_bar], color="black", linestyle=":")
         ax_x_bar[1].fill_between(abscissa_values_x_bar, rho_bounds[0], rho_bounds[1], alpha=0.2)
 
         # Plot time evolution of informed estimates and confidences
@@ -635,12 +603,12 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
         gamma_bounds = compute_std_bounds(agg_stats_obj.gamma_mean, agg_stats_obj.gamma_std)
 
         ax_x[0].plot(abscissa_values_x, agg_stats_obj.x_mean)
-        ax_x[0].axvline(abscissa_values_x[agg_stats_obj.x_conv_ind], color="black", linestyle=":")
+        ax_x[0].axvline(abscissa_values_x[conv_ind_x], color="black", linestyle=":")
         ax_x[0].axhline(target_fill_ratio, color="black", linestyle="--")
         ax_x[0].fill_between(abscissa_values_x, x_bounds[0], x_bounds[1], alpha=0.2)
 
         ax_x[1].plot(abscissa_values_x, agg_stats_obj.gamma_mean)
-        ax_x[1].axvline(abscissa_values_x[agg_stats_obj.x_conv_ind], color="black", linestyle=":")
+        ax_x[1].axvline(abscissa_values_x[conv_ind_x], color="black", linestyle=":")
         ax_x[1].fill_between(abscissa_values_x, gamma_bounds[0], gamma_bounds[1], alpha=0.2)
 
     # Set axis properties
