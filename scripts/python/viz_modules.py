@@ -321,24 +321,24 @@ def plot_heatmap_vdg(
     col_keys: list,
     outer_grid_row_labels: list,
     outer_grid_col_labels: list,
-    threshold: float
+    threshold: float,
+    **kwargs
 ):
-    """Plot heatmap based on a VisualizationDataGroupt object. TODO: currently only considers convergence data, should provide options
+    """Plot heatmap based on a VisualizationDataGroup object. TODO: currently only considers convergence data, should provide options
     """
 
     # Create 2 subfigures, one for the actual grid of heatmaps while the other for the colorbar
     fig_size = (16, 12)
     fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
+    fig.suptitle("Convergence rate for a {0} network topology (threshold: {1})".format(kwargs["comms_network_str"], threshold))
 
-    # Create subfigures
-    subfigs = fig.subfigures(1, 2, wspace=0.05, width_ratios=[10, 1.5])
-    ax_lst = subfigs[0].subplots(
-        nrows=len(outer_grid_row_labels),
-        ncols=len(outer_grid_col_labels),
-        sharex=True,
-        sharey=True,
-        gridspec_kw = {"wspace":0.001}
-    )
+    # Create two groups: left for all the heatmaps, right for the color bar
+    top_gs = fig.add_gridspec(1, 2, width_ratios=[10, 1.5])
+
+    left_gs_group = top_gs[0].subgridspec(nrows=len(outer_grid_row_labels), ncols=len(outer_grid_col_labels), wspace=0.001)
+    right_gs_group = top_gs[1].subgridspec(1, 1)
+
+    ax_lst = left_gs_group.subplots(sharex=True, sharey=True)
 
     # Find heatmap minimum and maximum to create a standard range for color bar later
     heatmap_data_grid = []
@@ -386,11 +386,11 @@ def plot_heatmap_vdg(
             )
 
     # Add inner grid labels
-    ax_lst[-1][-1].text(19.5, 19.5, "Sensor probability\nP(b|b) = P(w|w)") # sensor probability as x label
+    ax_lst[-1][-1].text(20.0, 19.5, "Sensor probability\nP(b|b) = P(w|w)") # sensor probability as x label
     ax_lst[0][0].text(-5, -2, "Black tile fill ratio") # fill ratio as y label
 
     # Add color bar
-    cbar_ax = subfigs[1].add_axes([0, 0.15, .07, 0.7]) # [left, bottom, width, height]
+    cbar_ax = right_gs_group.subplots(subplot_kw={"aspect": 15.0}) # add subplot with aspect ratio of 15
     cbar = plt.colorbar(tup[2], cax=cbar_ax)
     cbar.ax.set_ylabel("Convergence timestep (# of observations)") # TODO: need to have a general version
 
