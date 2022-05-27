@@ -15,6 +15,7 @@ if __name__ == "__main__":
     parser.add_argument("-t", nargs="*", help="flag to plot time series data for a specified selected target fill ratio and sensor probability (if group data: comms period, comms probability, and number of agents required)")
     parser.add_argument("-m", action="store_true", help="flag to plot heatmap data; only useful if multiple target fill ratios and sensor probabilities are simulated in data")
     parser.add_argument("-a", action="store_true", help="flag to use aggregate data instead of data from individual experiments")
+    parser.add_argument("-c", type=float, help="convergence threshold value")
     args = parser.parse_args()
 
     # Initialize values
@@ -42,7 +43,7 @@ if __name__ == "__main__":
 
         v = data.get_viz_data_obj(comms_period, comms_prob, num_agents)
 
-        vm.plot_timeseries(target_fill_ratio, sensor_prob, v, args.a)
+        vm.plot_timeseries(target_fill_ratio, sensor_prob, v, args.a, args.c)
 
     # Plot heatmap for all simulation data
     if args.m and not args.g:
@@ -53,7 +54,8 @@ if __name__ == "__main__":
             [1, 2, 5, 10],
             [10, 50, 100, 200],
             ["Comms. Period = 1", "Comms. Period = 2", "Comms. Period = 5", "Comms. Period = 10"],
-            ["Num. Agents = 10", "Num. Agents = 50", "Num. Agents = 100", "Num. Agents = 200"]
+            ["Num. Agents = 10", "Num. Agents = 50", "Num. Agents = 100", "Num. Agents = 200"],
+            args.c
         )
 
     end = timeit.default_timer()

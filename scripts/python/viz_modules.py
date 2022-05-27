@@ -315,13 +315,22 @@ class VisualizationDataGroup:
 
         return obj
 
-def plot_heatmap_vdg(data_obj: VisualizationDataGroup, row_keys: list, col_keys: list, outer_grid_row_labels: list, outer_grid_col_labels: list):
+def plot_heatmap_vdg(
+    data_obj: VisualizationDataGroup,
+    row_keys: list,
+    col_keys: list,
+    outer_grid_row_labels: list,
+    outer_grid_col_labels: list,
+    threshold: float
+):
     """Plot heatmap based on a VisualizationDataGroupt object. TODO: currently only considers convergence data, should provide options
     """
 
     # Create 2 subfigures, one for the actual grid of heatmaps while the other for the colorbar
     fig_size = (16, 12)
     fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
+
+    # Create subfigures
     subfigs = fig.subfigures(1, 2, wspace=0.05, width_ratios=[10, 1.5])
     ax_lst = subfigs[0].subplots(
         nrows=len(outer_grid_row_labels),
@@ -332,39 +341,44 @@ def plot_heatmap_vdg(data_obj: VisualizationDataGroup, row_keys: list, col_keys:
     )
 
     # Find heatmap minimum and maximum to create a standard range for color bar later
+    heatmap_data_grid = []
+
     minimum = np.inf
     maximum = -np.inf
 
     for ind_r, row in enumerate(row_keys):
+        heatmap_data_grid_row = []
+
         for ind_c, col in enumerate(col_keys):
 
             v = data_obj.get_viz_data_obj(comms_period=row, comms_prob=1.0, num_agents=col)
 
-            # Compute the convergence timestamps
-            convergence_vals = \
-                [
-                    [
-                        v.detect_convergence(dfr, sp, CONV_THRESH)[2]
-                            for sp in v.sp_range
-                    ]
-                    for dfr in v.dfr_range
-                ]
+            # Compute the convergence timestamps and save the matrix of convergence values
+            convergence_vals_matrix = generate_convergence_heatmap_data(v, threshold)
+            heatmap_data_grid_row.append(convergence_vals_matrix)
 
-            minimum = np.amin([minimum, np.amin(convergence_vals)])
-            maximum = np.amax([maximum, np.amax(convergence_vals)])
+            minimum = np.amin([minimum, np.amin(convergence_vals_matrix)])
+            maximum = np.amax([maximum, np.amax(convergence_vals_matrix)])
+
+        heatmap_data_grid.append(heatmap_data_grid_row)
     
     print("Heatmap minimum: {0}, maximum: {1}".format(minimum, maximum))
+
+    # Extract the inner grid ranges (simply taken from the last VisualizationData object)
+    dfr_range = v.dfr_range
+    sp_range = v.sp_range
 
     # Plot heatmap data
     for ind_r, row in enumerate(row_keys):
         for ind_c, col in enumerate(col_keys):
 
-            v = data_obj.get_viz_data_obj(comms_period=row, comms_prob=1.0, num_agents=col)
-            tup = plot_heatmap_vd(
-                v,
+            tup = heatmap(
+                heatmap_data_grid[ind_r][ind_c],
                 ax=ax_lst[ind_r][ind_c],
                 row_label=outer_grid_row_labels[ind_r],
                 col_label=outer_grid_col_labels[ind_c],
+                xticks=sp_range,
+                yticks=dfr_range,
                 vmin=minimum,
                 vmax=maximum,
                 activate_outer_grid_xlabel=True if ind_r == len(outer_grid_row_labels) - 1 else False,
@@ -384,8 +398,16 @@ def plot_heatmap_vdg(data_obj: VisualizationDataGroup, row_keys: list, col_keys:
     fig.set_size_inches(*fig_size)
     fig.savefig("/home/khaiyichin/heatmap.png", bbox_inches="tight", dpi=300)
 
+def generate_convergence_heatmap_data(v: VisualizationData, threshold: float):
+    """Generate the heatmap data using convergence values of the informed estimates.
+    """
+
+    return np.asarray(
+        [ [ v.detect_convergence(dfr, sp, threshold)[2]*v.comms_period for sp in v.sp_range ] for dfr in v.dfr_range ]
+    )
+
 def plot_heatmap_vd(data_obj: VisualizationData, row_label="infer", col_label="infer", xticks="infer", yticks="infer", ax=None, **kwargs):
-    """Plot heatmap based on a VisualizationData object. TODO: currently only considers convergence data, should provide options
+    """Plot heatmap based on a VisualizationData object. TODO: BROKEN, NEEDS FIXING
     """
 
     # Define the labels and ticks (TODO: need to create a more generalized form)
@@ -397,7 +419,7 @@ def plot_heatmap_vd(data_obj: VisualizationData, row_label="infer", col_label="i
 
     # Collect all the heatmap data into 2-D numpy array (for informed estimates' convergence only currently)
     heatmap_data = np.asarray(
-        [ [data_obj.agg_stats_dict[dfr][sp].x_conv_ind*data_obj.comms_period for sp in data_obj.sp_range] for dfr in data_obj.dfr_range ]
+        [ [v.detect_convergence(dfr, sp, threshold)[2] for sp in data_obj.sp_range] for dfr in data_obj.dfr_range ]
     )
 
     return heatmap(
