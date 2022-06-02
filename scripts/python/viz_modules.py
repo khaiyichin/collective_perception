@@ -328,9 +328,9 @@ def plot_heatmap_vdg(
     """
 
     # Create 2 subfigures, one for the actual grid of heatmaps while the other for the colorbar
-    fig_size = (16, 12)
+    fig_size = (20, 12)
     fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
-    fig.suptitle("Convergence rate for a {0} network topology (threshold: {1})".format(kwargs["comms_network_str"], threshold))
+    fig.suptitle("Convergence rate for a {0} network topology (threshold: {1})".format(kwargs["comms_network_str"], threshold), fontsize=20)
 
     # Create two groups: left for all the heatmaps, right for the color bar
     top_gs = fig.add_gridspec(1, 2, width_ratios=[10, 1.5])
@@ -386,13 +386,13 @@ def plot_heatmap_vdg(
             )
 
     # Add inner grid labels
-    ax_lst[-1][-1].text(20.0, 19.5, "Sensor probability\nP(b|b) = P(w|w)") # sensor probability as x label
-    ax_lst[0][0].text(-5, -2, "Black tile fill ratio") # fill ratio as y label
+    ax_lst[-1][-1].text(20.0, 19.5, "Sensor probability\nP(b|b) = P(w|w)", fontsize=15) # sensor probability as x label
+    ax_lst[0][0].text(-5, -2, "On-fire tile fill ratio", fontsize=15) # fill ratio as y label
 
     # Add color bar
     cbar_ax = right_gs_group.subplots(subplot_kw={"aspect": 15.0}) # add subplot with aspect ratio of 15
     cbar = plt.colorbar(tup[2], cax=cbar_ax)
-    cbar.ax.set_ylabel("Convergence timestep (# of observations)") # TODO: need to have a general version
+    cbar.ax.set_ylabel("Convergence timestep (# of observations)", fontsize=15) # TODO: need to have a general version
 
     # Save the heatmap
     fig.set_size_inches(*fig_size)
@@ -466,11 +466,11 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
 
     # Show all ticks and label them with the respective list entries
     if kwargs["activate_outer_grid_xlabel"]:
-        ax.set_xlabel(col_label)
+        ax.set_xlabel(col_label, fontsize=15)
         ax.xaxis.labelpad = 25
 
     if kwargs["activate_outer_grid_ylabel"]:
-        ax.set_ylabel(row_label)
+        ax.set_ylabel(row_label, fontsize=15)
         ax.yaxis.labelpad = 25
 
     ax.set_xticks(np.arange(heatmap_data.shape[1]), labels=xticks)

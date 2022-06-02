@@ -57,7 +57,7 @@ if __name__ == "__main__":
             ["Comms. Period = 1", "Comms. Period = 2", "Comms. Period = 5", "Comms. Period = 10"],
             ["Num. Agents = 10", "Num. Agents = 50", "Num. Agents = 100", "Num. Agents = 200"],
             args.CONV,
-            comms_network_str="fully-connected"
+            comms_network_str="line"
         )
 
     end = timeit.default_timer()
