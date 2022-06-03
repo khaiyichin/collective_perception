@@ -1,0 +1,291 @@
+ROTATION_MOTION_ENUM = 0
+STRAIGHT_MOTION_ENUM = 1
+ROTATION_MEAN_DURATION = 5 # in units of timesteps
+STRAIGHT_MEAN_DURATION = 15 # in units of timesteps
+ROTATION_SPEED = 5.0 # rad/s
+STRAIGHT_SPEED = 5.0 # cm/s
+CCW_ENUM = 0 # rotation direction enum
+CW_ENUM = 1 # rotation direction enum
+OBSTACLE_AVOIDANCE_ANG = math.pi/2 # angle range in which objects enter to activate obstacle avoidance sequence in rad
+
+function init()
+{
+    # Define sensor accuracies
+    b_prob = 1.0
+    w_prob = 0.95
+
+    # Define table for local values
+    local_vals = {.x = 0.5, .conf = 0.0000001}
+
+    clear_values()
+}
+
+function step()
+{
+    # while not observing obstacles, move
+    var obstacles = detect_obstacles()
+    if (not obstacles)
+    {
+        # Move robot in random walk fashion
+        move()
+
+        # Make observation
+        # observe()
+    }
+    else
+    {
+        # Avoid obstacles
+        avoid_obstacles(obstacles)
+    }
+
+    # Detect neighbors
+    if (neighbors.count())
+    {
+        # Communicate
+        communicate_tx()
+
+        communicate_rx()
+    }
+}
+
+# Executed once when the robot (or the simulator) is reset.
+function reset()
+{
+    # this may be useful for repeating experiments
+}
+ 
+# Executed once at the end of experiment.
+function destroy() {}
+
+##############################
+### User defined functions ###
+##############################
+
+# Transmit own local values
+function communicate_tx()
+{
+    neighbors.broadcast("local_vals", local_vals) # broadcast local estimate
+}
+
+# Receive local values from neighbors
+function communicate_rx()
+{
+    neighbors.listen("local_vals",
+        function(vid, neighbor_local_val_table, rid) # each neighbor_local_val_table consists of x and conf
+        {
+            # neighbor_vals[rid] = neighbor_local_val_table # do i care about value id?
+            append_to_table(neighbor_vals, neighbor_local_val_table)
+        }
+    )
+}
+
+# Clear the robot values
+function clear_values()
+{
+    total_b_tiles_obs = 0
+    total_obs = 0
+
+    neighbor_vals = {}
+
+    move_type = nil
+    move_duration = 0
+    rot_direction = nil
+}
+
+# Execute robot motion
+function move()
+{
+    # Random walk based on
+    # G. Valentini, D. Brambilla, H. Hamann, and M. Dorigo, “Collective Perception of Environmental Features in a Robot Swarm”
+
+    # Assert that values are correct (only useful in ARGoS simulation)
+    if ( (move_type == nil) and (move_duration != 0) )
+    {
+        log("ERROR: move_duration should be 0 when no move type is decided!")
+    }
+    else if ( (move_duration == 0) and (move_type != nil) )
+    {
+        log("ERROR: move_duration should be 0 when no move type is decided!")
+    }
+
+    # Select new move and duration if no move type is specified
+    if ( (move_type == nil) and (move_duration == 0) )
+    {
+        # Pick a move type
+        move_type = math.rng.uniform(ROTATION_MOTION_ENUM, STRAIGHT_MOTION_ENUM+1) # 0 for rotate, 1 for straight line
+
+        # Pick the duration
+        move_duration = (1-move_type)*math.rng.uniform(0, ROTATION_MEAN_DURATION*2+1) + move_type*math.rng.exponential(STRAIGHT_MEAN_DURATION)
+
+        # Convert move duration to int
+        move_duration = move_duration - (move_duration%1)
+    }
+
+    # Choose and execute motion type for remaining duration
+    if (move_type == ROTATION_MOTION_ENUM) # rotate
+    {
+        # Pick a direction rotation if not decided previously
+        if (rot_direction == nil)
+        {
+            rot_direction = math.rng.uniform(CCW_ENUM, CW_ENUM+1) # 0 for CCW and 1 for CW
+        }
+        move_rotate(rot_direction)
+    }
+    else
+    {
+        move_straight()
+    }
+
+    # Reduce the duration by one step
+    move_duration = move_duration - 1
+
+    # Reset move values when move_duration is complete
+    if (move_duration <= 0)
+    {
+        move_type = nil
+        rot_direction = nil
+        move_duration = 0
+    }
+}
+
+# Move robot in a straight line
+function move_straight()
+{
+    gotop(STRAIGHT_SPEED, 0.0)
+}
+
+# Rotate robot in-place
+function move_rotate(dir)
+{
+    # gotop(0.0, -1.0^dir * ROTATION_SPEED) # this doesn't work for ROTATION_SPEED < 9.5 rad/s, which is too quick
+    set_wheels(-1.0^(1-dir) * ROTATION_SPEED, -1.0^dir * ROTATION_SPEED)
+}
+
+# Execute observation
+function observe()
+{
+    # * The ground sensors are located on the bottom of the robot, and can
+    # * be used to perform line following.
+    # *
+    # * The readings are in the following order (seeing the robot from TOP,
+    # * battery socket is the BACK):
+    # *
+    # *      front
+    # *
+    # *      0   3    r
+    # * l             i
+    # * e  1       2  g
+    # * f             h
+    # * t             t
+    # *
+    # *       back
+    # *
+    
+    # Use both front sensors (0 and 3) to only record observation if they match
+    # This is acceptable for now since the distance between them is < 3cm.
+    # See http://ftp.k-team.com/KheperaIV/software/Gumstix%20COM%20Y/UserManual/Khepera%20IV%20User%20Manual%204.x.pdf
+
+    # The 'ground' keyword is a table provided to query the ground sensor readings
+
+    # Check if both sensors see the same color (only using front sensors, not side)
+    var left_front_color = ground[0].value
+    var right_front_color = ground[3].value
+
+    if (left_front_color == right_front_color)
+    {
+        # Make observation using artificial noise (probability)
+        # The actual sensor is set to have no noise
+        var observation = left_front_color
+        var prob = 0.0
+
+        if (observation == 1) # white
+        {
+            prob = w_prob
+        }
+        else if (observation == 0) # black
+        {
+            prob = b_prob
+        }
+        else
+        {
+            return nil # invalid observation
+        }
+
+        return observe_noisy(observation, prob)
+    }
+    else
+    {
+        return nil
+    }
+}
+
+# Provide noisy observation
+function observe_noisy(encounter, sensor_prob)
+{
+    if (math.rng.uniform(1.0) < sensor_prob)
+    {
+        return encounter
+    }
+    else
+    {
+        return 1.0 - encounter
+    }
+}
+
+# Detect obstacles
+function detect_obstacles()
+{
+    # Each individual sensor is saturated (value 1.0) by objects closer than 4 cm; the maximum range of the sensor is 12 cm.
+    # Between 4 and 12 cm, the readings follow an exponential law with the distance: 4.14*exp(-33.0*distance)-.085
+    var accum = {}
+    accum.x = 0
+    accum.y = 0
+
+    # Read each proximity sensor
+    var i = 0
+
+    while (i < size(proximity))
+    {
+        accum.x = accum.x + proximity[i].value * math.cos(proximity[i].angle)
+        accum.y = accum.y + proximity[i].value * math.sin(proximity[i].angle)
+        i = i + 1
+    }
+    accum.x = accum.x / size(proximity)
+    accum.y = accum.y / size(proximity)
+
+    var len = math.sqrt(accum.x * accum.x + accum.y * accum.y) # accumulated length (in arbitrary units)
+    var ang = math.atan(accum.y, accum.x) # accumulated angles
+
+    # Check if obstacle is detected
+    if (len >= 0.01) # arbitrary (tuned) value for detection activation
+    {
+        if ((ang > -OBSTACLE_AVOIDANCE_ANG) and
+            (ang < OBSTACLE_AVOIDANCE_ANG)) # only activate if within angle range
+        {
+            return {.len = len, .ang = ang}
+        }
+    }
+    else
+    {
+        return nil
+    }
+}
+
+# Execute obstacle avoidance sequence
+function avoid_obstacles(obstacles)
+{
+    if (obstacles.ang > 0)
+    {
+        move_rotate(CW_ENUM) # rotate to the right
+    }
+    else
+    {
+        move_rotate(CCW_ENUM) # rotate to the left
+    }
+}
+
+# Append element to table as if it's a dynamically-sized array
+function append_to_table(tab, elem)
+{
+    tab[size(tab)] = elem
+}

@@ -1,0 +1,45 @@
+function init() {}
+
+function step()
+{
+    observe()
+}
+
+# Executed once when the robot (or the simulator) is reset.
+function reset() {}
+ 
+# Executed once at the end of experiment.
+function destroy() {}
+
+### User defined functions ###
+
+# Execute observation
+function observe()
+{
+    # * The ground sensors are located on the bottom of the robot, and can
+    # * be used to perform line following.
+    # *
+    # * The readings are in the following order (seeing the robot from TOP,
+    # * battery socket is the BACK):
+    # *
+    # *      front
+    # *
+    # *      0   3    r
+    # * l             i
+    # * e  1       2  g
+    # * f             h
+    # * t             t
+    # *
+    # *       back
+    # *
+    
+    # Use both front sensors (0 and 3) to only record observation if they match
+    # This is acceptable for now since the distance between them is < 3cm.
+    # See http://ftp.k-team.com/KheperaIV/software/Gumstix%20COM%20Y/UserManual/Khepera%20IV%20User%20Manual%204.x.pdf
+
+    # The 'ground' keyword is a table provided to query the ground sensor readings
+
+    # Print the values of the ground sensors in the log panel
+    log("value0 = ", ground[0].value)
+    log("value3 = ", ground[3].value)
+}

@@ -3,3 +3,6 @@
 data/
 .venv/
 containers/
+*.bo
+*.bdb
+*.pkl
