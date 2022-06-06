@@ -114,7 +114,7 @@
   -->
     <arena size="3, 3, 1" center="0,0,0.5">
 
-        <floor id="floor" source="image" path="CollectivePerceptionCpp/img/white.png" />
+        <floor id="floor" source="image" path="collective_perception_cpp/img/white.png" />
 
         <!-- Place four boxes in a square to delimit the arena -->
         <box id="wall_north" size="2,0.1,0.5" movable="false">
