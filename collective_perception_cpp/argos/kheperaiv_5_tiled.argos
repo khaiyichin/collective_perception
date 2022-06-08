@@ -99,7 +99,7 @@
     <!-- ****************** -->
 
     <loop_functions library="/home/khaiyichin/research/collective_perception/collective_perception_cpp/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
-        <collective_perception arena_tile_count_x="20" arena_tile_count_y="20" fill_ratio="0.75" />
+        <collective_perception arena_tile_count_x="25" arena_tile_count_y="25" fill_ratio="0.7" />
         <!-- arena_tile_count_x and arena_tile_count_y is used to list the number of tiles for the x and y direction; the actual length is determined
                  by the arena tag -->
         <!-- fill_ratio is the probability of black tiles characterized by the bernoulli distribution -->
@@ -143,11 +143,15 @@
         </box>
 
         <!-- Place a foot-bot in the origin and bind it to the controller -->
-        <kheperaiv id="kiv_0" rab_range="1">
-            <body position="0,0,0" orientation="0,0,0" />
-            <controller config="bck" />
-        </kheperaiv>
-
+        <distribute>
+            <position method="uniform" min="-2.5,-2.5,0" max="2.5,2.5,0" />
+            <orientation method="uniform" min="0,0,0" max="360,0,0" />
+            <entity quantity="2" max_trials="100">
+                <kheperaiv id="kiv" rab_data_size="50" rab_range="3">
+                    <controller config="bck" />
+                </kheperaiv>
+            </entity>
+        </distribute>
     </arena>
 
     <!-- ******************* -->
@@ -197,7 +201,7 @@
   -->
     <visualization>
         <qt-opengl>
-            <!-- <user_functions label="buzz_qt" /> -->
+            <user_functions label="buzz_qt" />
             <camera>
                 <placements>
                     <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="35" />

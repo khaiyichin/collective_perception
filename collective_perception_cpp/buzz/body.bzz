@@ -3,21 +3,30 @@ STRAIGHT_MOTION_ENUM = 1
 ROTATION_MEAN_DURATION = 5 # in units of timesteps
 STRAIGHT_MEAN_DURATION = 15 # in units of timesteps
 ROTATION_SPEED = 5.0 # rad/s
-STRAIGHT_SPEED = 5.0 # cm/s
+STRAIGHT_SPEED = 15.0 # cm/s
 CCW_ENUM = 0 # rotation direction enum
 CW_ENUM = 1 # rotation direction enum
 OBSTACLE_AVOIDANCE_ANG = math.pi/2 # angle range in which objects enter to activate obstacle avoidance sequence in rad
 
 function init()
 {
-    # Define sensor accuracies
-    b_prob = 1.0
-    w_prob = 0.95
+    # Define sensor accuracy variables, modified by the ARGoS loop functions
+    b_prob = nil
+    w_prob = nil
 
     # Define table for local values
     local_vals = {.x = 0.5, .conf = 0.0000001}
 
     clear_values()
+
+    # Define listener callback function
+    neighbors.listen("local_vals",
+        function(vid, neighbor_local_val_table, rid) # each neighbor_local_val_table consists of x and conf
+        {
+            # append_to_table(neighbor_vals, neighbor_local_val_table)
+            neighbor_vals[size(neighbor_vals)] = neighbor_local_val_table
+        }
+    )
 }
 
 function step()
@@ -30,7 +39,7 @@ function step()
         move()
 
         # Make observation
-        # observe()
+        observe()
     }
     else
     {
@@ -38,14 +47,8 @@ function step()
         avoid_obstacles(obstacles)
     }
 
-    # Detect neighbors
-    if (neighbors.count())
-    {
-        # Communicate
-        communicate_tx()
-
-        communicate_rx()
-    }
+    # Broadcast values
+    communicate_tx()
 }
 
 # Executed once when the robot (or the simulator) is reset.
@@ -65,18 +68,6 @@ function destroy() {}
 function communicate_tx()
 {
     neighbors.broadcast("local_vals", local_vals) # broadcast local estimate
-}
-
-# Receive local values from neighbors
-function communicate_rx()
-{
-    neighbors.listen("local_vals",
-        function(vid, neighbor_local_val_table, rid) # each neighbor_local_val_table consists of x and conf
-        {
-            # neighbor_vals[rid] = neighbor_local_val_table # do i care about value id?
-            append_to_table(neighbor_vals, neighbor_local_val_table)
-        }
-    )
 }
 
 # Clear the robot values
@@ -211,7 +202,8 @@ function observe()
             return nil # invalid observation
         }
 
-        return observe_noisy(observation, prob)
+        total_b_tiles_obs = total_b_tiles_obs + (1-observe_noisy(observation, prob)) # this is because black and white are flipped
+        total_obs = total_obs + 1
     }
     else
     {
@@ -228,7 +220,7 @@ function observe_noisy(encounter, sensor_prob)
     }
     else
     {
-        return 1.0 - encounter
+        return 1 - encounter
     }
 }
 
