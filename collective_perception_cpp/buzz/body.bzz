@@ -10,21 +10,14 @@ OBSTACLE_AVOIDANCE_ANG = math.pi/2 # angle range in which objects enter to activ
 
 function init()
 {
-    # Define sensor accuracy variables, modified by the ARGoS loop functions
-    b_prob = nil
-    w_prob = nil
-
-    # Define table for local values
-    local_vals = {.x = 0.5, .conf = 0.0000001}
-
-    clear_values()
+    # Initialize values
+    reset_values()
 
     # Define listener callback function
     neighbors.listen("local_vals",
         function(vid, neighbor_local_val_table, rid) # each neighbor_local_val_table consists of x and conf
         {
-            # append_to_table(neighbor_vals, neighbor_local_val_table)
-            neighbor_vals[size(neighbor_vals)] = neighbor_local_val_table
+            append_to_table(curr_neighbor_vals, neighbor_local_val_table)
         }
     )
 }
@@ -49,12 +42,15 @@ function step()
 
     # Broadcast values
     communicate_tx()
+
+    # Update values
+    update_received_messages()
 }
 
 # Executed once when the robot (or the simulator) is reset.
 function reset()
 {
-    # this may be useful for repeating experiments
+    reset_values()
 }
  
 # Executed once at the end of experiment.
@@ -70,13 +66,27 @@ function communicate_tx()
     neighbors.broadcast("local_vals", local_vals) # broadcast local estimate
 }
 
-# Clear the robot values
-function clear_values()
+# Update buffer of received messages
+function update_received_messages()
 {
+    past_neighbor_vals = curr_neighbor_vals
+    curr_neighbor_vals = {}
+}
+
+# Clear the robot values
+function reset_values()
+{
+    # Define sensor accuracy variables, modified by the ARGoS loop functions
+    b_prob = nil
+    w_prob = nil
+
+    local_vals = {.x = 0.5, .conf = 1.0}
+
     total_b_tiles_obs = 0
     total_obs = 0
 
-    neighbor_vals = {}
+    past_neighbor_vals = {}
+    curr_neighbor_vals = {}
 
     move_type = nil
     move_duration = 0
@@ -202,7 +212,7 @@ function observe()
             return nil # invalid observation
         }
 
-        total_b_tiles_obs = total_b_tiles_obs + (1-observe_noisy(observation, prob)) # this is because black and white are flipped
+        total_b_tiles_obs = total_b_tiles_obs + ( 1-observe_noisy(observation, prob) ) # this is because black and white are flipped
         total_obs = total_obs + 1
     }
     else
@@ -220,7 +230,7 @@ function observe_noisy(encounter, sensor_prob)
     }
     else
     {
-        return 1 - encounter
+        return int(1 - encounter)
     }
 }
 

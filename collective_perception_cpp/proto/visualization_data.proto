@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+import "util.proto";
+
+package collective_perception_cpp.proto;
+
+/* Protobuf for storing simulation results for easy data analysis and visualization.
+
+The ExperimentData protobuf is not used for visualization (despite providing similar functionality)
+because of its RAM footprint (since it stores agent observations and tile configurations, none
+of which are needed in data visualization).
+
+Furthermore, due to the size of simulations, multiple runs are needed to cover the desired
+simulation parameters. This means that multiple ExperimentData objects have to be stored and
+loaded for data visualization, which complicates the structure of the ExperimentData protobuf if
+we were to also use it for data visualization. Thus it's easier to just create a separate class
+that takes in the paths to the multiple ExperimentData to extract the data.
+
+This protobuf is intended to store simulations with the same:
+    - communication network type,
+    - number of experiments,
+    - number of agents,
+    - communication period, and
+    - communication probability
+and with varying:
+    - target fill ratios, and
+    - sensor probabilities.
+*/
+message VisualizationData
+{
+    /*
+    Currently the static and dynamic simulation has similar concepts but uses different variable names.
+    For now they remain separated, but will be made uniform in the future.
+    */
+
+    // Common variables
+    string sim_type = 1;
+    uint32 num_agents = 2;
+    uint32 num_exp = 3;
+    repeated float tfr_range = 4 [packed = true]; // note that the Python version calls it `dfr_range`; will be updated in the future
+    repeated float sp_range = 5 [packed = true];
+    repeated RepeatedExperimentStats sim_stats = 6;
+
+    // Static (Python) simulation variables
+    string comms_graph = 7;
+    uint32 num_obs = 8; // will be merged to num_steps in the future
+    uint32 comms_period = 9;
+    float comms_prob = 10;
+
+    // Dynamic (C++) simulation variables
+    uint32 num_steps = 11;
+    float comms_range = 12;
+    float density = 13;
+}
+
+/* Protobuf to store VisualizationData objects.
+
+The VisualizationData objects are stored by first using the VisualizationData's method
+in loading serialized ExperimentData files. Then each VisualizationData object
+are stored in this class.
+
+This class is intended to store VisualizationData objects with the same:
+    - communication network type, and
+    - number of experiments,
+and with varying:
+    - number of agents,
+    - communication period,
+    - communication probability.
+The target fill ratios and sensor probabilities are already varied (with fixed ranges) in the
+stored VisualizationData objects.
+*/
+message VisualizationDataGroup
+{
+    repeated VisualizationData viz_data = 1;
+}

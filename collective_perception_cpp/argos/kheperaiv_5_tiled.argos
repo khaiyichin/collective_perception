@@ -130,23 +130,23 @@
 
         <!-- Place four boxes in a square to delimit the arena -->
         <box id="wall_north" size="5.25,0.1,0.5" movable="false">
-            <body position="0,2.6,0" orientation="0,0,0" />
+            <body position="0,2.55,0" orientation="0,0,0" />
         </box>
         <box id="wall_south" size="5.25,0.1,0.5" movable="false">
-            <body position="0,-2.6,0" orientation="0,0,0" />
+            <body position="0,-2.55,0" orientation="0,0,0" />
         </box>
         <box id="wall_east" size="0.1,5.25,0.5" movable="false">
-            <body position="2.6,0,0" orientation="0,0,0" />
+            <body position="2.55,0,0" orientation="0,0,0" />
         </box>
         <box id="wall_west" size="0.1,5.25,0.5" movable="false">
-            <body position="-2.6,0,0" orientation="0,0,0" />
+            <body position="-2.55,0,0" orientation="0,0,0" />
         </box>
 
         <!-- Place a foot-bot in the origin and bind it to the controller -->
         <distribute>
             <position method="uniform" min="-2.5,-2.5,0" max="2.5,2.5,0" />
             <orientation method="uniform" min="0,0,0" max="360,0,0" />
-            <entity quantity="2" max_trials="100">
+            <entity quantity="5" max_trials="100">
                 <kheperaiv id="kiv" rab_data_size="50" rab_range="3">
                     <controller config="bck" />
                 </kheperaiv>
@@ -201,7 +201,7 @@
   -->
     <visualization>
         <qt-opengl>
-            <user_functions label="buzz_qt" />
+            <!-- <user_functions label="buzz_qt" /> -->
             <camera>
                 <placements>
                     <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="35" />

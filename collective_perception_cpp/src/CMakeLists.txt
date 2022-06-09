@@ -20,6 +20,7 @@ add_library(collective_perception_loop_functions
 )
 target_link_libraries(collective_perception_loop_functions
     ${BUZZ_LIBRARY}
+    ${PROTO_LIB}
     argos3core_simulator
     argos3plugin_simulator_dynamics2d
     argos3plugin_simulator_entities

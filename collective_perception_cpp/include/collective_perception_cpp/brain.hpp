@@ -23,7 +23,7 @@ public:
          * @brief Construct a new ValuePair struct
          *
          */
-        ValuePair() : x(0.0), confidence(1.0e-9) {}
+        ValuePair() : x(0.0), confidence(1.0) {}
 
         /**
          * @brief Construct a new ValuePair struct

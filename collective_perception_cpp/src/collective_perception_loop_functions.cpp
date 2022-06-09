@@ -160,8 +160,8 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
     robot_brain.StoreObservations(total_black_obs, total_obs);
 
     // Collect neighbors' values
-    BuzzTableOpen(t_vm, "neighbor_vals");
-    buzzobj_t tNeighborVals = BuzzGet(t_vm, "neighbor_vals");
+    BuzzTableOpen(t_vm, "past_neighbor_vals");
+    buzzobj_t tNeighborVals = BuzzGet(t_vm, "past_neighbor_vals");
 
     // Ensure the type is correct (a table)
     if (!buzzobj_istable(tNeighborVals))
@@ -182,7 +182,7 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
 
         Brain::ValuePair v(
             buzzobj_getfloat(BuzzTableGet(t_vm, "x")),
-            buzzobj_getfloat(BuzzTableGet(t_vm, "confidence")));
+            buzzobj_getfloat(BuzzTableGet(t_vm, "conf")));
 
         BuzzTableCloseNested(t_vm);
 

@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package collective_perception_cpp.proto;
+
+message RepeatedExperimentAgentData // agent data for repeated experiment
+{
+    message AgentData // agent data for a single experiment
+    {
+        repeated uint32 tile_occurrences = 1 [packed = true];
+        repeated uint32 observations = 2 [packed = true];
+    }
+
+    repeated AgentData arr = 1;
+}
+
+message RepeatedExperimentStats // statistics for repeated experiments
+{
+    message Stats // statistics for a single experiment
+    {
+        repeated float x_mean = 1 [packed = true];
+        repeated float conf_mean = 2 [packed = true];
+        repeated float x_std = 3 [packed = true];
+        repeated float conf_std = 4 [packed = true];
+    }
+
+    repeated Stats local_vals = 1;
+    repeated Stats social_vals = 2;
+    repeated Stats informed_vals = 3;
+}
+
+// SimPacket message (roughly similar to the `SimPacket` struct in C++ and `Sim` class in Python)
+message SimPacket
+{
+    // Common variables
+    string sim_type = 1;
+    float tfr = 2; // target fill ratio used in this simulation
+    float b_prob = 3; // sensor probability used in this simulation
+    float w_prob = 4; // sensor probability used in this simulation
+    uint32 num_agents = 5;
+    uint32 num_exp = 6;
+
+    RepeatedExperimentAgentData agent_data = 7;
+    RepeatedExperimentStats stats = 8;
+
+    // Static (Python) simulation variables
+    string comms_graph = 9;
+    uint32 num_obs = 10;  // will be merged to num_steps in the future
+    uint32 comms_period = 11;
+    float comms_prob = 12;
+
+    // Dynamic (C++) simulation variables
+    uint32 num_steps = 13;
+    float comms_range = 14;
+    float density = 15;
+}
