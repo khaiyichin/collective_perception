@@ -1,6 +1,8 @@
 #ifndef SIMULATION_DATA_SET_HPP
 #define SIMULATION_DATA_SET_HPP
 
+#include <iterator>
+
 #include "data_common.hpp"
 #include "simulation_data_set.pb.h"
 
@@ -69,6 +71,10 @@ private:
      * @return int The rounded value
      */
     int RoundToMultiple(const int &value, const int &base);
+
+    std::vector<SimPacket> GetAllSimPackets();
+
+    std::string simulation_type = "dynamic";
 
     unsigned int num_agents_;
 

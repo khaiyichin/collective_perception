@@ -1,11 +1,13 @@
 # See https://www.falkoaxmann.de/dev/2020/11/08/grpc-plugin-cmake-support.html
 find_package(Protobuf REQUIRED)
 
-SET(PROTO_LIB_FILES
+set(PROTO_LIB_FILES
     ./util.proto
     ./simulation_data_set.proto
-    ./visualization_data.proto
 )
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON) # setting the fPIC flag
+
 
 add_library(${PROTO_LIB} ${PROTO_LIB_FILES})
 target_link_libraries(${PROTO_LIB} PUBLIC protobuf::libprotobuf)

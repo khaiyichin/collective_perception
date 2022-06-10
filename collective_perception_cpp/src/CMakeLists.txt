@@ -17,6 +17,7 @@ add_library(collective_perception_loop_functions
     collective_perception_loop_functions.cpp
     arena.cpp
     brain.cpp
+    simulation_data_set.cpp
 )
 target_link_libraries(collective_perception_loop_functions
     ${BUZZ_LIBRARY}

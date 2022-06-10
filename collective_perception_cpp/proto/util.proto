@@ -10,7 +10,7 @@ message RepeatedExperimentAgentData // agent data for repeated experiment
         repeated uint32 observations = 2 [packed = true];
     }
 
-    repeated AgentData arr = 1;
+    repeated AgentData agents = 1;
 }
 
 message RepeatedExperimentStats // statistics for repeated experiments

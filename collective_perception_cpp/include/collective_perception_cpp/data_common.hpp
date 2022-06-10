@@ -47,7 +47,7 @@ struct Stats
 /**
  * @brief Struct to store simulation data and statistics
  *
- * An SimPacket stores data from repeated experiments with the same:
+ * A SimPacket stores data from repeated experiments with the same:
  *  - number of agents,
  *  - number of steps,
  *  - communication range,
@@ -78,7 +78,7 @@ struct SimPacket
 
     std::string sim_type = "dynamic";
 
-    RepeatedExperimentData<Stats> local_vals_vec; ///< Local values for repeated experiments
+    RepeatedExperimentData<Stats> local_values_vec; ///< Local values for repeated experiments
 
     RepeatedExperimentData<Stats> social_values_vec; ///< Social values for repeated experiments
 
