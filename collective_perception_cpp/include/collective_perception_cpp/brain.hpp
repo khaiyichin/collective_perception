@@ -33,6 +33,11 @@ public:
          */
         ValuePair(const float &x, const float &confidence) : x(x), confidence(confidence) {}
 
+        inline ValuePair operator/(const float &val)
+        {
+            return ValuePair(x / val, confidence / val);
+        }
+
         float x; ///< Estimate value
 
         float confidence; ///< Confidence value

@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <cmath>
 
+#include <google/protobuf/stubs/common.h>
+
 /**
  * @brief Alias for storing multiple elements in a single experiment
  *
@@ -28,20 +30,20 @@ struct AgentData
 };
 
 /**
- * @brief Struct to store statistics
+ * @brief Struct to store statistics across all agents
  *
  */
 struct Stats
 {
     Stats() {}
 
-    std::vector<float> x_sample_mean;
+    std::vector<float> x_sample_mean; ///< mean estimate across all agents
 
-    std::vector<float> confidence_sample_mean;
+    std::vector<float> confidence_sample_mean; ///< mean confidence across all agents
 
-    std::vector<float> x_sample_std;
+    std::vector<float> x_sample_std; ///< 1 sigma estimate across all agents
 
-    std::vector<float> confidence_sample_std;
+    std::vector<float> confidence_sample_std; ///< 1 sigma confidence across all agents
 };
 
 /**
@@ -86,5 +88,31 @@ struct SimPacket
 
     RepeatedExperimentData<AgentData> agent_data_vec; ///< Agent data for repeated experiments
 };
+
+template <class T>
+void WriteProtoToDisk(const T &proto_obj, const std::string &path)
+{
+    GOOGLE_PROTOBUF_VERIFY_VERSION; // verify version of library linked is compatible with the version of header compiled
+
+    std::ofstream pb_stream(path, std::ios::trunc | std::ios::binary);
+
+    if (!proto_obj.SerializeToOstream(&pb_stream))
+    {
+        throw std::runtime_error("Failed to serialize!");
+    }
+}
+
+template <class T>
+void LoadProtoFromDisk(T &proto_obj, const std::string &path)
+{
+    GOOGLE_PROTOBUF_VERIFY_VERSION; // verify version of library linked is compatible with the version of header compiled
+
+    std::ifstream pb_stream(path, std::ios::binary);
+
+    if (!proto_obj.ParseFromIstream(&pb_stream))
+    {
+        throw std::runtime_error("Failed to read!");
+    }
+}
 
 #endif

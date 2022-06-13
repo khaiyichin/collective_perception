@@ -129,7 +129,21 @@ public:
     inline bool IsExperimentFinished() { return finished_; }
 
 private:
+    void ComputeStats();
+
     void SetupExperiment();
+
+    void CreateNewSimPacket();
+
+    void PopulateSimPacket();
+
+    std::vector<Brain::ValuePair> GetAllLocalValues();
+
+    std::vector<Brain::ValuePair> GetAllSocialValues();
+
+    std::vector<Brain::ValuePair> GetAllInformedValues();
+
+    std::pair<Brain::ValuePair, Brain::ValuePair> ComputeValuePairsSampleMeanAndStdDev(const std::vector<Brain::ValuePair> &input);
 
     template <typename T>
     std::vector<T> GenerateLinspace(const T &min, const T &max, const size_t &steps);
@@ -157,6 +171,14 @@ private:
     std::vector<std::pair<float, float>>::iterator curr_tfr_sp_range_itr_;
 
     InitializeRobot initialization_functor_;
+
+    SimPacket curr_sim_packet_;
+
+    Stats curr_local_stats_;
+
+    Stats curr_social_stats_;
+
+    Stats curr_informed_stats_;
 };
 
 #endif
