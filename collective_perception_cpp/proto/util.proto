@@ -37,7 +37,7 @@ message SimPacket
     float b_prob = 3; // sensor probability used in this simulation
     float w_prob = 4; // sensor probability used in this simulation
     uint32 num_agents = 5;
-    uint32 num_exp = 6;
+    uint32 num_trials = 6;
 
     RepeatedExperimentAgentData agent_data = 7;
     RepeatedExperimentStats stats = 8;

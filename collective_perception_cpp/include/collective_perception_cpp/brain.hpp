@@ -92,10 +92,10 @@ public:
      * @brief Construct a new Brain object
      *
      * @param id ID of the robot
-     * @param b_acc Sensor accuracy for black tiles
-     * @param w_acc Sensor accuracy for white tiles
+     * @param b_prob Sensor accuracy for black tiles
+     * @param w_prob Sensor accuracy for white tiles
      */
-    Brain(const std::string &id, const float &b_acc, const float &w_acc) : id_(id), b_acc_(b_acc), w_acc_(w_acc){};
+    Brain(const std::string &id, const float &b_prob, const float &w_prob) : id_(id), b_prob_(b_prob), w_prob_(w_prob){};
 
     /**
      * @brief Get the local ValuePair object
@@ -164,9 +164,9 @@ private:
 
     int total_obs_; ///< Total observations made
 
-    float b_acc_; ///< Sensor accuracy for observing black tiles
+    float b_prob_; ///< Sensor accuracy for observing black tiles
 
-    float w_acc_; ///< Sensor accuracy for observing white tiles
+    float w_prob_; ///< Sensor accuracy for observing white tiles
 
     std::vector<ValuePair> neighbors_value_pairs_; ///< Vector of neighbors' values
 

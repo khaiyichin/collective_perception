@@ -4,7 +4,7 @@ SimulationDataSet::SimulationDataSet(collective_perception_cpp::proto::Simulatio
 {
     // Store simulation parameters
     num_agents_ = sim_data_set_msg.num_agents();   // number of agents
-    num_experiments_ = sim_data_set_msg.num_exp(); // number of experiments
+    num_trials_ = sim_data_set_msg.num_trials(); // number of experiments
     num_steps_ = sim_data_set_msg.num_steps();     // number of simulation steps
     comms_range_ = sim_data_set_msg.comms_range(); // communication range
     density_ = sim_data_set_msg.density();         // swarm density
@@ -28,7 +28,7 @@ SimulationDataSet::SimulationDataSet(collective_perception_cpp::proto::Simulatio
         packet.b_prob = itr->b_prob();
         packet.w_prob = itr->w_prob();
         packet.num_agents = itr->num_agents();
-        packet.num_experiments = itr->num_exp();
+        packet.num_trials = itr->num_trials();
         packet.num_steps = itr->num_steps();
         packet.density = itr->density();
 
@@ -121,7 +121,7 @@ SimulationDataSet::SimulationDataSet(collective_perception_cpp::proto::Simulatio
 void SimulationDataSet::Serialize(collective_perception_cpp::proto::SimulationDataSet &sim_data_set_msg)
 {
     sim_data_set_msg.set_num_agents(num_agents_);   // number of agents
-    sim_data_set_msg.set_num_exp(num_experiments_); // number of experiments
+    sim_data_set_msg.set_num_trials(num_trials_); // number of experiments
     sim_data_set_msg.set_num_steps(num_steps_);     // number of simulation steps
     sim_data_set_msg.set_comms_range(comms_range_); // communication range
     sim_data_set_msg.set_density(density_);         // swarm density

@@ -60,7 +60,7 @@ void Brain::Solver::InformedSolve()
 
 void Brain::Solve()
 {
-    solver_.LocalSolve(total_black_obs_, total_obs_, b_acc_, w_acc_);
+    solver_.LocalSolve(total_black_obs_, total_obs_, b_prob_, w_prob_);
 
     if (neighbors_value_pairs_.size() != 0)
     {

@@ -70,7 +70,7 @@ struct SimPacket
 
     unsigned int num_agents;
 
-    unsigned int num_experiments;
+    unsigned int num_trials;
 
     unsigned int num_steps;
 

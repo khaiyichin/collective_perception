@@ -57,7 +57,7 @@ public:
      * @param tile_size Size of square tiles in units of meters
      * @param fill_ratio Black tile fill ratio
      */
-    Arena(const std::vector<uint32_t> &tile_count, const std::vector<float> &lower_lim_2d, const float &tile_size, const float &fill_ratio);
+    Arena(const std::pair<uint32_t, uint32_t> &tile_count, const std::pair<float, float> &lower_lim_2d, const float &tile_size, const float &fill_ratio);
 
     /**
      * @brief Generate the tiles

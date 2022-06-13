@@ -1,10 +1,10 @@
 #include "arena.hpp"
 
-Arena::Arena(const std::vector<uint32_t> &tile_count, const std::vector<float> &lower_lim_2d, const float &tile_size, const float &fill_ratio) : fill_ratio_(fill_ratio), tile_size_(tile_size)
+Arena::Arena(const std::pair<uint32_t, uint32_t> &tile_count, const std::pair<float, float> &lower_lim_2d, const float &tile_size, const float &fill_ratio) : fill_ratio_(fill_ratio), tile_size_(tile_size)
 {
     // Store arena dimensions
-    num_tiles_ = Arena::Dimensions<uint32_t>(tile_count[0], tile_count[1]);
-    lower_lim_ = Arena::Dimensions<float>(lower_lim_2d[0], lower_lim_2d[1]);
+    num_tiles_ = Arena::Dimensions<uint32_t>(tile_count.first, tile_count.second);
+    lower_lim_ = Arena::Dimensions<float>(lower_lim_2d.first, lower_lim_2d.second);
 
     // Create layout to the desired size with values of 0
     layout_.resize(num_tiles_.y, std::vector<uint32_t>(num_tiles_.x, 0));

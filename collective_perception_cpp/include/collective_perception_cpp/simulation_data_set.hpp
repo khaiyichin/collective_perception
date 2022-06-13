@@ -28,11 +28,11 @@ public:
     /**
      * @brief Construct a new SimulationDataSet object from SimulationDataSet protobuf
      *
-     * @param exp_data_proto
+     * @param sim_data_set_msg
      */
-    SimulationDataSet(collective_perception_cpp::proto::SimulationDataSet &exp_data_proto);
+    SimulationDataSet(collective_perception_cpp::proto::SimulationDataSet &sim_data_set_msg);
 
-    void Serialize(collective_perception_cpp::proto::SimulationDataSet &exp_data_proto);
+    void Serialize(collective_perception_cpp::proto::SimulationDataSet &sim_data_set_msg);
 
     /**
      * @brief Get the SimPacket object
@@ -49,6 +49,22 @@ public:
      * @param packet SimPacket object
      */
     void InsertSimPacket(const SimPacket &packet);
+
+    std::string simulation_type = "dynamic";
+
+    unsigned int num_agents_;
+
+    unsigned int num_trials_;
+
+    unsigned int num_steps_;
+
+    float comms_range_;
+
+    float density_;
+
+    std::vector<float> tfr_range_;
+
+    std::vector<float> sp_range_;
 
 private:
     /**
@@ -73,22 +89,6 @@ private:
     int RoundToMultiple(const int &value, const int &base);
 
     std::vector<SimPacket> GetAllSimPackets();
-
-    std::string simulation_type = "dynamic";
-
-    unsigned int num_agents_;
-
-    unsigned int num_experiments_;
-
-    unsigned int num_steps_;
-
-    float comms_range_;
-
-    float density_;
-
-    std::vector<float> tfr_range_;
-
-    std::vector<float> sp_range_;
 
     std::unordered_map<unsigned int, std::unordered_map<unsigned int, SimPacket>> sim_packets_;
 };

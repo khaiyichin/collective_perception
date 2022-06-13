@@ -23,7 +23,7 @@
           or set to zero, this value is taken from the clock and a warning
           message is displayed.
     -->
-        <experiment length="0" ticks_per_second="10" random_seed="124" />
+        <experiment length="10" ticks_per_second="10" random_seed="0" />
     </framework>
 
     <!-- *************** -->
@@ -99,7 +99,12 @@
     <!-- ****************** -->
 
     <loop_functions library="/home/khaiyichin/research/collective_perception/collective_perception_cpp/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
-        <collective_perception arena_tile_count_x="25" arena_tile_count_y="25" fill_ratio="0.7" />
+        <collective_perception>
+            <arena tile_count_x="25" tile_count_y="25" fill_ratio="0.7" />
+            <fill_ratio_range min="0.05" max="0.95" steps="19" />
+            <sensor_probability_range min="0.55" max="1.0" steps="19" />
+            <num_trials value="5" />
+        </collective_perception>
         <!-- arena_tile_count_x and arena_tile_count_y is used to list the number of tiles for the x and y direction; the actual length is determined
                  by the arena tag -->
         <!-- fill_ratio is the probability of black tiles characterized by the bernoulli distribution -->
@@ -147,7 +152,7 @@
             <position method="uniform" min="-2.5,-2.5,0" max="2.5,2.5,0" />
             <orientation method="uniform" min="0,0,0" max="360,0,0" />
             <entity quantity="5" max_trials="100">
-                <kheperaiv id="kiv" rab_data_size="50" rab_range="3">
+                <kheperaiv id="kiv" rab_data_size="50" rab_range="1.5">
                     <controller config="bck" />
                 </kheperaiv>
             </entity>
@@ -200,14 +205,13 @@
       $ argos3 -q visualizations
   -->
     <visualization>
-        <qt-opengl>
-            <!-- <user_functions label="buzz_qt" /> -->
+        <!-- <qt-opengl>
             <camera>
                 <placements>
                     <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="35" />
                 </placements>
             </camera>
-        </qt-opengl>
+        </qt-opengl> -->
     </visualization>
 
 </argos-configuration>

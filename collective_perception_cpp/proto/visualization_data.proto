@@ -36,7 +36,7 @@ message VisualizationData
     // Common variables
     string sim_type = 1;
     uint32 num_agents = 2;
-    uint32 num_exp = 3;
+    uint32 num_trials = 3;
     repeated float tfr_range = 4 [packed = true]; // note that the Python version calls it `dfr_range`; will be updated in the future
     repeated float sp_range = 5 [packed = true];
     repeated RepeatedExperimentStats sim_stats = 6;
