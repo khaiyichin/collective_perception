@@ -2,10 +2,11 @@
 
 void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 {
+    // Set robot sensor probabilities
     BuzzPut(t_vm, "b_prob", b_prob);
     BuzzPut(t_vm, "w_prob", w_prob);
 
-    // Use robot ID and sensor accuracy to instantiate Brain class
+    // Initialize RobotIDBrainMap
     (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, b_prob, w_prob);
     auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
 
@@ -34,6 +35,31 @@ void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 
 void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 {
+    // Collect debugging values for AgentData objects
+    unsigned int encounter, observation;
+
+    BuzzTableOpen(t_vm, "debug_data");
+    buzzobj_t tDebugData = BuzzGet(t_vm, "debug_data");
+
+    if (!buzzobj_istable(tDebugData))
+    {
+        LOGERR << str_robot_id << ": variable \"debug_data\" has wrong type " << buzztype_desc[tDebugData->o.type] << std::endl;
+        return;
+    }
+    else
+    {
+        // Extract the integer component from the ID
+        std::string dup_str_robot_id = str_robot_id;
+        int index = std::stoi(dup_str_robot_id.erase(0, prefix.length())) - base_num;
+
+        // Get data
+        auto &agent_data = (*agt_data_vec_ptr)[index];
+        agent_data.tile_occurrences.push_back(buzzobj_getint(BuzzTableGet(t_vm, "encounter")));
+        agent_data.tile_occurrences.push_back(buzzobj_getint(BuzzTableGet(t_vm, "observation")));
+
+        BuzzTableClose(t_vm);
+    }
+
     // Get reference to the robot brain
     auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
 
@@ -204,14 +230,17 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
         // Grab number of steps
         sim_data_set_.num_steps_ = GetSimulator().GetMaxSimulationClock();
+
+        // Grab robot ID prefix and base number
+        TConfigurationNode &robot_id_node = GetNode(col_per_root_node, "robot_id");
+
+        GetNodeAttribute(robot_id_node, "prefix", id_prefix_);
+        GetNodeAttribute(robot_id_node, "base_num", id_base_num_);
     }
     catch (CARGoSException &ex)
     {
         THROW_ARGOSEXCEPTION_NESTED("Error parsing loop functions!", ex);
     }
-
-    // Initialize each robot
-    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second);
 
     LOG << "[INFO] Running trial " << trial_counter_ + 1 << " with new parameters." << std::endl;
     LOG << "[INFO] Target fill ratio = " << curr_tfr_sp_range_itr_->first << std::endl;
@@ -220,7 +249,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
     // Create SimPacket to store data
     CreateNewSimPacket();
 
-    // Setup experiment with updated parameters
+    // Setup experiment
     SetupExperiment();
 }
 
@@ -249,6 +278,14 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
 
     LOG << "[INFO] Arena tile fill ratio = " << arena_.GetTrueTileDistribution() << " with " << arena_.GetTotalNumTiles() << " tiles." << std::endl;
 
+    // Setup functors
+    curr_agt_data_vec_ptr_ = std::make_shared<std::vector<AgentData>>(sim_data_set_.num_agents_);
+    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second);
+    process_thought_functor_ = ProcessRobotThought(id_brain_map_ptr_,
+                                                   curr_agt_data_vec_ptr_,
+                                                   id_prefix_,
+                                                   id_base_num_);
+
     // Re-initialize each robot
     BuzzForeachVM(initialization_functor_);
 }
@@ -256,7 +293,7 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
 void CollectivePerceptionLoopFunctions::PostStep()
 {
     // Iterate through each brain to process 'thought'
-    BuzzForeachVM(ProcessRobotThought(id_brain_map_ptr_));
+    BuzzForeachVM(process_thought_functor_);
 
     // Compute statistics
     ComputeStats();
@@ -265,9 +302,10 @@ void CollectivePerceptionLoopFunctions::PostStep()
 void CollectivePerceptionLoopFunctions::ComputeStats()
 {
     // Get all agent values
-    std::vector<Brain::ValuePair> local = GetAllLocalValues();
-    std::vector<Brain::ValuePair> social = GetAllSocialValues();
-    std::vector<Brain::ValuePair> informed = GetAllInformedValues();
+    auto solver_vals = GetAllSolverValues();
+    std::vector<Brain::ValuePair> local = solver_vals[0];
+    std::vector<Brain::ValuePair> social = solver_vals[1];
+    std::vector<Brain::ValuePair> informed = solver_vals[2];
 
     // Compute mean and std dev across all values
     std::pair<Brain::ValuePair, Brain::ValuePair> local_vals = ComputeValuePairsSampleMeanAndStdDev(local);
@@ -295,37 +333,20 @@ void CollectivePerceptionLoopFunctions::ComputeStats()
     curr_informed_stats_.confidence_sample_std.push_back(informed_vals.second.confidence);
 }
 
-std::vector<Brain::ValuePair> CollectivePerceptionLoopFunctions::GetAllLocalValues()
+std::array<std::vector<Brain::ValuePair>, 3> CollectivePerceptionLoopFunctions::GetAllSolverValues()
 {
-    std::vector<Brain::ValuePair> output(sim_data_set_.num_agents_);
+    std::vector<Brain::ValuePair> local(sim_data_set_.num_agents_);
+    std::vector<Brain::ValuePair> social(sim_data_set_.num_agents_);
+    std::vector<Brain::ValuePair> informed(sim_data_set_.num_agents_);
 
     for (auto &kv : *id_brain_map_ptr_)
     {
-        output.push_back(kv.second.GetLocalValuePair());
+        local.push_back(kv.second.GetLocalValuePair());
+        social.push_back(kv.second.GetLocalValuePair());
+        informed.push_back(kv.second.GetLocalValuePair());
     }
-    return output;
-}
 
-std::vector<Brain::ValuePair> CollectivePerceptionLoopFunctions::GetAllSocialValues()
-{
-    std::vector<Brain::ValuePair> output(sim_data_set_.num_agents_);
-
-    for (auto &kv : *id_brain_map_ptr_)
-    {
-        output.push_back(kv.second.GetSocialValuePair());
-    }
-    return output;
-}
-
-std::vector<Brain::ValuePair> CollectivePerceptionLoopFunctions::GetAllInformedValues()
-{
-    std::vector<Brain::ValuePair> output(sim_data_set_.num_agents_);
-
-    for (auto &kv : *id_brain_map_ptr_)
-    {
-        output.push_back(kv.second.GetInformedValuePair());
-    }
-    return output;
+    return {local, social, informed};
 }
 
 std::pair<Brain::ValuePair, Brain::ValuePair> CollectivePerceptionLoopFunctions::ComputeValuePairsSampleMeanAndStdDev(const std::vector<Brain::ValuePair> &input)
@@ -358,9 +379,11 @@ std::pair<Brain::ValuePair, Brain::ValuePair> CollectivePerceptionLoopFunctions:
 
 void CollectivePerceptionLoopFunctions::PopulateSimPacket()
 {
-    curr_sim_packet_.local_values_vec.push_back(curr_local_stats_);
-    curr_sim_packet_.social_values_vec.push_back(curr_social_stats_);
-    curr_sim_packet_.informed_values_vec.push_back(curr_informed_stats_);
+    // Extract the vector of AgentData objects
+    curr_sim_packet_.repeated_local_values.push_back(curr_local_stats_);
+    curr_sim_packet_.repeated_social_values.push_back(curr_social_stats_);
+    curr_sim_packet_.repeated_informed_values.push_back(curr_informed_stats_);
+    curr_sim_packet_.repeated_agent_data_vec.push_back(*curr_agt_data_vec_ptr_);
 }
 
 void CollectivePerceptionLoopFunctions::PostExperiment()
@@ -381,8 +404,6 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
         // Check parameter sets
         if (curr_tfr_sp_range_itr_ != tfr_sp_ranges_.end()) // more parameter sets are left
         {
-            initialization_functor_.UpdateSensorProbability(curr_tfr_sp_range_itr_->second);
-
             LOG << "[INFO] Running trial " << trial_counter_ + 1 << " with new parameters." << std::endl;
             LOG << "[INFO] Target fill ratio = " << curr_tfr_sp_range_itr_->first << std::endl;
             LOG << "[INFO] Sensor probability = " << curr_tfr_sp_range_itr_->second << std::endl;

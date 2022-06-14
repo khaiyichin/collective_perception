@@ -2,20 +2,25 @@ syntax = "proto3";
 
 package collective_perception_cpp.proto;
 
-message RepeatedExperimentAgentData // agent data for repeated experiment
+message RepeatedTrialAgentData // multi agent data for repeated trials
 {
-    message AgentData // agent data for a single experiment
+    message AgentData // single agent data for a single trial
     {
         repeated uint32 tile_occurrences = 1 [packed = true];
         repeated uint32 observations = 2 [packed = true];
     }
 
-    repeated AgentData agents = 1;
+    message MultiAgentData // multi agent data for a single trial
+    {
+        repeated AgentData agents = 1;
+    }
+
+    repeated MultiAgentData multiagents = 1;
 }
 
-message RepeatedExperimentStats // statistics for repeated experiments
+message RepeatedTrialStats // combined agent statistics for repeated trials
 {
-    message Stats // statistics for a single experiment
+    message Stats // combined agent statistics for a single trial
     {
         repeated float x_mean = 1 [packed = true];
         repeated float conf_mean = 2 [packed = true];
@@ -39,8 +44,8 @@ message SimPacket
     uint32 num_agents = 5;
     uint32 num_trials = 6;
 
-    RepeatedExperimentAgentData agent_data = 7;
-    RepeatedExperimentStats stats = 8;
+    RepeatedTrialAgentData rtad = 7;
+    RepeatedTrialStats rts = 8;
 
     // Static (Python) simulation variables
     string comms_graph = 9;

@@ -9,15 +9,15 @@
 #include <google/protobuf/stubs/common.h>
 
 /**
- * @brief Alias for storing multiple elements in a single experiment
+ * @brief Alias for storing multiple trial data
  *
  * @tparam T Any type to be stored
  */
 template <class T>
-using RepeatedExperimentData = std::vector<T>;
+using RepeatedTrials = std::vector<T>;
 
 /**
- * @brief Struct to store a single agent's data in one experiment
+ * @brief Struct to store a single agent's data in one trial (mostly for debugging purposes)
  *
  */
 struct AgentData
@@ -80,13 +80,13 @@ struct SimPacket
 
     std::string sim_type = "dynamic";
 
-    RepeatedExperimentData<Stats> local_values_vec; ///< Local values for repeated experiments
+    RepeatedTrials<Stats> repeated_local_values; ///< Local values for repeated trials
 
-    RepeatedExperimentData<Stats> social_values_vec; ///< Social values for repeated experiments
+    RepeatedTrials<Stats> repeated_social_values; ///< Social values for repeated trials
 
-    RepeatedExperimentData<Stats> informed_values_vec; ///< Social values for repeated experiments
+    RepeatedTrials<Stats> repeated_informed_values; ///< Social values for repeated trials
 
-    RepeatedExperimentData<AgentData> agent_data_vec; ///< Agent data for repeated experiments
+    RepeatedTrials<std::vector<AgentData>> repeated_agent_data_vec; ///< Agent data vector for repeated trials
 };
 
 template <class T>
