@@ -91,6 +91,8 @@ function reset_values()
     move_type = nil
     move_duration = 0
     rot_direction = nil
+
+    debug_data = {.encounter = 0, .observation = 0} # stored for debugging; not used in actual computation
 }
 
 # Execute robot motion
@@ -196,14 +198,14 @@ function observe()
     {
         # Make observation using artificial noise (probability)
         # The actual sensor is set to have no noise
-        var observation = left_front_color
+        var encounter = left_front_color
         var prob = 0.0
 
-        if (observation == 1) # white
+        if (encounter == 1) # white
         {
             prob = w_prob
         }
-        else if (observation == 0) # black
+        else if (encounter == 0) # black
         {
             prob = b_prob
         }
@@ -212,7 +214,12 @@ function observe()
             return nil # invalid observation
         }
 
-        total_b_tiles_obs = total_b_tiles_obs + ( 1-observe_noisy(observation, prob) ) # this is because black and white are flipped
+        var noisy_observation = int(1-observe_noisy(encounter, prob)) # this is because black and white are flipped
+
+        debug_data["encounter"] = encounter
+        debug_data["observation"] = noisy_observation
+
+        total_b_tiles_obs = total_b_tiles_obs + noisy_observation
         total_obs = total_obs + 1
     }
     else

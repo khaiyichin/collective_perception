@@ -32,3 +32,21 @@ target_include_directories(collective_perception_loop_functions
     PRIVATE
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
 )
+
+# Build executables
+add_executable(run_dynamic_simulations run_dynamic_simulations.cpp)
+target_link_libraries(run_dynamic_simulations
+    PRIVATE
+    argos3core_simulator
+    ${PROTO_LIB}
+)
+
+add_executable(protobuf_info protobuf_info.cpp)
+target_link_libraries(protobuf_info
+    PRIVATE
+    ${PROTO_LIB}
+)
+target_include_directories(protobuf_info
+    PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
+)

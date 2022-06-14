@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <cmath>
+#include <fstream>
 
 #include <google/protobuf/stubs/common.h>
 
