@@ -23,7 +23,7 @@ public:
          * @brief Construct a new ValuePair struct
          *
          */
-        ValuePair() : x(0.0), confidence(1.0) {}
+        ValuePair() : x(0.0), confidence(0.0) {}
 
         /**
          * @brief Construct a new ValuePair struct
@@ -36,6 +36,19 @@ public:
         inline ValuePair operator/(const float &val)
         {
             return ValuePair(x / val, confidence / val);
+        }
+
+        friend inline bool operator==(const ValuePair &lhs, const ValuePair &rhs)
+        {
+            if (lhs.x == rhs.x && lhs.confidence == rhs.confidence)
+            {
+                return true;
+            }
+
+            else
+            {
+                return false;
+            }
         }
 
         float x; ///< Estimate value
@@ -107,28 +120,28 @@ public:
      *
      * @return ValuePair The local values
      */
-    ValuePair GetLocalValuePair() { return solver_.local_vals; }
+    inline ValuePair GetLocalValuePair() { return solver_.local_vals; }
 
     /**
      * @brief Get the social ValuePair object
      *
      * @return ValuePair The social values
      */
-    ValuePair GetSocialValuePair() { return solver_.social_vals; }
+    inline ValuePair GetSocialValuePair() { return solver_.social_vals; }
 
     /**
      * @brief Get the informed ValuePair object
      *
      * @return ValuePair The informed values
      */
-    ValuePair GetInformedValuePair() { return solver_.informed_vals; }
+    inline ValuePair GetInformedValuePair() { return solver_.informed_vals; }
 
     /**
      * @brief Get the robot's ID that's associated with the Brain instance
      *
      * @return std::string Robot ID
      */
-    std::string GetId() { return id_; }
+    inline std::string GetId() { return id_; }
 
     /**
      * @brief Solve values

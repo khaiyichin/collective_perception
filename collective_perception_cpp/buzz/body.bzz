@@ -2,8 +2,6 @@ ROTATION_MOTION_ENUM = 0
 STRAIGHT_MOTION_ENUM = 1
 ROTATION_MEAN_DURATION = 5 # in units of timesteps
 STRAIGHT_MEAN_DURATION = 15 # in units of timesteps
-ROTATION_SPEED = 5.0 # rad/s
-STRAIGHT_SPEED = 15.0 # cm/s
 CCW_ENUM = 0 # rotation direction enum
 CW_ENUM = 1 # rotation direction enum
 OBSTACLE_AVOIDANCE_ANG = math.pi/2 # angle range in which objects enter to activate obstacle avoidance sequence in rad
@@ -20,6 +18,9 @@ function init()
             append_to_table(curr_neighbor_vals, neighbor_local_val_table)
         }
     )
+    
+    # Set custom seed
+    math.rng.setseed(id)
 }
 
 function step()
@@ -80,7 +81,12 @@ function reset_values()
     b_prob = nil
     w_prob = nil
 
-    local_vals = {.x = 0.5, .conf = 1.0}
+    # Define velocity variables, modified by the ARGoS loop functions
+    rot_spd = nil # rad/s
+    lin_spd = nil # cm/s
+
+    # Define initial values, not modified by ARGoS loop functions
+    local_vals = {.x = 0.5, .conf = 0.0}
 
     total_b_tiles_obs = 0
     total_obs = 0
@@ -104,11 +110,11 @@ function move()
     # Assert that values are correct (only useful in ARGoS simulation)
     if ( (move_type == nil) and (move_duration != 0) )
     {
-        log("ERROR: move_duration should be 0 when no move type is decided!")
+        logerr("ERROR: move_duration should be 0 when no move type is decided!")
     }
     else if ( (move_duration == 0) and (move_type != nil) )
     {
-        log("ERROR: move_duration should be 0 when no move type is decided!")
+        logerr("ERROR: move_duration should be 0 when no move type is decided!")
     }
 
     # Select new move and duration if no move type is specified
@@ -154,14 +160,14 @@ function move()
 # Move robot in a straight line
 function move_straight()
 {
-    gotop(STRAIGHT_SPEED, 0.0)
+    gotop(lin_spd, 0.0)
 }
 
 # Rotate robot in-place
 function move_rotate(dir)
 {
-    # gotop(0.0, -1.0^dir * ROTATION_SPEED) # this doesn't work for ROTATION_SPEED < 9.5 rad/s, which is too quick
-    set_wheels(-1.0^(1-dir) * ROTATION_SPEED, -1.0^dir * ROTATION_SPEED)
+    # gotop(0.0, -1.0^dir * rot_spd) # this doesn't work for rot_spd < 9.5 rad/s, which is too quick
+    set_wheels(-1.0^(1-dir) * rot_spd, -1.0^dir * rot_spd)
 }
 
 # Execute observation
@@ -291,6 +297,11 @@ function avoid_obstacles(obstacles)
     {
         move_rotate(CCW_ENUM) # rotate to the left
     }
+
+    # Reset motion
+    move_type = nil
+    rot_direction = nil
+    move_duration = 0
 }
 
 # Append element to table as if it's a dynamically-sized array

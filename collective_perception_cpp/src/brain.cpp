@@ -8,7 +8,7 @@ void Brain::Solver::LocalSolve(const int &total_b_obs, const int &total_obs, con
 
     if ((b == 1.0) && (w == 1.0)) // perfect sensor
     {
-        local_vals.x = (float)h / t;
+        local_vals.x = h / t;
         local_vals.confidence = std::pow(t, 3) / (h * (t - h));
     }
     else // imperfect sensor
@@ -31,7 +31,7 @@ void Brain::Solver::LocalSolve(const int &total_b_obs, const int &total_obs, con
         }
         else
         {
-            local_vals.x = ((float)h / t + w - 1.0) / (b + w - 1);
+            local_vals.x = (h / t + w - 1.0) / (b + w - 1);
             local_vals.confidence = (std::pow(t, 3) * std::pow(b + w - 1.0, 2)) / (h * (t - h));
         }
     }
@@ -39,10 +39,21 @@ void Brain::Solver::LocalSolve(const int &total_b_obs, const int &total_obs, con
 
 void Brain::Solver::SocialSolve(const std::vector<ValuePair> &neighbor_vals)
 {
-    // Accumulate all the values in a sum
+    // Accumulate all the values in a sum (the confidence is the inverse of variance)
     auto lambda = [](const ValuePair &a, const ValuePair &b)
     {
-        return Brain::ValuePair(a.x + b.x, (a.confidence * b.confidence) / (a.confidence + b.confidence));
+        if (a == Brain::ValuePair(0.0, 0.0))
+        {
+            return b;
+        }
+        else if (b == Brain::ValuePair(0.0, 0.0))
+        {
+            return a;
+        }
+        else
+        {
+            return Brain::ValuePair(a.x + b.x, (a.confidence * b.confidence) / (a.confidence + b.confidence));
+        }
     };
 
     Brain::ValuePair sum = std::reduce(neighbor_vals.begin(), neighbor_vals.end(), Brain::ValuePair(), lambda);
@@ -60,11 +71,15 @@ void Brain::Solver::InformedSolve()
 
 void Brain::Solve()
 {
+    // Solve local values (since it's purely based on self observations)
     solver_.LocalSolve(total_black_obs_, total_obs_, b_prob_, w_prob_);
 
+    // Compute social values only if neighbor values are available
     if (neighbors_value_pairs_.size() != 0)
     {
         solver_.SocialSolve(neighbors_value_pairs_);
-        solver_.InformedSolve();
     }
+
+    // Solve informed values (since local values are always available, even if social values aren't)
+    solver_.InformedSolve();
 }

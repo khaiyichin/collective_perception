@@ -6,6 +6,10 @@ void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
     BuzzPut(t_vm, "b_prob", b_prob);
     BuzzPut(t_vm, "w_prob", w_prob);
 
+    // Set robot speeds
+    BuzzPut(t_vm, "lin_spd", lin_spd);
+    BuzzPut(t_vm, "rot_spd", rot_spd);
+
     // Initialize RobotIDBrainMap
     (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, b_prob, w_prob);
     auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
@@ -159,6 +163,9 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         // Grab arena information
         TConfigurationNode &arena_node = GetNode(col_per_root_node, "arena");
 
+        // Grab verbosity level
+        GetNodeAttribute(GetNode(col_per_root_node, "verbosity"), "level", verbose_level_);
+
         // Get a pointer to the ARGoS floor entity (method provided by superclass)
         CSpace &space_entity = GetSpace();
         floor_entity_ptr_ = &space_entity.GetFloorEntity();
@@ -184,8 +191,6 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
         assert(length_x == length_y); // only square tiles allowed
         arena_tile_size_ = length_x;
-
-        LOG << "[INFO] Generated tile size of " << arena_tile_size_ << "m" << std::endl;
 
         // Grab fill ratio ranges
         TConfigurationNode &fill_ratio_node = GetNode(col_per_root_node, "fill_ratio_range");
@@ -218,6 +223,10 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
         curr_tfr_sp_range_itr_ = tfr_sp_ranges_.begin();
 
+        // Grab robot speeds
+        GetNodeAttribute(GetNode(col_per_root_node, "speed"), "linear", robot_speeds_.first);
+        GetNodeAttribute(GetNode(col_per_root_node, "speed"), "rotational", robot_speeds_.second);
+
         // Grab number of agents and communications range
         auto &rab_map = space_entity.GetEntitiesByType("rab");
         CRABEquippedEntity &random_rab = *any_cast<CRABEquippedEntity *>(rab_map.begin()->second);
@@ -236,15 +245,30 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
         GetNodeAttribute(robot_id_node, "prefix", id_prefix_);
         GetNodeAttribute(robot_id_node, "base_num", id_base_num_);
+
+        // Grab probotuf file save path
+        GetNodeAttribute(GetNode(col_per_root_node, "path"), "output", proto_file_path_);
+
+        if (verbose_level_ == "full" || verbose_level_ == "reduced")
+        {
+            LOG << "[INFO] Collective perception loop functions verbose level = \"" << verbose_level_ << "\"" << std::endl;
+            LOG << "[INFO] Specifying number of arena tiles = " << arena_x << "*" << arena_y << std::endl;
+            LOG << "[INFO] Specifying robot speeds = " << robot_speeds_.first << " cm/s & " << robot_speeds_.second << " rad/s" << std::endl;
+            LOG << "[INFO] Specifying number of trials = " << sim_data_set_.num_trials_ << std::endl;
+            LOG << "[INFO] Specifying output filepath = \"" << proto_file_path_ << "\"" << std::endl;
+
+            LOG << "[INFO] Generated tile size = " << arena_tile_size_ << " m" << std::endl;
+
+            LOG << "[INFO] Running trial 1 with new parameters:"
+                << " target fill ratio = " << curr_tfr_sp_range_itr_->first
+                << " & sensor probability = " << curr_tfr_sp_range_itr_->second
+                << std::endl;
+        }
     }
     catch (CARGoSException &ex)
     {
         THROW_ARGOSEXCEPTION_NESTED("Error parsing loop functions!", ex);
     }
-
-    LOG << "[INFO] Running trial " << trial_counter_ + 1 << " with new parameters." << std::endl;
-    LOG << "[INFO] Target fill ratio = " << curr_tfr_sp_range_itr_->first << std::endl;
-    LOG << "[INFO] Sensor probability = " << curr_tfr_sp_range_itr_->second << std::endl;
 
     // Create SimPacket to store data
     CreateNewSimPacket();
@@ -276,11 +300,14 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
     // Create new Arena object
     arena_ = Arena(arena_tile_count_, arena_lower_lim_, arena_tile_size_, curr_tfr_sp_range_itr_->first);
 
-    LOG << "[INFO] Arena tile fill ratio = " << arena_.GetTrueTileDistribution() << " with " << arena_.GetTotalNumTiles() << " tiles." << std::endl;
+    if (verbose_level_ == "full")
+    {
+        LOG << "[INFO] Arena tile fill ratio = " << arena_.GetTrueTileDistribution() << " with " << arena_.GetTotalNumTiles() << " tiles." << std::endl;
+    }
 
     // Setup functors
     curr_agt_data_vec_ptr_ = std::make_shared<std::vector<AgentData>>(sim_data_set_.num_agents_);
-    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second);
+    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, robot_speeds_);
     process_thought_functor_ = ProcessRobotThought(id_brain_map_ptr_,
                                                    curr_agt_data_vec_ptr_,
                                                    id_prefix_,
@@ -288,6 +315,9 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
 
     // Re-initialize each robot
     BuzzForeachVM(initialization_functor_);
+
+    // Compute the pre-experiment statistics
+    ComputeStats();
 }
 
 void CollectivePerceptionLoopFunctions::PostStep()
@@ -335,15 +365,19 @@ void CollectivePerceptionLoopFunctions::ComputeStats()
 
 std::array<std::vector<Brain::ValuePair>, 3> CollectivePerceptionLoopFunctions::GetAllSolverValues()
 {
-    std::vector<Brain::ValuePair> local(sim_data_set_.num_agents_);
-    std::vector<Brain::ValuePair> social(sim_data_set_.num_agents_);
-    std::vector<Brain::ValuePair> informed(sim_data_set_.num_agents_);
+    std::vector<Brain::ValuePair> local;
+    std::vector<Brain::ValuePair> social;
+    std::vector<Brain::ValuePair> informed;
+
+    local.reserve(sim_data_set_.num_agents_);
+    social.reserve(sim_data_set_.num_agents_);
+    informed.reserve(sim_data_set_.num_agents_);
 
     for (auto &kv : *id_brain_map_ptr_)
     {
         local.push_back(kv.second.GetLocalValuePair());
-        social.push_back(kv.second.GetLocalValuePair());
-        informed.push_back(kv.second.GetLocalValuePair());
+        social.push_back(kv.second.GetSocialValuePair());
+        informed.push_back(kv.second.GetInformedValuePair());
     }
 
     return {local, social, informed};
@@ -404,23 +438,30 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
         // Check parameter sets
         if (curr_tfr_sp_range_itr_ != tfr_sp_ranges_.end()) // more parameter sets are left
         {
-            LOG << "[INFO] Running trial " << trial_counter_ + 1 << " with new parameters." << std::endl;
-            LOG << "[INFO] Target fill ratio = " << curr_tfr_sp_range_itr_->first << std::endl;
-            LOG << "[INFO] Sensor probability = " << curr_tfr_sp_range_itr_->second << std::endl;
+            if (verbose_level_ == "full" || verbose_level_ == "reduced")
+            {
+                LOG << "[INFO] Running trial 1 with new parameters:"
+                    << " target fill ratio = " << curr_tfr_sp_range_itr_->first
+                    << " & sensor probability = " << curr_tfr_sp_range_itr_->second
+                    << std::endl;
+            }
 
             // Create SimPacket to store data
             CreateNewSimPacket();
         }
         else // no more parameter sets
         {
-            LOG << "[INFO] All simulation parameters executed." << std::endl;
+            if (verbose_level_ == "full" || verbose_level_ == "reduced")
+            {
+                LOG << "[INFO] All simulation parameters executed." << std::endl;
+            }
 
             // Export SimulationDataSet object
             collective_perception_cpp::proto::SimulationDataSet sim_proto_msg;
 
             sim_data_set_.Serialize(sim_proto_msg);
 
-            WriteProtoToDisk(sim_proto_msg, "/home/khaiyichin/Downloads/test.pb.sds"); // debug: need to validate
+            WriteProtoToDisk(sim_proto_msg, proto_file_path_); // debug: need to validate
 
             google::protobuf::ShutdownProtobufLibrary();
 
@@ -431,7 +472,10 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
     {
 
         // Repeat trial
-        LOG << "[INFO] Running trial " << trial_counter_ + 1 << " with same parameters." << std::endl;
+        if (verbose_level_ == "full")
+        {
+            LOG << "[INFO] Running trial " << trial_counter_ + 1 << " with same parameters." << std::endl;
+        }
     }
 }
 

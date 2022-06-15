@@ -222,9 +222,21 @@ RTStatsProtoMsg SimulationDataSet::ExtractRepeatedTrialStatsMsg(const std::array
         *(social.mutable_x_mean()) = {arr[1][ind].x_sample_mean.begin(), arr[1][ind].x_sample_mean.end()};
         *(informed.mutable_x_mean()) = {arr[2][ind].x_sample_mean.begin(), arr[2][ind].x_sample_mean.end()};
 
-        local_stats_msg_vec.push_back(local);
-        social_stats_msg_vec.push_back(social);
-        informed_stats_msg_vec.push_back(informed);
+        *(local.mutable_conf_mean()) = {arr[0][ind].confidence_sample_mean.begin(), arr[0][ind].confidence_sample_mean.end()};
+        *(social.mutable_conf_mean()) = {arr[1][ind].confidence_sample_mean.begin(), arr[1][ind].confidence_sample_mean.end()};
+        *(informed.mutable_conf_mean()) = {arr[2][ind].confidence_sample_mean.begin(), arr[2][ind].confidence_sample_mean.end()};
+
+        *(local.mutable_x_std()) = {arr[0][ind].x_sample_std.begin(), arr[0][ind].x_sample_std.end()};
+        *(social.mutable_x_std()) = {arr[1][ind].x_sample_std.begin(), arr[1][ind].x_sample_std.end()};
+        *(informed.mutable_x_std()) = {arr[2][ind].x_sample_std.begin(), arr[2][ind].x_sample_std.end()};
+
+        *(local.mutable_conf_std()) = {arr[0][ind].confidence_sample_std.begin(), arr[0][ind].confidence_sample_std.end()};
+        *(social.mutable_conf_std()) = {arr[1][ind].confidence_sample_std.begin(), arr[1][ind].confidence_sample_std.end()};
+        *(informed.mutable_conf_std()) = {arr[2][ind].confidence_sample_std.begin(), arr[2][ind].confidence_sample_std.end()};
+
+        local_stats_msg_vec[ind] = local;
+        social_stats_msg_vec[ind] = social;
+        informed_stats_msg_vec[ind] = informed;
     }
 
     *(rts_msg.mutable_local_vals()) = {local_stats_msg_vec.begin(), local_stats_msg_vec.end()};

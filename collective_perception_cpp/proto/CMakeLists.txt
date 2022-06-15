@@ -8,7 +8,6 @@ set(PROTO_LIB_FILES
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # setting the fPIC flag
 
-
 add_library(${PROTO_LIB} ${PROTO_LIB_FILES})
 target_link_libraries(${PROTO_LIB} PUBLIC protobuf::libprotobuf)
 target_include_directories(${PROTO_LIB}
@@ -17,3 +16,4 @@ target_include_directories(${PROTO_LIB}
 )
 
 protobuf_generate(LANGUAGE cpp TARGET ${PROTO_LIB})
+protobuf_generate(LANGUAGE python TARGET ${PROTO_LIB})
