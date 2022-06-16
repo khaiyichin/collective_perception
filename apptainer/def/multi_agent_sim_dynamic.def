@@ -1,0 +1,40 @@
+Bootstrap: localimage
+From: ../containers/argos_buzz_protobuf_release.sif
+
+%labels
+    AUTHOR khaiyichin@gmail.com
+    VERSION 1.0.0
+    NAME multi_agent_sim_dynamic
+
+%help
+    SUMMARY
+    This container contains the environment setup to execute the simulation for
+    a dynamic multi-agent simulation (ARGoS-based).
+
+    CHANGELOG
+    v1.0.0
+    Initial release.
+
+%files
+    ../../collective_perception_cpp collective_perception_cpp
+
+%post -c /bin/bash
+    # Prevent user prompts
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Update and upgrade packages
+    apt update && apt upgrade -qy
+
+    # Build collective_perception_cpp
+    pushd collective_perception_cpp
+    rm -rf build
+    mkdir build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j$(nproc)
+    popd
+
+    # Insert additional labels
+    echo "CREATED $(date)" >> $APPTAINER_LABELS
+
+%runscript
+    /collective_perception_cpp/build/src/run_dynamic_simulations -c param_multi_agent_sim_dynamic.argos
