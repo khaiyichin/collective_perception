@@ -33,7 +33,7 @@ INC=(19)
 
 # Set fixed parameters
 sed -i "s/numExperiments:.*/numExperiments: 5/g" param_multi_agent_sim.yaml
-sed -i "s/numObs:.*/numObs: 1500/g" param_multi_agent_sim.yaml
+sed -i "s/numObs:.*/numObs: 2000/g" param_multi_agent_sim.yaml
 
 # Run simulations
 {
