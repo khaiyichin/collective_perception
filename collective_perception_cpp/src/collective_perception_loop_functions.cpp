@@ -161,7 +161,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         TConfigurationNode &col_per_root_node = GetNode(t_tree, "collective_perception");
 
         // Grab arena information
-        TConfigurationNode &arena_node = GetNode(col_per_root_node, "arena");
+        TConfigurationNode &arena_tiles_node = GetNode(col_per_root_node, "arena_tiles");
 
         // Grab verbosity level
         GetNodeAttribute(GetNode(col_per_root_node, "verbosity"), "level", verbose_level_);
@@ -173,8 +173,8 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         // Get the size of the arena (in units of tiles)
         uint32_t arena_x, arena_y;
 
-        GetNodeAttribute(arena_node, "tile_count_x", arena_x);
-        GetNodeAttribute(arena_node, "tile_count_y", arena_y);
+        GetNodeAttribute(arena_tiles_node, "tile_count_x", arena_x);
+        GetNodeAttribute(arena_tiles_node, "tile_count_y", arena_y);
 
         arena_tile_count_ = std::make_pair(arena_x, arena_y);
 
@@ -247,7 +247,9 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(robot_id_node, "base_num", id_base_num_);
 
         // Grab probotuf file save path
-        GetNodeAttribute(GetNode(col_per_root_node, "path"), "output", proto_file_path_);
+        TConfigurationNode &path_node = GetNode(col_per_root_node, "path");
+        GetNodeAttribute(path_node, "output", proto_file_path_);
+        GetNodeAttribute(path_node, "include_datetime", proto_datetime_);
 
         if (verbose_level_ == "full" || verbose_level_ == "reduced")
         {
@@ -255,7 +257,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
             LOG << "[INFO] Specifying number of arena tiles = " << arena_x << "*" << arena_y << std::endl;
             LOG << "[INFO] Specifying robot speeds = " << robot_speeds_.first << " cm/s & " << robot_speeds_.second << " rad/s" << std::endl;
             LOG << "[INFO] Specifying number of trials = " << sim_data_set_.num_trials_ << std::endl;
-            LOG << "[INFO] Specifying output filepath = \"" << proto_file_path_ << "\"" << std::endl;
+            LOG << "[INFO] Specifying output filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << proto_file_path_ << "\"" << std::endl;
 
             LOG << "[INFO] Generated tile size = " << arena_tile_size_ << " m" << std::endl;
 
@@ -461,7 +463,37 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
 
             sim_data_set_.Serialize(sim_proto_msg);
 
-            WriteProtoToDisk(sim_proto_msg, proto_file_path_); // debug: need to validate
+            // Create output filename
+            std::string output_file;
+
+            if (proto_datetime_)
+            {
+                // Get current time in string form
+                time_t curr_time;
+                time(&curr_time);
+                tm *curr_tm = localtime(&curr_time);
+
+                std::string datetime_str;
+                datetime_str.resize(100);
+
+                strftime(&(datetime_str[0]), datetime_str.size(), "%m%d%y_%H%M%S", curr_tm);
+
+                // Strip extension from filename
+                std::pair<std::string, std::string> name_ext_pair;
+                std::stringstream stream(proto_file_path_);
+
+                getline(stream, name_ext_pair.first, '.');
+                getline(stream, name_ext_pair.second, '.');
+
+                // Generate updated filename
+                output_file = name_ext_pair.first + "_" + datetime_str.c_str() + "." + name_ext_pair.second;
+            }
+            else
+            {
+                output_file = proto_file_path_;
+            }
+
+            WriteProtoToDisk(sim_proto_msg, output_file); // debug: need to validate
 
             google::protobuf::ShutdownProtobufLibrary();
 

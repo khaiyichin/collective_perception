@@ -23,7 +23,7 @@
           or set to zero, this value is taken from the clock and a warning
           message is displayed.
     -->
-        <experiment length="500" ticks_per_second="10" random_seed="0" />
+        <experiment length="1000" ticks_per_second="10" random_seed="0" />
     </framework>
 
     <!-- *************** -->
@@ -89,7 +89,7 @@
           function.
           The user, writing the controller, defines how it is organized.
       -->
-            <params bytecode_file="build/buzz/body.bo" debug_file="build/buzz/body.bdb" />
+            <params bytecode_file="/collective_perception_cpp/build/buzz/body.bo" debug_file="/collective_perception_cpp/build/buzz/body.bdb" />
         </buzz_controller_kheperaiv>
 
     </controllers>
@@ -98,16 +98,16 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="/home/khaiyichin/research/collective_perception/collective_perception_cpp/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
+    <loop_functions library="/collective_perception_cpp/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
         <collective_perception>
-            <arena_tiles tile_count_x="100" tile_count_y="100" />
-            <fill_ratio_range min="0.05" max="0.95" steps="3" />
-            <sensor_probability_range min="0.55" max="0.95" steps="3" />
+            <arena_tiles tile_count_x="100" tile_count_y="100" /> <!-- number of tiles for the arena -->
+            <fill_ratio_range min="0.05" max="0.95" steps="2" /> <!-- range of target fill ratios -->
+            <sensor_probability_range min="0.5" max="0.95" steps="2" /> <!-- range of sensor probabilities -->
             <speed linear="15.0" rotational="5.0" /> <!-- in units of cm/s, rad/s -->
-            <num_trials value="5" />
+            <num_trials value="5" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <robot_id prefix="kiv" base_num="0" /> <!-- must match the ones in the arena configuration -->
-            <path output="data/test.pb" include_datetime="true" />
-            <verbosity level="reduced"/> <!-- "full", "reduced", "none" -->
+            <path output="data/multi_agent_sim_dynamic_data.pb" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
+            <verbosity level="reduced" /> <!-- "full", "reduced", "none" -->
         </collective_perception>
     </loop_functions>
 
@@ -132,7 +132,6 @@
     <arena size="5, 5, 1" center="0,0,0.5">
 
         <floor id="floor" source="loop_functions" pixels_per_meter="100" />
-        <!-- <floor id="floor" source="image" path="img/white.png" /> -->
 
         <!-- Place four boxes in a square to delimit the arena -->
         <box id="wall_north" size="5.25,0.1,0.5" movable="false">
@@ -148,11 +147,11 @@
             <body position="-2.55,0,0" orientation="0,0,0" />
         </box>
 
-        <!-- Place a foot-bot in the origin and bind it to the controller -->
+        <!-- Place the Khepera IV robots in the arena in random and bind it to the controller -->
         <distribute>
             <position method="uniform" min="-2.5,-2.5,0" max="2.5,2.5,0" />
             <orientation method="uniform" min="0,0,0" max="360,0,0" />
-            <entity quantity="5" max_trials="100" base_num="0">
+            <entity quantity="100" max_trials="100" base_num="0">
                 <kheperaiv id="kiv" rab_data_size="50" rab_range="0.7">
                     <controller config="bck" />
                 </kheperaiv>

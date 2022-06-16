@@ -59,7 +59,7 @@ sed -i "s/numObs:.*/numObs: 1500/g" param_multi_agent_sim.yaml
                 min=$(echo ${MIN[d]})
                 max=$(echo ${MAX[d]})
                 inc=$(echo ${INC[d]})
-                sed -i "/desFillRatios:/{n;N;N;d}" param_multi_agent_sim.yaml
+                sed -i "/desFillRatios:/{n;N;N;d}" param_multi_agent_sim.yaml # remove the line and 2 lines after 'desFillRatios'
                 sed -i "s/desFillRatios:/desFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" param_multi_agent_sim.yaml
                 singularity run multi_agent_sim_static.sif
             done

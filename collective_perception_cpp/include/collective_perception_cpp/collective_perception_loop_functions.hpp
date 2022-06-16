@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <ctime>
 
 // Buzz and ARGoS headers
 #include <buzz/argos/buzz_loop_functions.h>
@@ -162,6 +163,8 @@ private:
     std::vector<T> GenerateLinspace(const T &min, const T &max, const size_t &steps);
 
     bool finished_ = false;
+
+    bool proto_datetime_;
 
     int trial_counter_ = 0;
 

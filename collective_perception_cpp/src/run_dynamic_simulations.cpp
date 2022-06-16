@@ -1,8 +1,9 @@
+#include <filesystem>
+
 #include <argos3/core/simulator/simulator.h>
 #include <argos3/core/utility/plugins/dynamic_loading.h>
 #include <argos3/core/simulator/query_plugins.h>
 #include <argos3/core/simulator/argos_command_line_arg_parser.h>
-
 #include <argos3/core/simulator/loop_functions.h>
 
 using namespace argos;
@@ -22,13 +23,14 @@ int main(int n_argc, char **ppch_argv)
 
       switch (cACLAP.GetAction())
       {
-      case CARGoSCommandLineArgParser::ACTION_RUN_EXPERIMENT:
+      case (CARGoSCommandLineArgParser::ACTION_RUN_EXPERIMENT):
       {
          CDynamicLoading::LoadAllLibraries();
 
          cSimulator.SetExperimentFileName(cACLAP.GetExperimentConfigFile());
          cSimulator.LoadExperiment();
 
+         // Run experiments
          while (!cSimulator.GetLoopFunctions().IsExperimentFinished())
          {
             cSimulator.Reset();
@@ -36,7 +38,7 @@ int main(int n_argc, char **ppch_argv)
          }
          break;
       }
-      case CARGoSCommandLineArgParser::ACTION_UNKNOWN:
+      case (CARGoSCommandLineArgParser::ACTION_UNKNOWN):
       {
          /* Should never get here */
          break;

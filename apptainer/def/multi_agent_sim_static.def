@@ -40,6 +40,7 @@ From: ubuntu:20.04
         numpy==1.22.3 \
         packaging==21.3 \
         Pillow==9.1.0 \
+        protobuf==4.21.1 \
         pycairo==1.21.0 \
         pyparsing==3.0.9 \
         python-dateutil==2.8.2 \
