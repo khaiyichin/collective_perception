@@ -1,0 +1,43 @@
+Bootstrap: localimage
+From: ../containers/argos_buzz_base_release_no_qt.sif
+
+%labels
+    AUTHOR khaiyichin@gmail.com
+    VERSION 1.0.0
+    NAME protobuf_layer
+
+%help
+    SUMMARY
+    This container contains the installation of protobuf since the installation
+    is time-intensive. To add this layer to an existing build simply modify the
+    value for `From` above to point to an existing .sif file
+
+    CHANGELOG
+    v1.0.0
+    Initial release.
+
+%post -c /bin/bash
+    # Prevent user prompts
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Update and upgrade packages
+    apt update && apt upgrade -qy
+    
+    # Install dependencies
+    apt install -q -y autoconf automake libtool curl make g++ unzip
+
+    # Install Protobuf (and dependencies of collective_perception_cpp)
+    wget "https://github.com/protocolbuffers/protobuf/releases/download/v21.1/protobuf-python-4.21.1.tar.gz"
+    tar -xvf protobuf-python-4.21.1.tar.gz
+    pushd protobuf-3.21.1
+    ./configure
+    make -j$(nproc)
+    make check
+    make install
+    ldconfig
+    popd
+
+    # Insert additional labels
+    echo "CREATED $(date)" >> $APPTAINER_LABELS
+
+%runscript

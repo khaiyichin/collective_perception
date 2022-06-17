@@ -37,9 +37,10 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
      *
      * @param id_brain_ptr Pointer to the unordered map to be populated with robot IDs and Brain instances
      * @param sensor_prob Initial sensor probability to be assigned to robots
+     * @param spd Speed to be assigned to robots
      */
-    InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr, const float &sensor_prob, const std::pair<float, float> &spd)
-        : id_brain_map_ptr(id_brain_ptr), b_prob(sensor_prob), w_prob(sensor_prob), lin_spd(spd.first), rot_spd(spd.second) {}
+    InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr, const float &sensor_prob, const float &spd)
+        : id_brain_map_ptr(id_brain_ptr), b_prob(sensor_prob), w_prob(sensor_prob), spd(spd) {}
 
     /**
      * @brief Overload the () operator (used to initialize each robot using BuzzForeachVM())
@@ -53,9 +54,7 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
 
     float w_prob;
 
-    float lin_spd;
-
-    float rot_spd;
+    float spd;
 
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr; ///< Pointer to unordered map containing robot IDs and corresponding Brain instances
 };
@@ -172,6 +171,8 @@ private:
 
     float arena_tile_size_;
 
+    float robot_speed_;
+
     std::string verbose_level_;
 
     std::string proto_file_path_;
@@ -181,8 +182,6 @@ private:
     std::pair<uint32_t, uint32_t> arena_tile_count_;
 
     std::pair<float, float> arena_lower_lim_;
-
-    std::pair<float, float> robot_speeds_;
 
     std::vector<std::pair<float, float>> tfr_sp_ranges_;
 

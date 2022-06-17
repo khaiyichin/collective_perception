@@ -6,9 +6,8 @@ void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
     BuzzPut(t_vm, "b_prob", b_prob);
     BuzzPut(t_vm, "w_prob", w_prob);
 
-    // Set robot speeds
-    BuzzPut(t_vm, "lin_spd", lin_spd);
-    BuzzPut(t_vm, "rot_spd", rot_spd);
+    // Set robot speed
+    BuzzPut(t_vm, "spd", spd);
 
     // Initialize RobotIDBrainMap
     (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, b_prob, w_prob);
@@ -224,8 +223,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         curr_tfr_sp_range_itr_ = tfr_sp_ranges_.begin();
 
         // Grab robot speeds
-        GetNodeAttribute(GetNode(col_per_root_node, "speed"), "linear", robot_speeds_.first);
-        GetNodeAttribute(GetNode(col_per_root_node, "speed"), "rotational", robot_speeds_.second);
+        GetNodeAttribute(GetNode(col_per_root_node, "speed"), "value", robot_speed_);
 
         // Grab number of agents and communications range
         auto &rab_map = space_entity.GetEntitiesByType("rab");
@@ -255,7 +253,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         {
             LOG << "[INFO] Collective perception loop functions verbose level = \"" << verbose_level_ << "\"" << std::endl;
             LOG << "[INFO] Specifying number of arena tiles = " << arena_x << "*" << arena_y << std::endl;
-            LOG << "[INFO] Specifying robot speeds = " << robot_speeds_.first << " cm/s & " << robot_speeds_.second << " rad/s" << std::endl;
+            LOG << "[INFO] Specifying robot speed = " << robot_speed_ << " cm/s" << std::endl;
             LOG << "[INFO] Specifying number of trials = " << sim_data_set_.num_trials_ << std::endl;
             LOG << "[INFO] Specifying output filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << proto_file_path_ << "\"" << std::endl;
 
@@ -309,7 +307,7 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
 
     // Setup functors
     curr_agt_data_vec_ptr_ = std::make_shared<std::vector<AgentData>>(sim_data_set_.num_agents_);
-    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, robot_speeds_);
+    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, robot_speed_);
     process_thought_functor_ = ProcessRobotThought(id_brain_map_ptr_,
                                                    curr_agt_data_vec_ptr_,
                                                    id_prefix_,
