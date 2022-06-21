@@ -33,8 +33,19 @@ message RepeatedTrialStats // combined agent statistics for repeated trials
     repeated Stats informed_vals = 3;
 }
 
-// SimPacket message (roughly similar to the `SimPacket` struct in C++ and `Sim` class in Python)
-message SimPacket
+/*
+A Packet (roughly similar to the `Packet` struct in C++ and `Sim` class in Python)
+stores data from repeated trials with the same:
+ - number of experiments,
+ - number of agents,
+ - number of steps,
+ - communication range,
+ - swarm density,
+ - robot speed,
+ - target fill ratio, and
+ - sensor probability.
+ */
+message Packet
 {
     // Common variables
     string sim_type = 1;
@@ -43,9 +54,6 @@ message SimPacket
     float w_prob = 4; // sensor probability used in this simulation
     uint32 num_agents = 5;
     uint32 num_trials = 6;
-
-    RepeatedTrialAgentData rtad = 7;
-    RepeatedTrialStats rts = 8;
 
     // Static (Python) simulation variables
     string comms_graph = 9;
@@ -57,4 +65,17 @@ message SimPacket
     uint32 num_steps = 13;
     float comms_range = 14;
     float density = 15;
+    float speed = 16;
+}
+
+message StatsPacket
+{
+    Packet packet = 1;
+    RepeatedTrialStats rts = 2;
+}
+
+message AgentDataPacket
+{
+    Packet packet = 1;
+    RepeatedTrialAgentData rtad = 2;
 }

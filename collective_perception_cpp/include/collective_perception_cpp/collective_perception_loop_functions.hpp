@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <ctime>
+#include <cmath>
 
 // Buzz and ARGoS headers
 #include <buzz/argos/buzz_loop_functions.h>
@@ -14,7 +15,9 @@
 // Local headers
 #include "arena.hpp"
 #include "brain.hpp"
-#include "simulation_data_set.hpp"
+#include "simulation_set.hpp"
+#include "simulation_stats_set.hpp"
+#include "simulation_agent_data_set.hpp"
 
 using namespace argos;
 
@@ -76,7 +79,7 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
      * @param id_base_num ID base number used to offset the robot ID integer value
      */
     ProcessRobotThought(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr,
-                        const std::shared_ptr<std::vector<AgentData>> &agt_vec_ptr,
+                        std::vector<AgentData> *agt_vec_ptr,
                         const std::string &id_prefix, const int &id_base_num)
         : id_brain_map_ptr(id_brain_ptr), agt_data_vec_ptr(agt_vec_ptr), prefix(id_prefix), base_num(id_base_num) {}
 
@@ -90,7 +93,7 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
 
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr; ///< Pointer to unordered map containing robot IDs and corresponding Brain instances
 
-    std::shared_ptr<std::vector<AgentData>> agt_data_vec_ptr; ///< Pointer to vector of agent data
+    std::vector<AgentData> *agt_data_vec_ptr; ///< Pointer to vector of agent data
 
     std::string prefix; ///< Prefix to robot ID
 
@@ -150,9 +153,7 @@ private:
 
     void SetupExperiment();
 
-    void CreateNewSimPacket();
-
-    void PopulateSimPacket();
+    void CreateNewPacket();
 
     std::array<std::vector<Brain::ValuePair>, 3> GetAllSolverValues();
 
@@ -171,11 +172,7 @@ private:
 
     float arena_tile_size_;
 
-    float robot_speed_;
-
     std::string verbose_level_;
-
-    std::string proto_file_path_;
 
     std::string id_prefix_;
 
@@ -187,27 +184,25 @@ private:
 
     std::vector<std::pair<float, float>>::iterator curr_tfr_sp_range_itr_;
 
-    std::shared_ptr<std::vector<AgentData>> curr_agt_data_vec_ptr_;
-
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr_ = std::make_shared<RobotIdBrainMap>(); ///< Pointer to unordered map containing robot IDs and Brain instances
 
     Arena arena_; ///< Arena object
 
     CFloorEntity *floor_entity_ptr_ = NULL; ///< Pointer to the floor entity class
 
-    SimulationDataSet sim_data_set_;
+    SimulationSet simulation_parameters_;
+
+    SimulationStatsSet sim_stats_set_;
+
+    SimulationAgentDataSet sim_agent_data_set_;
 
     InitializeRobot initialization_functor_;
 
     ProcessRobotThought process_thought_functor_;
 
-    SimPacket curr_sim_packet_;
+    StatsPacket curr_stats_packet_;
 
-    Stats curr_local_stats_;
-
-    Stats curr_social_stats_;
-
-    Stats curr_informed_stats_;
+    AgentDataPacket curr_agent_data_packet_;
 };
 
 #endif

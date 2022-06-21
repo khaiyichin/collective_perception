@@ -31,7 +31,7 @@ struct AgentData
 };
 
 /**
- * @brief Struct to store statistics across all agents
+ * @brief Struct to store statistics across all agents per trial
  *
  */
 struct Stats
@@ -48,20 +48,21 @@ struct Stats
 };
 
 /**
- * @brief Struct to store simulation data and statistics
+ * @brief Struct to serve as parent struct to store simulation data and statistics
  *
- * A SimPacket stores data from repeated experiments with the same:
+ * A Packet stores data from repeated trials with the same:
  *  - number of agents,
  *  - number of steps,
  *  - communication range,
  *  - swarm density,
+ *  - robot speed,
  *  - target fill ratio, and
  *  - sensor probability.
  *
  */
-struct SimPacket
+struct Packet
 {
-    SimPacket() {}
+    Packet() {}
 
     float comms_range;
 
@@ -79,13 +80,42 @@ struct SimPacket
 
     float density;
 
+    float speed;
+
     std::string sim_type = "dynamic";
+};
+
+struct StatsPacket : Packet
+{
+    StatsPacket() {}
+
+    /**
+     * @brief Construct a new Stats Packet object
+     * 
+     * @param n Number of trials
+     */
+    inline StatsPacket(const unsigned int &n)
+        : repeated_local_values(n), repeated_social_values(n), repeated_informed_values(n) {}
 
     RepeatedTrials<Stats> repeated_local_values; ///< Local values for repeated trials
 
     RepeatedTrials<Stats> repeated_social_values; ///< Social values for repeated trials
 
     RepeatedTrials<Stats> repeated_informed_values; ///< Social values for repeated trials
+};
+
+struct AgentDataPacket : Packet
+{
+    AgentDataPacket() {}
+
+    /**
+     * @brief Construct a new Agent Data Packet object
+     * 
+     * @param n Number of trials
+     * @param m Number of agents
+     */
+    inline AgentDataPacket(const unsigned int &n, const unsigned int &m)
+        : repeated_agent_data_vec(n, std::vector<AgentData>(m)) {}
 
     RepeatedTrials<std::vector<AgentData>> repeated_agent_data_vec; ///< Agent data vector for repeated trials
 };

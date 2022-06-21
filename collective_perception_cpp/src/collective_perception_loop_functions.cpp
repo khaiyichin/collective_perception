@@ -185,8 +185,8 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         // Compute tile size
         CVector3 arena_size = space_entity.GetArenaSize();
 
-        float length_x = arena_size.GetX() / arena_x;
-        float length_y = arena_size.GetY() / arena_y;
+        float length_x = arena_size.GetX() / arena_x; // tile size in the x-direction
+        float length_y = arena_size.GetY() / arena_y; // tile size in the y-direction
 
         assert(length_x == length_y); // only square tiles allowed
         arena_tile_size_ = length_x;
@@ -200,7 +200,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(fill_ratio_node, "max", max);
         GetNodeAttribute(fill_ratio_node, "steps", steps);
 
-        sim_data_set_.tfr_range_ = GenerateLinspace(min, max, steps);
+        simulation_parameters_.tfr_range_ = GenerateLinspace(min, max, steps);
 
         // Grab sensor probability ranges
         TConfigurationNode &sensor_probability_node = GetNode(col_per_root_node, "sensor_probability_range");
@@ -209,12 +209,12 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(sensor_probability_node, "max", max);
         GetNodeAttribute(sensor_probability_node, "steps", steps);
 
-        sim_data_set_.sp_range_ = GenerateLinspace(min, max, steps);
+        simulation_parameters_.sp_range_ = GenerateLinspace(min, max, steps);
 
         // Create pairings for target fill ratios and sensor probabilities
-        for (const float &tfr : sim_data_set_.tfr_range_)
+        for (const float &tfr : simulation_parameters_.tfr_range_)
         {
-            for (const float &sp : sim_data_set_.sp_range_)
+            for (const float &sp : simulation_parameters_.sp_range_)
             {
                 tfr_sp_ranges_.push_back(std::pair<float, float>(tfr, sp));
             }
@@ -223,20 +223,22 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         curr_tfr_sp_range_itr_ = tfr_sp_ranges_.begin();
 
         // Grab robot speeds
-        GetNodeAttribute(GetNode(col_per_root_node, "speed"), "value", robot_speed_);
+        GetNodeAttribute(GetNode(col_per_root_node, "speed"), "value", simulation_parameters_.speed_);
 
         // Grab number of agents and communications range
         auto &rab_map = space_entity.GetEntitiesByType("rab");
         CRABEquippedEntity &random_rab = *any_cast<CRABEquippedEntity *>(rab_map.begin()->second);
 
-        sim_data_set_.num_agents_ = rab_map.size();         // the number of range and bearing sensors is the same as the number of robots
-        sim_data_set_.comms_range_ = random_rab.GetRange(); // all the range and bearing sensors have the same range
+        simulation_parameters_.num_agents_ = rab_map.size();         // the number of range and bearing sensors is the same as the number of robots
+        simulation_parameters_.comms_range_ = random_rab.GetRange(); // all the range and bearing sensors have the same range
+        simulation_parameters_.density_ = simulation_parameters_.num_agents_ * M_PI * std::pow(simulation_parameters_.comms_range_, 2) /
+                                          (arena_size.GetX() * arena_size.GetY()); // the density is the ratio of swarm communication area to total walkable area
 
         // Grab number of trials
-        GetNodeAttribute(GetNode(col_per_root_node, "num_trials"), "value", sim_data_set_.num_trials_);
+        GetNodeAttribute(GetNode(col_per_root_node, "num_trials"), "value", simulation_parameters_.num_trials_);
 
         // Grab number of steps
-        sim_data_set_.num_steps_ = GetSimulator().GetMaxSimulationClock();
+        simulation_parameters_.num_steps_ = GetSimulator().GetMaxSimulationClock();
 
         // Grab robot ID prefix and base number
         TConfigurationNode &robot_id_node = GetNode(col_per_root_node, "robot_id");
@@ -246,17 +248,24 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
         // Grab probotuf file save path
         TConfigurationNode &path_node = GetNode(col_per_root_node, "path");
-        GetNodeAttribute(path_node, "output", proto_file_path_);
+        GetNodeAttribute(path_node, "stats", sim_stats_set_.proto_filepath_);
+        GetNodeAttribute(path_node, "agent_data", sim_agent_data_set_.proto_filepath_);
         GetNodeAttribute(path_node, "include_datetime", proto_datetime_);
+
+        // Populate simulation parameters for SimulationStatsSet and SimulationAgentDataSet objects
+        sim_stats_set_.PopulateSimulationSetParams(simulation_parameters_);
+        sim_agent_data_set_.PopulateSimulationSetParams(simulation_parameters_);
 
         if (verbose_level_ == "full" || verbose_level_ == "reduced")
         {
             LOG << "[INFO] Collective perception loop functions verbose level = \"" << verbose_level_ << "\"" << std::endl;
             LOG << "[INFO] Specifying number of arena tiles = " << arena_x << "*" << arena_y << std::endl;
-            LOG << "[INFO] Specifying robot speed = " << robot_speed_ << " cm/s" << std::endl;
-            LOG << "[INFO] Specifying number of trials = " << sim_data_set_.num_trials_ << std::endl;
-            LOG << "[INFO] Specifying output filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << proto_file_path_ << "\"" << std::endl;
+            LOG << "[INFO] Specifying robot speed = " << simulation_parameters_.speed_ << " cm/s" << std::endl;
+            LOG << "[INFO] Specifying number of trials = " << simulation_parameters_.num_trials_ << std::endl;
+            LOG << "[INFO] Specifying output statistics filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << sim_stats_set_.proto_filepath_ << "\"" << std::endl;
+            LOG << "[INFO] Specifying output agent data filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << sim_agent_data_set_.proto_filepath_ << "\"" << std::endl;
 
+            LOG << "[INFO] Computed swarm density = " << simulation_parameters_.density_ << std::endl;
             LOG << "[INFO] Generated tile size = " << arena_tile_size_ << " m" << std::endl;
 
             LOG << "[INFO] Running trial 1 with new parameters:"
@@ -270,33 +279,38 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         THROW_ARGOSEXCEPTION_NESTED("Error parsing loop functions!", ex);
     }
 
-    // Create SimPacket to store data
-    CreateNewSimPacket();
+    // Create Packet to store data
+    CreateNewPacket();
 
     // Setup experiment
     SetupExperiment();
 }
 
-void CollectivePerceptionLoopFunctions::CreateNewSimPacket()
+void CollectivePerceptionLoopFunctions::CreateNewPacket()
 {
-    curr_sim_packet_ = SimPacket();
-    curr_sim_packet_.comms_range = sim_data_set_.comms_range_;
-    curr_sim_packet_.target_fill_ratio = curr_tfr_sp_range_itr_->first;
-    curr_sim_packet_.b_prob = curr_tfr_sp_range_itr_->second;
-    curr_sim_packet_.w_prob = curr_tfr_sp_range_itr_->second;
-    curr_sim_packet_.num_agents = sim_data_set_.num_agents_;
-    curr_sim_packet_.num_trials = sim_data_set_.num_trials_;
-    curr_sim_packet_.num_steps = sim_data_set_.num_steps_;
-    curr_sim_packet_.density = sim_data_set_.density_;
+    curr_stats_packet_ = StatsPacket(simulation_parameters_.num_trials_);
+    curr_stats_packet_.comms_range = simulation_parameters_.comms_range_;
+    curr_stats_packet_.target_fill_ratio = curr_tfr_sp_range_itr_->first;
+    curr_stats_packet_.b_prob = curr_tfr_sp_range_itr_->second;
+    curr_stats_packet_.w_prob = curr_tfr_sp_range_itr_->second;
+    curr_stats_packet_.num_agents = simulation_parameters_.num_agents_;
+    curr_stats_packet_.num_trials = simulation_parameters_.num_trials_;
+    curr_stats_packet_.num_steps = simulation_parameters_.num_steps_;
+    curr_stats_packet_.density = simulation_parameters_.density_;
+
+    curr_agent_data_packet_ = AgentDataPacket(simulation_parameters_.num_trials_, simulation_parameters_.num_agents_);
+    curr_agent_data_packet_.comms_range = simulation_parameters_.comms_range_;
+    curr_agent_data_packet_.target_fill_ratio = curr_tfr_sp_range_itr_->first;
+    curr_agent_data_packet_.b_prob = curr_tfr_sp_range_itr_->second;
+    curr_agent_data_packet_.w_prob = curr_tfr_sp_range_itr_->second;
+    curr_agent_data_packet_.num_agents = simulation_parameters_.num_agents_;
+    curr_agent_data_packet_.num_trials = simulation_parameters_.num_trials_;
+    curr_agent_data_packet_.num_steps = simulation_parameters_.num_steps_;
+    curr_agent_data_packet_.density = simulation_parameters_.density_;
 }
 
 void CollectivePerceptionLoopFunctions::SetupExperiment()
 {
-    // Initialize Stats objects
-    curr_local_stats_ = Stats();
-    curr_social_stats_ = Stats();
-    curr_informed_stats_ = Stats();
-
     // Create new Arena object
     arena_ = Arena(arena_tile_count_, arena_lower_lim_, arena_tile_size_, curr_tfr_sp_range_itr_->first);
 
@@ -306,10 +320,11 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
     }
 
     // Setup functors
-    curr_agt_data_vec_ptr_ = std::make_shared<std::vector<AgentData>>(sim_data_set_.num_agents_);
-    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, robot_speed_);
+    std::vector<AgentData> *curr_agent_data_vec_ptr = &curr_agent_data_packet_.repeated_agent_data_vec[trial_counter_];
+
+    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, simulation_parameters_.speed_);
     process_thought_functor_ = ProcessRobotThought(id_brain_map_ptr_,
-                                                   curr_agt_data_vec_ptr_,
+                                                   curr_agent_data_vec_ptr,
                                                    id_prefix_,
                                                    id_base_num_);
 
@@ -343,24 +358,24 @@ void CollectivePerceptionLoopFunctions::ComputeStats()
     std::pair<Brain::ValuePair, Brain::ValuePair> informed_vals = ComputeValuePairsSampleMeanAndStdDev(informed);
 
     // Store mean values
-    curr_local_stats_.x_sample_mean.push_back(local_vals.first.x);
-    curr_local_stats_.confidence_sample_mean.push_back(local_vals.first.confidence);
+    curr_stats_packet_.repeated_local_values[trial_counter_].x_sample_mean.push_back(local_vals.first.x);
+    curr_stats_packet_.repeated_local_values[trial_counter_].confidence_sample_mean.push_back(local_vals.first.confidence);
 
-    curr_social_stats_.x_sample_mean.push_back(social_vals.first.x);
-    curr_social_stats_.confidence_sample_mean.push_back(social_vals.first.confidence);
+    curr_stats_packet_.repeated_social_values[trial_counter_].x_sample_mean.push_back(social_vals.first.x);
+    curr_stats_packet_.repeated_social_values[trial_counter_].confidence_sample_mean.push_back(social_vals.first.confidence);
 
-    curr_informed_stats_.x_sample_mean.push_back(informed_vals.first.x);
-    curr_informed_stats_.confidence_sample_mean.push_back(informed_vals.first.confidence);
+    curr_stats_packet_.repeated_informed_values[trial_counter_].x_sample_mean.push_back(informed_vals.first.x);
+    curr_stats_packet_.repeated_informed_values[trial_counter_].confidence_sample_mean.push_back(informed_vals.first.confidence);
 
     // Store std dev values
-    curr_local_stats_.x_sample_std.push_back(local_vals.second.x);
-    curr_local_stats_.confidence_sample_std.push_back(local_vals.second.confidence);
+    curr_stats_packet_.repeated_local_values[trial_counter_].x_sample_std.push_back(local_vals.second.x);
+    curr_stats_packet_.repeated_local_values[trial_counter_].confidence_sample_std.push_back(local_vals.second.confidence);
 
-    curr_social_stats_.x_sample_std.push_back(social_vals.second.x);
-    curr_social_stats_.confidence_sample_std.push_back(social_vals.second.confidence);
+    curr_stats_packet_.repeated_social_values[trial_counter_].x_sample_std.push_back(social_vals.second.x);
+    curr_stats_packet_.repeated_social_values[trial_counter_].confidence_sample_std.push_back(social_vals.second.confidence);
 
-    curr_informed_stats_.x_sample_std.push_back(informed_vals.second.x);
-    curr_informed_stats_.confidence_sample_std.push_back(informed_vals.second.confidence);
+    curr_stats_packet_.repeated_informed_values[trial_counter_].x_sample_std.push_back(informed_vals.second.x);
+    curr_stats_packet_.repeated_informed_values[trial_counter_].confidence_sample_std.push_back(informed_vals.second.confidence);
 }
 
 std::array<std::vector<Brain::ValuePair>, 3> CollectivePerceptionLoopFunctions::GetAllSolverValues()
@@ -369,9 +384,9 @@ std::array<std::vector<Brain::ValuePair>, 3> CollectivePerceptionLoopFunctions::
     std::vector<Brain::ValuePair> social;
     std::vector<Brain::ValuePair> informed;
 
-    local.reserve(sim_data_set_.num_agents_);
-    social.reserve(sim_data_set_.num_agents_);
-    informed.reserve(sim_data_set_.num_agents_);
+    local.reserve(sim_stats_set_.num_agents_);
+    social.reserve(sim_stats_set_.num_agents_);
+    informed.reserve(sim_stats_set_.num_agents_);
 
     for (auto &kv : *id_brain_map_ptr_)
     {
@@ -411,29 +426,18 @@ std::pair<Brain::ValuePair, Brain::ValuePair> CollectivePerceptionLoopFunctions:
     return std::make_pair(sample_mean, sample_std_dev);
 }
 
-void CollectivePerceptionLoopFunctions::PopulateSimPacket()
-{
-    // Extract the vector of AgentData objects
-    curr_sim_packet_.repeated_local_values.push_back(curr_local_stats_);
-    curr_sim_packet_.repeated_social_values.push_back(curr_social_stats_);
-    curr_sim_packet_.repeated_informed_values.push_back(curr_informed_stats_);
-    curr_sim_packet_.repeated_agent_data_vec.push_back(*curr_agt_data_vec_ptr_);
-}
-
 void CollectivePerceptionLoopFunctions::PostExperiment()
 {
-    // Store data for current experiment by storing Stats objects (Stats objects will be cleared in Reset())
-    PopulateSimPacket();
-
     // Check to see if all trials are complete
-    if (++trial_counter_ % sim_data_set_.num_trials_ == 0) // all trials for current param set is done
+    if (++trial_counter_ % simulation_parameters_.num_trials_ == 0) // all trials for current param set is done
     {
         trial_counter_ = 0; // reset counter
 
         ++curr_tfr_sp_range_itr_; // use next parameter set
 
-        // Store SimPacket
-        sim_data_set_.InsertSimPacket(curr_sim_packet_);
+        // Store Packet
+        sim_stats_set_.InsertStatsPacket(curr_stats_packet_);
+        sim_agent_data_set_.InsertAgentDataPacket(curr_agent_data_packet_);
 
         // Check parameter sets
         if (curr_tfr_sp_range_itr_ != tfr_sp_ranges_.end()) // more parameter sets are left
@@ -446,8 +450,8 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
                     << std::endl;
             }
 
-            // Create SimPacket to store data
-            CreateNewSimPacket();
+            // Create Packet to store data
+            CreateNewPacket();
         }
         else // no more parameter sets
         {
@@ -456,13 +460,15 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
                 LOG << "[INFO] All simulation parameters executed." << std::endl;
             }
 
-            // Export SimulationDataSet object
-            collective_perception_cpp::proto::SimulationDataSet sim_proto_msg;
+            // Export SimulationStatsSet object
+            collective_perception_cpp::proto::SimulationStatsSet sim_stats_set_proto_msg;
+            collective_perception_cpp::proto::SimulationAgentDataSet sim_agent_data_set_proto_msg;
 
-            sim_data_set_.Serialize(sim_proto_msg);
+            sim_stats_set_.Serialize(sim_stats_set_proto_msg);
+            sim_agent_data_set_.Serialize(sim_agent_data_set_proto_msg);
 
             // Create output filename
-            std::string output_file;
+            std::string output_file_stats, output_file_agent_data;
 
             if (proto_datetime_)
             {
@@ -477,21 +483,27 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
                 strftime(&(datetime_str[0]), datetime_str.size(), "%m%d%y_%H%M%S", curr_tm);
 
                 // Strip extension from filename
-                std::pair<std::string, std::string> name_ext_pair;
-                std::stringstream stream(proto_file_path_);
+                std::pair<std::string, std::string> name_ext_pair_stats, name_ext_pair_agent_data;
+                std::stringstream stream_stats(sim_stats_set_.proto_filepath_);
+                std::stringstream stream_agent_data(sim_agent_data_set_.proto_filepath_);
 
-                getline(stream, name_ext_pair.first, '.');
-                getline(stream, name_ext_pair.second, '.');
+                getline(stream_stats, name_ext_pair_stats.first, '.');
+                getline(stream_stats, name_ext_pair_stats.second, '.');
+                getline(stream_agent_data, name_ext_pair_agent_data.first, '.');
+                getline(stream_agent_data, name_ext_pair_agent_data.second, '.');
 
                 // Generate updated filename
-                output_file = name_ext_pair.first + "_" + datetime_str.c_str() + "." + name_ext_pair.second;
+                output_file_stats = name_ext_pair_stats.first + "_" + datetime_str.c_str() + "." + name_ext_pair_stats.second;
+                output_file_agent_data = name_ext_pair_agent_data.first + "_" + datetime_str.c_str() + "." + name_ext_pair_agent_data.second;
             }
             else
             {
-                output_file = proto_file_path_;
+                output_file_stats = sim_stats_set_.proto_filepath_;
+                output_file_agent_data = sim_agent_data_set_.proto_filepath_;
             }
 
-            WriteProtoToDisk(sim_proto_msg, output_file); // debug: need to validate
+            WriteProtoToDisk(sim_stats_set_proto_msg, output_file_stats);
+            WriteProtoToDisk(sim_agent_data_set_proto_msg, output_file_agent_data);
 
             google::protobuf::ShutdownProtobufLibrary();
 

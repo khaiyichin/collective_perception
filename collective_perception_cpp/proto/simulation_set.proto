@@ -5,17 +5,18 @@ import "util.proto";
 package collective_perception_cpp.proto;
 
 /*
-A SimulationDataSet stores sets of data from simulations (i.e., `SimPacket`s) with the same:
+A SimulationSet stores sets of data from simulations (i.e., `SimPacket`s) with the same:
  - number of experiments,
  - number of agents,
  - number of steps,
- - communication range, and
+ - communication range,
+ - robot speed, and
  - swarm density
 and with varying:
  - target fill ratios, and
  - sensor probabilities.
  */
-message SimulationDataSet
+message SimulationSet
 {
     /*
     Currently the static and dynamic simulation has similar concepts but uses different variable names.
@@ -28,7 +29,6 @@ message SimulationDataSet
     uint32 num_trials = 3;
     repeated float tfr_range = 4 [packed = true]; // note that the Python version calls it `dfr_range`; will be updated in the future
     repeated float sp_range = 5 [packed = true];
-    repeated SimPacket sim_packets = 6;
 
     // Static (Python) simulation variables
     string comms_graph = 7;
@@ -40,4 +40,17 @@ message SimulationDataSet
     uint32 num_steps = 11;
     float comms_range = 12;
     float density = 13;
+    float speed = 14;
+}
+
+message SimulationStatsSet
+{
+    SimulationSet sim_set = 1;
+    repeated StatsPacket stats_packets = 2;
+}
+
+message SimulationAgentDataSet
+{
+    SimulationSet sim_set = 1;
+    repeated AgentDataPacket agent_data_packets = 2;
 }

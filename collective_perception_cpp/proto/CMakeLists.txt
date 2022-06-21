@@ -3,7 +3,7 @@ find_package(Protobuf REQUIRED)
 
 set(PROTO_LIB_FILES
     ./util.proto
-    ./simulation_data_set.proto
+    ./simulation_set.proto
 )
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # setting the fPIC flag
