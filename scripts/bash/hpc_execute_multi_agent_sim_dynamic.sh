@@ -7,23 +7,26 @@
 
 # Define varying parameters
 SPEED=(10.0 15.0 20.0 25.0) # cm/s
-AGENTS=(10 50 100 200)
+AGENTS=(10 20 50 100)
 THREADS=20
 
 # Set fixed parameters
 TFR_RANGE=(0.05 0.95 19)
-SP_RANGE=(0.5 0.95 19)
+SP_RANGE=(0.525 0.975 19)
 TRIALS=5
 TILES=500
-FILEPATH="data\/multi_agent_sim_dynamic_data.pb"
+STATSPATH="data\/multi_agent_sim_dynamic_stats.pbs"
+AGENTDATAPATH="data\/multi_agent_sim_dynamic_agent_data.pbad"
 
 sed -i "s/<fill_ratio_range.*/<fill_ratio_range min=\"${TFR_RANGE[0]}\" max=\"${TFR_RANGE[1]}\" steps=\"${TFR_RANGE[2]}\" \/>/" param_multi_agent_sim_dynamic.argos # fill ratio range
 sed -i "s/<sensor_probability_range.*/<sensor_probability_range min=\"${SP_RANGE[0]}\" max=\"${SP_RANGE[1]}\" steps=\"${SP_RANGE[2]}\" \/>/" param_multi_agent_sim_dynamic.argos # sensor prob range
 sed -i "s/<num_trials.*/<num_trials value=\"$TRIALS\" \/>/" param_multi_agent_sim_dynamic.argos # number of trials
 sed -i "s/<arena_tiles.*/<arena_tiles tile_count_x=\"$TILES\" tile_count_y=\"$TILES\" \/>/" param_multi_agent_sim_dynamic.argos # tile count
-sed -i "s/<path.*/<path output=\"$FILEPATH\" include_datetime=\"true\" \/>/" param_multi_agent_sim_dynamic.argos # output path
+sed -i "s/<path.*/<path stats=\"$STATSPATH\" agent_data=\"$AGENTDATAPATH\"  include_datetime=\"true\" \/>/" param_multi_agent_sim_dynamic.argos # output path
 sed -i "s/<verbosity.*/<verbosity level=\"full\" \/>/" param_multi_agent_sim_dynamic.argos # verbosity
-sed -i "s/<experiment.*/<experiment length=\"500\" ticks_per_second=\"10\" random_seed=\"0\" \/>/" param_multi_agent_sim_dynamic.argos # experiment length
+sed -i "s/<experiment.*/<experiment length=\"200\" ticks_per_second=\"10\" random_seed=\"0\" \/>/" param_multi_agent_sim_dynamic.argos # experiment length
+
+mkdir data
 
 # Run simulations
 {

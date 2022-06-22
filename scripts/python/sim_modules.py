@@ -52,15 +52,15 @@ class Sim:
         """Class for storing statistics of simulation experiments.
         """
 
-        def __init__(self, sim_type, num_exp, num_obs, comms_period):
+        def __init__(self, sim_type, num_exp=0, num_obs=0, comms_period=1):
 
-            if sim_type == "single":
+            if sim_type == "single" and num_exp != 0 and num_obs != 0:
                 self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
                 self.alpha_sample_mean = np.zeros( (num_exp, num_obs + 1) )
                 self.x_hat_sample_std = np.zeros( (num_exp, num_obs + 1) )
                 self.alpha_sample_std = np.zeros( (num_exp, num_obs + 1) )
 
-            elif sim_type == "multi":
+            elif sim_type == "multi" and num_exp != 0 and num_obs != 0:
                 self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
                 self.alpha_sample_mean = np.zeros( (num_exp, num_obs + 1) )
                 self.x_hat_sample_std = np.zeros( (num_exp, num_obs + 1) )
@@ -75,6 +75,22 @@ class Sim:
                 self.gamma_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
                 self.x_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
                 self.gamma_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
+
+            else: # for population with dynamic simulation data
+                self.x_hat_sample_mean = None
+                self.alpha_sample_mean = None
+                self.x_hat_sample_std = None
+                self.alpha_sample_std = None
+
+                self.x_bar_sample_mean = None
+                self.rho_sample_mean = None
+                self.x_bar_sample_std = None
+                self.rho_sample_std = None
+
+                self.x_sample_mean = None
+                self.gamma_sample_mean = None
+                self.x_sample_std = None
+                self.gamma_sample_std = None
 
     def __init__(self, num_exp, num_obs, des_fill_ratio, main_filename_suffix):
         self.num_exp = num_exp
@@ -775,6 +791,7 @@ class ExperimentData:
     """
 
     def __init__(self, sim_param_obj):
+        self.sim_type = "static"
         self.num_agents = sim_param_obj.num_agents
         self.num_exp = sim_param_obj.num_exp
         self.num_obs = sim_param_obj.num_obs

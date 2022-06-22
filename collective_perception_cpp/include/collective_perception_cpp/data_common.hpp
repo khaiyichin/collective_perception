@@ -90,7 +90,7 @@ struct StatsPacket : Packet
     StatsPacket() {}
 
     /**
-     * @brief Construct a new Stats Packet object
+     * @brief Construct a new StatsPacket object
      * 
      * @param n Number of trials
      */
@@ -109,7 +109,7 @@ struct AgentDataPacket : Packet
     AgentDataPacket() {}
 
     /**
-     * @brief Construct a new Agent Data Packet object
+     * @brief Construct a new AgentDataPacket object
      * 
      * @param n Number of trials
      * @param m Number of agents

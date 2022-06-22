@@ -11,18 +11,30 @@ include_directories(${BUZZ_C_INCLUDE_DIR})
 
 # Set install rule
 
-# Build library
+# Build libraries
+add_library(collective_perception_data_structures
+simulation_stats_set.cpp
+simulation_agent_data_set.cpp
+)
+target_link_libraries(collective_perception_data_structures
+PRIVATE
+${PROTO_LIB}
+)
+target_include_directories(collective_perception_data_structures
+PRIVATE
+$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
+)
+
 add_library(collective_perception_loop_functions
     MODULE
     collective_perception_loop_functions.cpp
     arena.cpp
     brain.cpp
-    simulation_stats_set.cpp
-    simulation_agent_data_set.cpp
 )
 target_link_libraries(collective_perception_loop_functions
     ${BUZZ_LIBRARY}
     ${PROTO_LIB}
+    collective_perception_data_structures
     argos3core_simulator
     argos3plugin_simulator_dynamics2d
     argos3plugin_simulator_entities
@@ -45,6 +57,7 @@ target_link_libraries(run_dynamic_simulations
 add_executable(protobuf_info protobuf_info.cpp)
 target_link_libraries(protobuf_info
     PRIVATE
+    collective_perception_data_structures
     ${PROTO_LIB}
 )
 target_include_directories(protobuf_info

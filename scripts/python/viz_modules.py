@@ -8,11 +8,17 @@ import pickle
 from datetime import datetime
 import warnings
 from joblib import Parallel, delayed
+from abc import ABC, abstractmethod
 
-from sim_modules import ExperimentData
+from sim_modules import ExperimentData, Sim
+
+import sys
+sys.path.append("/home/khaiyichin/research/collective_perception/collective_perception_cpp/build/proto") # may need a better way
+import simulation_set_pb2
 
 # Default values
 CONV_THRESH = 5e-3
+FIG_SIZE = (20, 12)
 
 warnings.filterwarnings("ignore", category=UserWarning) # ignore UserWarning type warnings
 
@@ -60,9 +66,8 @@ class VisualizationData:
             self.rho_std = []
             self.gamma_std = []
 
-    def __init__(self, exp_data_obj_folder):
+    def __init__(self, exp_data_obj_folder=""):
 
-        # Load experiment data statistics
         first_obj = True
 
         # Iterate through folder contents recursively to obtain all serialized filenames
@@ -70,44 +75,201 @@ class VisualizationData:
 
         for root, _, files in os.walk(exp_data_obj_folder):
             for f in files:
-                if os.path.splitext(f)[1] == ".pkl": # currently serialized files are pickled
+                if os.path.splitext(f)[1] == ".pkl" or os.path.splitext(f)[1] == ".pbs":
                     exp_data_obj_paths.append( os.path.join(root, f) )
 
         # Load the files
         for path in exp_data_obj_paths:
-            obj = ExperimentData.load(path, False)
 
+            # Check type of file to load
+            if os.path.splitext(path)[1] == ".pkl": obj = self.load_pkl_file(path)
+            elif os.path.splitext(path)[1] == ".pbs": obj = self.load_proto_file(path)
+            else: raise RuntimeError("Unknown extension encountered; please provide \".pkl\" or \".pbs\" files.")
+
+            # Check that common simulation parameters are the same before combining
             if first_obj:
+
+                # Check simulation type
+                if hasattr(obj, "sim_type"): # TODO: legacy ExperimentData classes has no sim_type; remove this when upgrade is complete
+                    self.sim_type = obj.sim_type
+
+                    if self.sim_type == "dynamic":
+                        self.comms_range = obj.comms_range
+                        self.density = obj.density
+                        self.speed = obj.speed
+                        self.comms_period = 1
+
+                    elif self.sim_type == "static":
+                        self.graph_type = obj.graph_type
+                        self.comms_period = obj.comms_period
+                        self.comms_prob = obj.comms_prob
+
+                else: # TODO: legacy ExperimentData classes has no sim_type; remove this when upgrade is complete
+                    self.graph_type = obj.graph_type
+                    self.comms_period = obj.comms_period
+                    self.comms_prob = obj.comms_prob
+
+                # Common parameters
                 self.num_agents = obj.num_agents
                 self.num_exp = obj.num_exp
                 self.num_obs = obj.num_obs
-                self.graph_type = obj.graph_type
-                self.comms_period = obj.comms_period
-                self.comms_prob = obj.comms_prob
                 self.dfr_range = obj.dfr_range
                 self.sp_range = obj.sp_range
                 self.stats_obj_dict = obj.stats_obj_dict
                 self.agg_stats_dict = {} # to be populated later
                 
                 first_obj = False
+
             else:
                 similarity_bool = True
+
+                if hasattr(self, "sim_type"): # TODO: legacy ExperimentData classes has no sim_type; remove this when upgrade is complete
+                    similarity_bool = similarity_bool and (self.sim_type == obj.sim_type)
+
+                    if self.sim_type == "dynamic":
+                        similarity_bool = similarity_bool and (self.comms_range == obj.comms_range)
+                        similarity_bool = similarity_bool and (self.density == obj.density)
+                        similarity_bool = similarity_bool and (self.speed == obj.speed)
+
+                    elif self.sim_type == "static":
+                        similarity_bool = similarity_bool and (self.graph_type == obj.graph_type)
+                        similarity_bool = similarity_bool and (self.comms_period == obj.comms_period)
+                        similarity_bool = similarity_bool and (self.comms_prob == obj.comms_prob)
+
+                else: # TODO: legacy ExperimentData classes has no sim_type; remove this when upgrade is complete
+                    similarity_bool = similarity_bool and (self.graph_type == obj.graph_type)
+                    similarity_bool = similarity_bool and (self.comms_period == obj.comms_period)
+                    similarity_bool = similarity_bool and (self.comms_prob == obj.comms_prob)
+
+                # Common parameters
                 similarity_bool = similarity_bool and (self.num_agents == obj.num_agents)
                 similarity_bool = similarity_bool and (self.num_exp == obj.num_exp)
                 similarity_bool = similarity_bool and (self.num_obs == obj.num_obs)
-                similarity_bool = similarity_bool and (self.graph_type == obj.graph_type)
-                similarity_bool = similarity_bool and (self.comms_period == obj.comms_period)
-                similarity_bool = similarity_bool and (self.comms_prob == obj.comms_prob)
-                similarity_bool = similarity_bool and (self.sp_range == obj.sp_range)
 
-                # Only the target fill ratio range can be different (highest level)
-                if not similarity_bool:
-                    raise RuntimeError("The ExperimentData objects in the \"{0}\" directory do not have the same parameters.".format(exp_data_obj_paths))
-                else:
+                # Check to see if either target fill ratio range or sensor probability range matches
+                if (self.sp_range == obj.sp_range): # sensor probability matches
+
+                    # Update the dictionary of tfr-sp_dict key-value pair
                     self.dfr_range.extend(obj.dfr_range)
                     self.stats_obj_dict.update(obj.stats_obj_dict)
 
+                elif (self.dfr_range == obj.dfr_range): # target fill ratio matches
+
+                    # Update the internal dictionary of sp-stats key-value pair
+                    self.sp_range.extend(obj.sp_range)
+                    [self.stats_obj_dict[i].update(obj.stats_obj_dict[i]) for i in obj.dfr_range]
+
+                else: similarity_bool = False
+
+                # Only the target fill ratio range can be different (highest level)
+                if not similarity_bool:
+                    raise RuntimeError("The objects in the \"{0}\" directory do not have the same parameters.".format(exp_data_obj_paths))
+
         self.aggregate_statistics()
+
+    def load_pkl_file(self, folder_path): return ExperimentData.load(folder_path, False)
+
+    def load_proto_file(self, folder_path):
+        """Load SimulationStatsSet protobuf file into VisualizationData object.
+        """
+        with open(folder_path, "rb") as fopen:
+            sim_stats_set_msg = simulation_set_pb2.SimulationStatsSet()
+            sim_stats_set_msg.ParseFromString(fopen.read())
+
+        # Add dynamic class member variables (remove abstraction layers)
+        setattr(simulation_set_pb2.SimulationStatsSet, "sim_type", sim_stats_set_msg.sim_set.sim_type)
+        setattr(simulation_set_pb2.SimulationStatsSet, "num_agents", sim_stats_set_msg.sim_set.num_agents)
+        setattr(simulation_set_pb2.SimulationStatsSet, "num_exp", sim_stats_set_msg.sim_set.num_trials)
+        setattr(simulation_set_pb2.SimulationStatsSet, "dfr_range", np.round(sim_stats_set_msg.sim_set.tfr_range, 3).tolist())
+        setattr(simulation_set_pb2.SimulationStatsSet, "sp_range", np.round(sim_stats_set_msg.sim_set.sp_range, 3).tolist())
+        setattr(simulation_set_pb2.SimulationStatsSet, "num_obs", sim_stats_set_msg.sim_set.num_steps)
+        setattr(simulation_set_pb2.SimulationStatsSet, "comms_range", sim_stats_set_msg.sim_set.comms_range)
+        setattr(simulation_set_pb2.SimulationStatsSet, "speed", sim_stats_set_msg.sim_set.speed)
+        setattr(simulation_set_pb2.SimulationStatsSet, "density", sim_stats_set_msg.sim_set.density)
+        setattr(simulation_set_pb2.SimulationStatsSet, "stats_obj_dict", {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.dfr_range} )
+
+        # stats_obj_dict = {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.dfr_range}
+
+        for stats_packet in sim_stats_set_msg.stats_packets:
+            stats_obj = Sim.SimStats(None)
+
+            # Extract Stats protobuf message into a list of 4-tuples containing (x_mean, conf_mean, x_std, conf_std) for all trials
+            repeated_trial_local_vals = [ ( np.asarray(s.x_mean),
+                                            np.asarray(s.conf_mean),
+                                            np.asarray(s.x_std),
+                                            np.asarray(s.conf_std) ) for s in stats_packet.rts.local_vals ]
+            repeated_trial_social_vals = [ ( np.asarray(s.x_mean),
+                                            np.asarray(s.conf_mean),
+                                            np.asarray(s.x_std),
+                                            np.asarray(s.conf_std) ) for s in stats_packet.rts.social_vals ]
+            repeated_trial_informed_vals = [ ( np.asarray(s.x_mean),
+                                            np.asarray(s.conf_mean),
+                                            np.asarray(s.x_std),
+                                            np.asarray(s.conf_std) ) for s in stats_packet.rts.informed_vals ]
+
+            stats_obj.x_hat_sample_mean, stats_obj.alpha_sample_mean, stats_obj.x_hat_sample_std, stats_obj.alpha_sample_std = zip(*repeated_trial_local_vals)
+            stats_obj.x_bar_sample_mean, stats_obj.rho_sample_mean, stats_obj.x_bar_sample_std, stats_obj.rho_sample_std = zip(*repeated_trial_social_vals)
+            stats_obj.x_sample_mean, stats_obj.gamma_sample_mean, stats_obj.x_sample_std, stats_obj.gamma_sample_std = zip(*repeated_trial_informed_vals)
+
+
+
+            #### TODO NEED FIXING: REMOVE AFTER LEGACY DATA IS FIXED (RE-REPLICATED WITH UPDATED PROGRAM) ####
+            # Temporary fix to bug that computes additional value in the beginning
+            if (len(stats_obj.x_hat_sample_mean)>1) and (len(stats_obj.x_hat_sample_mean[0]) != len(stats_obj.x_hat_sample_mean[1])):
+                print("DEBUG: DEVELOPER TAKE NOTE TO FIX THIS; THE VERY FIRST TRIAL HAS AN ADDITIONAL SAMPLE")
+
+                # Have to do this because of numpy doesn't allow inplace changing, and tuples do not allow reassignment
+                stats_obj.x_hat_sample_mean = [ *stats_obj.x_hat_sample_mean ]
+                stats_obj.alpha_sample_mean = [ *stats_obj.alpha_sample_mean ]
+                stats_obj.x_hat_sample_std = [ *stats_obj.x_hat_sample_std ]
+                stats_obj.alpha_sample_std = [ *stats_obj.alpha_sample_std ]
+
+                stats_obj.x_bar_sample_mean = [ *stats_obj.x_bar_sample_mean ]
+                stats_obj.rho_sample_mean = [ *stats_obj.rho_sample_mean ]
+                stats_obj.x_bar_sample_std = [ *stats_obj.x_bar_sample_std ]
+                stats_obj.rho_sample_std = [ *stats_obj.rho_sample_std ]
+
+                stats_obj.x_sample_mean = [ *stats_obj.x_sample_mean ]
+                stats_obj.gamma_sample_mean = [ *stats_obj.gamma_sample_mean ]
+                stats_obj.x_sample_std = [ *stats_obj.x_sample_std ]
+                stats_obj.gamma_sample_std = [ *stats_obj.gamma_sample_std ]
+
+                stats_obj.x_hat_sample_mean[0] = stats_obj.x_hat_sample_mean[0][1:]
+                stats_obj.alpha_sample_mean[0] = stats_obj.alpha_sample_mean[0][1:]
+                stats_obj.x_hat_sample_std[0] = stats_obj.x_hat_sample_std[0][1:]
+                stats_obj.alpha_sample_std[0] = stats_obj.alpha_sample_std[0][1:]
+
+                stats_obj.x_bar_sample_mean[0] = stats_obj.x_bar_sample_mean[0][1:]
+                stats_obj.rho_sample_mean[0] = stats_obj.rho_sample_mean[0][1:]
+                stats_obj.x_bar_sample_std[0] = stats_obj.x_bar_sample_std[0][1:]
+                stats_obj.rho_sample_std[0] = stats_obj.rho_sample_std[0][1:]
+
+                stats_obj.x_sample_mean[0] = stats_obj.x_sample_mean[0][1:]
+                stats_obj.gamma_sample_mean[0] = stats_obj.gamma_sample_mean[0][1:]
+                stats_obj.x_sample_std[0] = stats_obj.x_sample_std[0][1:]
+                stats_obj.gamma_sample_std[0] = stats_obj.gamma_sample_std[0][1:]
+
+            ################################
+
+            # Convert tuple of 1-D numpy arrays into 2-D ndarrays with row = trial index and col = step index
+            stats_obj.x_hat_sample_mean = np.array( [*stats_obj.x_hat_sample_mean] )
+            stats_obj.alpha_sample_mean = np.array( [*stats_obj.alpha_sample_mean] )
+            stats_obj.x_hat_sample_std = np.array( [*stats_obj.x_hat_sample_std] )
+            stats_obj.alpha_sample_std = np.array( [*stats_obj.alpha_sample_std] )
+
+            stats_obj.x_bar_sample_mean = np.array( [*stats_obj.x_bar_sample_mean] )
+            stats_obj.rho_sample_mean = np.array( [*stats_obj.rho_sample_mean] )
+            stats_obj.x_bar_sample_std = np.array( [*stats_obj.x_bar_sample_std] )
+            stats_obj.rho_sample_std = np.array( [*stats_obj.rho_sample_std] )
+
+            stats_obj.x_sample_mean = np.array( [*stats_obj.x_sample_mean] )
+            stats_obj.gamma_sample_mean = np.array( [*stats_obj.gamma_sample_mean] )
+            stats_obj.x_sample_std = np.array( [*stats_obj.x_sample_std] )
+            stats_obj.gamma_sample_std = np.array( [*stats_obj.gamma_sample_std] )
+
+            sim_stats_set_msg.stats_obj_dict[np.round(stats_packet.packet.tfr, 3)][np.round(stats_packet.packet.b_prob, 3)] = stats_obj
+
+        return sim_stats_set_msg
 
     def aggregate_statistics(self):
         """Aggregate the statistics.
@@ -211,29 +373,52 @@ class VisualizationData:
 
         return conv_ind[0], conv_ind[1], conv_ind[2]
 
-class VisualizationDataGroup:
-    """Class to store VisualizationData objects.
+    def compute_accuracy(self, target_fill_ratio: float, sensor_prob: float, conv_ind_lst=None):
+        """Compute the estimate accuracy with respect to the target fill ratio.
 
-    The VisualizationData objects are stored by first using the VisualizationData's method
-    in loading serialized ExperimentData files. Then each VisualizationData object
-    are stored in this class.
+        If the list of convergence indices is not provided, then convergence indices will be
+        found in this function to use as target values to compute accuracies, based on the
+        default convergence threshold.
 
-    This class is intended to store VisualizationData objects with the same:
-        - communication network type, and
-        - number of experiments,
-    and with varying:
-        - number of agents,
-        - communication period,
-        - communication probability.
-    The target fill ratios and sensor probabilities are already varied (with fixed ranges) in the
-    stored VisualizationData objects.
+        Args:
+            target_fill_ratio: The target fill ratio used in the simulation.
+            sensor_prob: The sensor probability used in the simulation.
+            conv_ind_lst: The list of 3 convergence indices.
 
-    This class is initialized with 1 argument:
-        data_folder: A string specifying the directory containing all the ExperimentData files.
-    """
+        Returns:
+            The 3 accuracies.
+        """
 
-    def __init__(self, data_folder):
+        if conv_ind_lst is None:
+            conv_ind_lst = self.detect_convergence(target_fill_ratio, sensor_prob)
 
+        acc_x_hat = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean[conv_ind_lst[0]] - target_fill_ratio)
+        acc_x_bar = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean[conv_ind_lst[1]] - target_fill_ratio)
+        acc_x = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean[conv_ind_lst[2]] - target_fill_ratio)
+
+        return acc_x_hat, acc_x_bar, acc_x
+
+    def get_informed_estimate_metrics(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH):
+        """Get the accuracy and convergence of informed estimates.
+
+        Args:
+            target_fill_ratio: The target fill ratio used in the simulations.
+            sensor_prob: The sensor probability used in the simulation.
+            threshold: A float parametrizing the difference threshold.
+
+        Returns:
+            A tuple of convergence (taking communication period into account) and accuracy values for the informed estimate.
+        """
+
+        conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold)
+        print(target_fill_ratio, sensor_prob, conv_lst)
+        acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst)
+
+        return conv_lst[2]*self.comms_period, acc_lst[2]
+
+class VisualizationDataGroupBase(ABC):
+
+    def __init__(self, data_folder, ext):
         self.viz_data_obj_dict = {}
         self.stored_obj_counter = 0
 
@@ -243,15 +428,65 @@ class VisualizationDataGroup:
         for root, _, files in os.walk(data_folder):
 
             # Check to see if any pickle file exist in the current directory
-            serialized_files = [f for f in files if os.path.splitext(f)[1] == ".pkl"]
+            serialized_files = [f for f in files if os.path.splitext(f)[1] == ext]
 
             if len(serialized_files) == 0: # move on to the next folder
                 continue
-            else: # pickle file found, that means the directory two levels up is needed
+            else: # pickle file found, that means the directory two levels up is needed @TODO bad assumption; dynamic case it may only be one level
                 parent_folder, folder = os.path.split( os.path.abspath(root) )
                 exp_data_obj_folders.append(parent_folder)
 
         self.folders = list(set(exp_data_obj_folders)) # store the unique values for the paths
+
+    @abstractmethod
+    def get_viz_data_obj(self, args: dict) -> VisualizationData:
+        """Get VisualizationData object.
+        """
+        raise NotImplementedError("get_viz_data_obj function not implemented.")
+
+    @abstractmethod
+    def save(self, filepath=None, curr_time=None):
+        """Save to pickle.
+        """
+        raise NotImplementedError("save function not implemented.")
+
+    @classmethod
+    def load(cls, filepath):
+        """Load pickled data.
+        """
+
+        with open(filepath, "rb") as fopen:
+            obj = pickle.load(fopen)
+
+        # Verify the unpickled object
+        assert isinstance(obj, cls)
+
+        return obj
+
+class VisualizationDataGroupStatic(VisualizationDataGroupBase):
+    """Class to store VisualizationData objects for static simulations.
+
+    The VisualizationData objects are stored by first using the VisualizationData's method
+    in loading serialized ExperimentData files. Then each VisualizationData object
+    are stored in this class.
+
+    This class is intended to store VisualizationData objects with the same:
+        - communication network type, and
+        - number of experiments,
+    and with varying:
+        - communication period,
+        - communication probability,
+        - number of agents.
+    The target fill ratios and sensor probabilities are already varied (with fixed ranges) in the
+    stored VisualizationData objects.
+
+    This class is initialized with 1 argument:
+        data_folder: A string specifying the directory containing all the ExperimentData files.
+    """
+
+    def __init__(self, data_folder):
+
+        super().__init__(data_folder, ".pkl")
 
         # Load the VisualizationData objects and store them
         for folder in self.folders:
@@ -270,7 +505,7 @@ class VisualizationDataGroup:
                 self.viz_data_obj_dict[v.comms_period][v.comms_prob][v.num_agents] = v
                 self.stored_obj_counter += 1
 
-    def get_viz_data_obj(self, comms_period: int, comms_prob: float, num_agents: int) -> VisualizationData:
+    def get_viz_data_obj(self, args: dict) -> VisualizationData:
         """Get the VisualizationData object.
 
         Args:
@@ -281,6 +516,10 @@ class VisualizationDataGroup:
         Returns:
             A VisualizationData object for the specified inputs.
         """
+        comms_period = args["comms_period"]
+        comms_prob = args["comms_prob"]
+        num_agents = args["num_agents"]
+
         return self.viz_data_obj_dict[comms_period][comms_prob][num_agents]
 
     def save(self, filepath=None, curr_time=None):
@@ -295,28 +534,163 @@ class VisualizationDataGroup:
             root, ext = os.path.splitext(filepath)
             save_path = root + "_" + curr_time + ext
         else:
-            save_path = "viz_data_group" + curr_time + ".pkl"
+            save_path = "viz_data_group_static_" + curr_time + ".pkl"
 
         with open(save_path, "wb") as fopen:
             pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
 
-        print( "\nSaved VisualizationDataGroup object containing {0} items at: {1}.\n".format( self.stored_obj_counter, os.path.abspath(save_path) ) )
+        print( "\nSaved VisualizationDataGroupStatic object containing {0} items at: {1}.\n".format( self.stored_obj_counter, os.path.abspath(save_path) ) )
 
-    @classmethod
-    def load(cls, filepath):
-        """Load pickled data.
+# TODO: legacy class; must remove after upgrade complete
+class VisualizationDataGroup(VisualizationDataGroupStatic):
+    pass
+
+class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
+    """Class to store VisualizationData objects for dynamic simulations.
+
+    The VisualizationData objects are stored by first using the VisualizationData's method
+    in loading serialized SimulationStatSet protobuf files. Then each VisualizationData object
+    are stored in this class.
+
+    This class is intended to store VisualizationData objects with the same:
+        - number of experiments,
+    and with varying:
+        - robot speed, and
+        - number of agents.
+    The target fill ratios and sensor probabilities are already varied (with fixed ranges) in the
+    stored VisualizationData objects.
+
+    This class is initialized with 1 argument:
+        data_folder: A string specifying the directory containing all the SimulationStatSet protobuf files.
+    """
+
+    def __init__(self, data_folder):
+
+        super().__init__(data_folder, ".pbs")
+
+        # Load the VisualizationData objects and store them
+        for folder in self.folders:
+            v = VisualizationData(folder)
+
+            # Check existence of objects in dictionary before storing
+            if v.speed not in self.viz_data_obj_dict:
+                self.viz_data_obj_dict[v.speed] = {}
+
+            if v.num_agents in self.viz_data_obj_dict[v.speed]:
+                raise ValueError("The data for speed={0}, num_agents={1} exists already!".format(v.speed, v.num_agents))
+            else:
+                self.viz_data_obj_dict[v.speed][v.num_agents] = v
+                self.stored_obj_counter += 1
+
+    def get_viz_data_obj(self, args: dict) -> VisualizationData:
+        """Get the VisualizationData object.
+
+        Args:
+            num_agents: The number of agents.
+            speed: The robot speed.
+
+        Returns:
+            A VisualizationData object for the specified inputs.
+        """
+        num_agents = args["num_agents"]
+        speed = args["speed"]
+
+        return self.viz_data_obj_dict[num_agents][speed]
+
+    def save(self, filepath=None, curr_time=None):
+        """Serialize the class into a pickle.
         """
 
-        with open(filepath, "rb") as fopen:
-            obj = pickle.load(fopen)
+        # Get current time
+        if curr_time is None:
+            curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
 
-        # Verify the unpickled object
-        assert isinstance(obj, cls)
+        if filepath:
+            root, ext = os.path.splitext(filepath)
+            save_path = root + "_" + curr_time + ext
+        else:
+            save_path = "viz_data_group_dynamic_" + curr_time + ".pkl"
 
-        return obj
+        with open(save_path, "wb") as fopen:
+            pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
+
+        print( "\nSaved VisualizationDataGroupDynamic object containing {0} items at: {1}.\n".format( self.stored_obj_counter, os.path.abspath(save_path) ) )
+
+def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
+    """Plot single heatmap based on a VisualizationData object. TODO: BROKEN, NEEDS FIXING
+    """
+
+    fig_size = FIG_SIZE
+    fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
+    fig.suptitle("Performance for a {0} network topology (threshold: {1})".format(kwargs["comms_network_str"], threshold), fontsize=20)
+
+    # Create two groups: left for all the heatmaps, right for the color bar
+    top_lvl_gs = fig.add_gridspec(1, 2, width_ratios=[10, 2.5])
+    left_gs_group = top_lvl_gs[0].subgridspec(nrows=1, ncols=1, wspace=0.001)
+    right_gs_group = top_lvl_gs[1].subgridspec(1, 1)
+
+    ax = left_gs_group.subplots()
+
+    # Find heatmap minimum and maximum to create a standard range for color bar later
+    conv_min = np.inf
+    conv_max = -np.inf
+    acc_min = np.inf
+    acc_max = -np.inf
+
+    # Compute the convergence timestamps and save the matrix of convergence values
+    heatmap_data = generate_combined_heatmap_data(data_obj, threshold, order=(None, "convergence", "accuracy"))
+
+    conv_min = np.amin([conv_min, np.amin(heatmap_data[1])])
+    conv_max = np.amax([conv_max, np.amax(heatmap_data[1])])
+    acc_min = np.amin([acc_min, np.amin(heatmap_data[2])])
+    acc_max = np.amax([acc_max, np.amax(heatmap_data[2])])
+
+    print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
+    print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
+
+    # Extract the target fill ratio and sensor probability ranges (simply taken from the last VisualizationData object)
+    tfr_range = data_obj.dfr_range
+    sp_range = data_obj.sp_range
+
+    tup = heatmap(
+        convert_to_img(heatmap_data, [(0,0), (conv_min, conv_max), (acc_min, acc_max)], active_channels=[1, 2]), # normalize and convert to img
+        ax=ax,
+        row_label="On-fire tile fill ratio",
+        col_label="Sensor probability\nP(b|b) = P(w|w)",
+        xticks=sp_range,
+        yticks=tfr_range
+    )
+
+    # Add color legend
+    color_leg_ax = right_gs_group.subplots(subplot_kw={"aspect": 40.0})
+    color_leg_px_count = (60, 240)
+    r = np.zeros((color_leg_px_count[1], color_leg_px_count[0]))
+    g = np.repeat( np.reshape( np.linspace(1.0, 0.0, color_leg_px_count[1]), (color_leg_px_count[1], 1) ), color_leg_px_count[0], axis=1 )
+    b = np.repeat( np.reshape( np.linspace(0.0, 1.0, color_leg_px_count[0]), (1, color_leg_px_count[0]) ), color_leg_px_count[1], axis=0)
+
+    # Add color legend labels
+    color_leg_ax.imshow( np.moveaxis( np.array( [r, g, b] ), 0, 2) )
+    color_leg_ax.set_ylabel("Convergence", fontsize=15)
+    color_leg_ax.set_xlabel("Accuracy", fontsize=15)
+
+    # Add label limits for convergence
+    color_leg_ax.text(-0.1*color_leg_px_count[0], 0.995*color_leg_px_count[1], "Slow", fontsize=12, rotation=90)
+    color_leg_ax.text(-0.1*color_leg_px_count[0], 0.1*color_leg_px_count[0], "Fast", fontsize=12, rotation=90)
+
+    # Add label limits for accuracy
+    color_leg_ax.text(-0.01*color_leg_px_count[0], 1.02*color_leg_px_count[1], "Low", fontsize=12)
+    color_leg_ax.text(0.86*color_leg_px_count[0], 1.02*color_leg_px_count[1], "High", fontsize=12)
+
+    # Remove color legend
+    color_leg_ax.set_xticks([])
+    color_leg_ax.set_yticks([])
+
+    # Save the heatmap
+    fig.set_size_inches(*fig_size)
+    fig.savefig("/home/khaiyichin/heatmap_single.png", bbox_inches="tight", dpi=300)
 
 def plot_heatmap_vdg(
-    data_obj: VisualizationDataGroup,
+    data_obj: VisualizationDataGroupBase,
     row_keys: list,
     col_keys: list,
     outer_grid_row_labels: list,
@@ -324,16 +698,16 @@ def plot_heatmap_vdg(
     threshold: float,
     **kwargs
 ):
-    """Plot heatmap based on a VisualizationDataGroup object. TODO: currently only considers convergence data, should provide options
+    """Plot gridded heatmap based on a VisualizationDataGroup object.
     """
 
     # Create 2 subfigures, one for the actual grid of heatmaps while the other for the colorbar
-    fig_size = (20, 12)
+    fig_size = FIG_SIZE
     fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
-    fig.suptitle("Convergence rate for a {0} network topology (threshold: {1})".format(kwargs["comms_network_str"], threshold), fontsize=20)
+    fig.suptitle("Performance for a {0} network topology (threshold: {1})".format(kwargs["comms_network_str"], threshold), fontsize=20)
 
     # Create two groups: left for all the heatmaps, right for the color bar
-    top_gs = fig.add_gridspec(1, 2, width_ratios=[10, 1.5])
+    top_gs = fig.add_gridspec(1, 2, width_ratios=[10, 2.5])
 
     left_gs_group = top_gs[0].subgridspec(nrows=len(outer_grid_row_labels), ncols=len(outer_grid_col_labels), wspace=0.001)
     right_gs_group = top_gs[1].subgridspec(1, 1)
@@ -343,26 +717,31 @@ def plot_heatmap_vdg(
     # Find heatmap minimum and maximum to create a standard range for color bar later
     heatmap_data_grid = []
 
-    minimum = np.inf
-    maximum = -np.inf
+    conv_min = np.inf
+    conv_max = -np.inf
+    acc_min = np.inf
+    acc_max = -np.inf
 
     for ind_r, row in enumerate(row_keys):
         heatmap_data_grid_row = []
 
         for ind_c, col in enumerate(col_keys):
 
-            v = data_obj.get_viz_data_obj(comms_period=row, comms_prob=1.0, num_agents=col)
+            v = data_obj.get_viz_data_obj({"comms_period": row, "comms_prob": 1.0, "num_agents": col})
 
             # Compute the convergence timestamps and save the matrix of convergence values
-            convergence_vals_matrix = generate_convergence_heatmap_data(v, threshold)
-            heatmap_data_grid_row.append(convergence_vals_matrix)
+            matrix = generate_combined_heatmap_data(v, threshold, order=(None, "convergence", "accuracy"))
+            heatmap_data_grid_row.append(matrix)
 
-            minimum = np.amin([minimum, np.amin(convergence_vals_matrix)])
-            maximum = np.amax([maximum, np.amax(convergence_vals_matrix)])
+            conv_min = np.amin([conv_min, np.amin(matrix[1])])
+            conv_max = np.amax([conv_max, np.amax(matrix[1])])
+            acc_min = np.amin([acc_min, np.amin(matrix[2])])
+            acc_max = np.amax([acc_max, np.amax(matrix[2])])
 
         heatmap_data_grid.append(heatmap_data_grid_row)
     
-    print("Heatmap minimum: {0}, maximum: {1}".format(minimum, maximum))
+    print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
+    print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
 
     # Extract the inner grid ranges (simply taken from the last VisualizationData object)
     dfr_range = v.dfr_range
@@ -373,14 +752,12 @@ def plot_heatmap_vdg(
         for ind_c, col in enumerate(col_keys):
 
             tup = heatmap(
-                heatmap_data_grid[ind_r][ind_c],
+                convert_to_img(heatmap_data_grid[ind_r][ind_c], [(0,0), (conv_min, conv_max), (acc_min, acc_max)], active_channels=[1, 2]), # normalize and convert to img
                 ax=ax_lst[ind_r][ind_c],
                 row_label=outer_grid_row_labels[ind_r],
                 col_label=outer_grid_col_labels[ind_c],
                 xticks=sp_range,
                 yticks=dfr_range,
-                vmin=minimum,
-                vmax=maximum,
                 activate_outer_grid_xlabel=True if ind_r == len(outer_grid_row_labels) - 1 else False,
                 activate_outer_grid_ylabel=True if ind_c == 0 else False
             )
@@ -389,49 +766,112 @@ def plot_heatmap_vdg(
     ax_lst[-1][-1].text(20.0, 19.5, "Sensor probability\nP(b|b) = P(w|w)", fontsize=15) # sensor probability as x label
     ax_lst[0][0].text(-5, -2, "On-fire tile fill ratio", fontsize=15) # fill ratio as y label
 
+    # Add color legend
+    color_leg_ax = right_gs_group.subplots(subplot_kw={"aspect": 40.0})
+    color_leg_px_count = (60, 240)
+    r = np.zeros((color_leg_px_count[1], color_leg_px_count[0]))
+    g = np.repeat( np.reshape( np.linspace(1.0, 0.0, color_leg_px_count[1]), (color_leg_px_count[1], 1) ), color_leg_px_count[0], axis=1 )
+    b = np.repeat( np.reshape( np.linspace(0.0, 1.0, color_leg_px_count[0]), (1, color_leg_px_count[0]) ), color_leg_px_count[1], axis=0)
+
+    # Add color legend labels
+    color_leg_ax.imshow( np.moveaxis( np.array( [r, g, b] ), 0, 2) )
+    color_leg_ax.set_ylabel("Convergence", fontsize=15)
+    color_leg_ax.set_xlabel("Accuracy", fontsize=15)
+
+    # Add label limits for convergence
+    color_leg_ax.text(-0.1*color_leg_px_count[0], 0.995*color_leg_px_count[1], "Slow", fontsize=12, rotation=90)
+    color_leg_ax.text(-0.1*color_leg_px_count[0], 0.1*color_leg_px_count[0], "Fast", fontsize=12, rotation=90)
+
+    # Add label limits for accuracy
+    color_leg_ax.text(-0.01*color_leg_px_count[0], 1.02*color_leg_px_count[1], "Low", fontsize=12)
+    color_leg_ax.text(0.86*color_leg_px_count[0], 1.02*color_leg_px_count[1], "High", fontsize=12)
+
+    # Remove color legend
+    color_leg_ax.set_xticks([])
+    color_leg_ax.set_yticks([])
+
     # Add color bar
-    cbar_ax = right_gs_group.subplots(subplot_kw={"aspect": 15.0}) # add subplot with aspect ratio of 15
-    cbar = plt.colorbar(tup[2], cax=cbar_ax)
-    cbar.ax.set_ylabel("Convergence timestep (# of observations)", fontsize=15) # TODO: need to have a general version
+    # cbar_ax = right_gs_group.subplots(subplot_kw={"aspect": 15.0}) # add subplot with aspect ratio of 15
+    # cbar = plt.colorbar(tup[2], cax=cbar_ax)
+    # cbar.ax.set_ylabel("Convergence timestep (# of observations)", fontsize=15) # TODO: need to have a general version
 
     # Save the heatmap
     fig.set_size_inches(*fig_size)
     fig.savefig("/home/khaiyichin/heatmap.png", bbox_inches="tight", dpi=300)
 
-def generate_convergence_heatmap_data(v: VisualizationData, threshold: float):
-    """Generate the heatmap data using convergence values of the informed estimates.
+# def generate_convergence_heatmap_data(v: VisualizationData, threshold: float):
+#     """Generate the heatmap data using convergence values of the informed estimates.
+#     """
+
+#     return np.asarray(
+#         [ [ v.detect_convergence(dfr, sp, threshold)[2]*v.comms_period for sp in v.sp_range ] for dfr in v.dfr_range ]
+#     )
+
+def generate_combined_heatmap_data(v: VisualizationData, threshold: float, order=(None, "convergence", "accuracy")):
     """
 
-    return np.asarray(
-        [ [ v.detect_convergence(dfr, sp, threshold)[2]*v.comms_period for sp in v.sp_range ] for dfr in v.dfr_range ]
-    )
-
-def plot_heatmap_vd(data_obj: VisualizationData, row_label="infer", col_label="infer", xticks="infer", yticks="infer", ax=None, **kwargs):
-    """Plot heatmap based on a VisualizationData object. TODO: BROKEN, NEEDS FIXING
+    Returns:
+        A 3-D ndarray (containing 3 2-D arrays), with the 1st as the convergence heatmap and the 3rd
+            as the accuracy heatmap. The 2nd array is populated with zeros.
     """
 
-    # Define the labels and ticks (TODO: need to create a more generalized form)
-    if row_label == "infer": row_label = "Black tile fill ratio"
-    if col_label == "infer": col_label = "Sensor probability, P(b|b) = P(w|w)"
+    output = np.zeros(shape=(3, len(v.dfr_range), len(v.sp_range)))
+    conv_layer = []
+    acc_layer = []
 
-    if xticks == "infer": xticks = data_obj.sp_range
-    if yticks == "infer": yticks = data_obj.dfr_range
+    for tfr in v.dfr_range:
+        conv_layer_row = []
+        acc_layer_row = []
 
-    # Collect all the heatmap data into 2-D numpy array (for informed estimates' convergence only currently)
-    heatmap_data = np.asarray(
-        [ [v.detect_convergence(dfr, sp, threshold)[2] for sp in data_obj.sp_range] for dfr in data_obj.dfr_range ]
-    )
+        for sp in v.sp_range:
 
-    return heatmap(
-        heatmap_data,
-        row_label=row_label,
-        col_label=col_label,
-        xticks=xticks,
-        yticks=yticks,
-        ax=ax,
-        valfmt="{x:3d}",
-        **kwargs
-    )
+            tup = v.get_informed_estimate_metrics(tfr, sp, threshold)
+            conv_layer_row.append(tup[0])
+            acc_layer_row.append(tup[1])
+
+        conv_layer.append(conv_layer_row)
+        acc_layer.append(acc_layer_row)
+
+    output[order.index("convergence")] = np.asarray(conv_layer)
+    output[order.index("accuracy")] = np.asarray(acc_layer)
+
+    return output
+
+def convert_to_img(heatmap_ndarr: np.ndarray, limits: list, active_channels = [0,1,2]):
+    """Convert the convergence and accuracy ndarray into a 3 channel image-type ndarray.
+
+    The output would be a heatmap of the same size, but with values ranging from 0.0 to 1.0,
+    with 0.0 meaning slow convergence/low accuracy and 1.0 meaning fast convergence/high accuracy.
+
+    Args:
+        heatmap_ndarr: A 3-D numpy array, with the 1st axis indicating the different data groups.
+            E.g. heatmap_ndarr[0] = 2-D heatmap of first group, heatmap_ndarr[1] = 2-D array of second group.
+        conv_lims: A tuple containing (min, max) convergence values.
+        acc_lims: A tuple containing (min, max) convergence values.
+    Returns:
+        The same heatmap normalized and axis-flipped to an image with (m,n,3) dimensions.
+    """
+
+    def normalize(arr, min_val, max_val):
+        arr_range = max_val - min_val
+        return ( arr_range - ( arr - min_val ) ) / arr_range
+
+    if 0 in active_channels:
+        channel_0 = normalize(heatmap_ndarr[0], limits[0][0], limits[0][1])
+        assert (np.all(channel_0 <= 1.0) and np.all(channel_0 >= 0.0)), "Normalized channel 0 values exceed [0.0, 1.0] range"
+    else: channel_0 = np.zeros(heatmap_ndarr[0].shape)
+
+    if 1 in active_channels:
+        channel_1 = normalize(heatmap_ndarr[1], limits[1][0], limits[1][1])
+        assert (np.all(channel_1 <= 1.0) and np.all(channel_1 >= 0.0)), "Normalized channel 1 values exceed [0.0, 1.0] range"
+    else: channel_1 = np.zeros(heatmap_ndarr[1].shape)
+
+    if 2 in active_channels:
+        channel_2 = normalize(heatmap_ndarr[2], limits[2][0], limits[2][1])
+        assert (np.all(channel_2 <= 1.0) and np.all(channel_2 >= 0.0)), "Normalized channel 2 values exceed [0.0, 1.0] range"
+    else: channel_2 = np.zeros(heatmap_ndarr[2].shape)
+
+    return np.moveaxis(np.array([channel_0, channel_1, channel_2]), 0, 2)
 
 def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=None, cbar_kw={}, cbarlabel="", valfmt="{x:.2f}", **kwargs):
     """Create a heatmap.
@@ -462,7 +902,8 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
         kwargs["activate_outer_grid_ylabel"] = True
 
     # Plot the heatmap
-    im = ax.imshow(heatmap_data, norm=LogNorm(vmin=kwargs["vmin"], vmax=kwargs["vmax"]), cmap="jet")
+    # im = ax.imshow(heatmap_data, norm=LogNorm(vmin=kwargs["vmin"], vmax=kwargs["vmax"]), cmap="jet")
+    im = ax.imshow(heatmap_data)
 
     # Show all ticks and label them with the respective list entries
     if kwargs["activate_outer_grid_xlabel"]:

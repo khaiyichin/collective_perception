@@ -5,8 +5,8 @@ commsGraph:
   commsPeriod: 5 # in units of observation rounds
   commsProb: 1.0 # communication probability
 sensorProb: # sensor probability range (inclusive) to simulate
-  min: 0.55
-  max: 1.0
+  min: 0.525
+  max: 0.975
   incSteps: 19
 desFillRatios: # target fill ratio range (inclusive) to simulate
   min: 0.05

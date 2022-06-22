@@ -31,7 +31,7 @@ SimulationStatsSet::SimulationStatsSet(collective_perception_cpp::proto::Simulat
         auto &informed_vals_msg = rts_msg_ptr->informed_vals();
 
         // Iterate through different trials of values
-        for (size_t i = 0; i < num_steps_; ++i)
+        for (size_t i = 0; i < num_trials_; ++i)
         {
             Stats local, social, informed;
 
