@@ -25,15 +25,15 @@ fi
 # COMM=("full" "ring" "line" "scale-free")
 COMM=$1 # when run in the cluster different communication graph parameters are run with separate nodes for increased efficiency
 PERIOD=(1 2 5 10)
-AGENTS=(10 50 100 200)
+AGENTS=(10 20 50 100 200)
 
 MIN=(0.05)
 MAX=(0.95)
 INC=(19)
 
 # Set fixed parameters
-sed -i "s/numExperiments:.*/numExperiments: 5/g" param_multi_agent_sim.yaml
-sed -i "s/numObs:.*/numObs: 2000/g" param_multi_agent_sim.yaml
+sed -i "s/numExperiments:.*/numExperiments: 5/g" param_multi_agent_sim_static.yaml
+sed -i "s/numObs:.*/numObs: 2000/g" param_multi_agent_sim_static.yaml
 
 # Run simulations
 {
@@ -42,25 +42,25 @@ sed -i "s/numObs:.*/numObs: 2000/g" param_multi_agent_sim.yaml
     echo -e "\n################################### EXECUTION BEGIN ###################################"
     echo -e "################################# ${START_TIME} #################################\n"
 
-    sed -i "s/type:.*/type: \"$COMM\"/g" param_multi_agent_sim.yaml # communication network graph type
+    sed -i "s/type:.*/type: \"$COMM\"/g" param_multi_agent_sim_static.yaml # communication network graph type
 
     for (( b = 0; b <= 3; b++ )) # comms period
     do
         period=$(echo ${PERIOD[b]})
-        sed -i "s/commsPeriod:.*/commsPeriod: $period/" param_multi_agent_sim.yaml
+        sed -i "s/commsPeriod:.*/commsPeriod: $period/" param_multi_agent_sim_static.yaml
 
         for (( c = 0; c <= 4; c++ )) # agent number
         do
             agents=$(echo ${AGENTS[c]})
-            sed -i "s/numAgents:.*/numAgents: $agents/" param_multi_agent_sim.yaml
+            sed -i "s/numAgents:.*/numAgents: $agents/" param_multi_agent_sim_static.yaml
 
             for (( d = 0; d <= 0; d++ )) # fill ratios
             do
                 min=$(echo ${MIN[d]})
                 max=$(echo ${MAX[d]})
                 inc=$(echo ${INC[d]})
-                sed -i "/desFillRatios:/{n;N;N;d}" param_multi_agent_sim.yaml # remove the line and 2 lines after 'desFillRatios'
-                sed -i "s/desFillRatios:/desFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" param_multi_agent_sim.yaml
+                sed -i "/desFillRatios:/{n;N;N;d}" param_multi_agent_sim_static.yaml # remove the line and 2 lines after 'desFillRatios'
+                sed -i "s/desFillRatios:/desFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" param_multi_agent_sim_static.yaml
                 singularity run multi_agent_sim_static.sif
             done
 

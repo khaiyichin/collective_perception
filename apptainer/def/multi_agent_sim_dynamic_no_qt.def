@@ -37,4 +37,4 @@ From: ../containers/argos_buzz_protobuf_release_no_qt.sif
     echo "CREATED $(date)" >> $APPTAINER_LABELS
 
 %runscript
-    /collective_perception_cpp/build/src/run_dynamic_simulations -c param_multi_agent_sim_dynamic.argos
+    /collective_perception_cpp/build/src/run_dynamic_simulations -l /dev/null -c param_multi_agent_sim_dynamic.argos

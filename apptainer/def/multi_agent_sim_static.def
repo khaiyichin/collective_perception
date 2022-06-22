@@ -53,4 +53,4 @@ From: ubuntu:20.04
 
 %runscript
     # Run simulation
-    python3 multi_agent_sim.py -p
+    python3 multi_agent_sim_static.py -p

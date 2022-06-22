@@ -17,10 +17,10 @@
 module load singularity/3.6.2
 
 # Copy required files
-cp $1/examples/param/param_multi_agent_sim.yaml .
-cp $1/python/multi_agent_sim.py .
+cp $1/examples/param/param_multi_agent_sim_static.yaml .
+cp $1/python/multi_agent_sim_static.py .
 cp $1/python/sim_modules.py .
-cp $1/bash/hpc_execute_multi_agent_sim.sh .
+cp $1/bash/hpc_execute_multi_agent_sim_static.sh .
 
 # Run simulation
-./hpc_execute_multi_agent_sim.sh $2
+./hpc_execute_multi_agent_sim_static.sh $2
