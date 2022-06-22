@@ -97,7 +97,7 @@ if __name__ == "__main__":
     curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
 
     # Parse simulation parameters
-    param_obj = parse_yaml_param_file("param_multi_agent_sim.yaml")
+    param_obj = parse_yaml_param_file("param_multi_agent_sim_static.yaml")
 
     # Create a folder to store simulation data
     create_simulation_folder(param_obj.full_suffix, curr_time)
