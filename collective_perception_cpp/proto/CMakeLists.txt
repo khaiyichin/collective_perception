@@ -16,4 +16,8 @@ target_include_directories(${PROTO_LIB}
 )
 
 protobuf_generate(LANGUAGE cpp TARGET ${PROTO_LIB})
-protobuf_generate(LANGUAGE python TARGET ${PROTO_LIB})
+protobuf_generate(
+    LANGUAGE python
+    TARGET ${PROTO_LIB}
+    PROTOC_OUT_DIR ${CMAKE_HOME_DIRECTORY}/../scripts/python # store in python directory
+)

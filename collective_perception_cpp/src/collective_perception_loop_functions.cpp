@@ -248,6 +248,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
         // Grab probotuf file save path
         TConfigurationNode &path_node = GetNode(col_per_root_node, "path");
+        GetNodeAttribute(path_node, "folder", output_folder_);
         GetNodeAttribute(path_node, "stats", sim_stats_set_.proto_filepath_);
         GetNodeAttribute(path_node, "agent_data", sim_agent_data_set_.proto_filepath_);
         GetNodeAttribute(path_node, "include_datetime", proto_datetime_);
@@ -262,6 +263,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
             LOG << "[INFO] Specifying number of arena tiles = " << arena_x << "*" << arena_y << std::endl;
             LOG << "[INFO] Specifying robot speed = " << simulation_parameters_.speed_ << " cm/s" << std::endl;
             LOG << "[INFO] Specifying number of trials = " << simulation_parameters_.num_trials_ << std::endl;
+            LOG << "[INFO] Specifying output folder " << output_folder_ << std::endl;
             LOG << "[INFO] Specifying output statistics filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << sim_stats_set_.proto_filepath_ << "\"" << std::endl;
             LOG << "[INFO] Specifying output agent data filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << sim_agent_data_set_.proto_filepath_ << "\"" << std::endl;
 
@@ -457,52 +459,7 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
                 LOG << "[INFO] All simulation parameters executed." << std::endl;
             }
 
-            // Export SimulationStatsSet object
-            collective_perception_cpp::proto::SimulationStatsSet sim_stats_set_proto_msg;
-            collective_perception_cpp::proto::SimulationAgentDataSet sim_agent_data_set_proto_msg;
-
-            sim_stats_set_.Serialize(sim_stats_set_proto_msg);
-            sim_agent_data_set_.Serialize(sim_agent_data_set_proto_msg);
-
-            // Create output filename
-            std::string output_file_stats, output_file_agent_data;
-
-            if (proto_datetime_)
-            {
-                // Get current time in string form
-                time_t curr_time;
-                time(&curr_time);
-                tm *curr_tm = localtime(&curr_time);
-
-                std::string datetime_str;
-                datetime_str.resize(100);
-
-                strftime(&(datetime_str[0]), datetime_str.size(), "%m%d%y_%H%M%S", curr_tm);
-
-                // Strip extension from filename
-                std::pair<std::string, std::string> name_ext_pair_stats, name_ext_pair_agent_data;
-                std::stringstream stream_stats(sim_stats_set_.proto_filepath_);
-                std::stringstream stream_agent_data(sim_agent_data_set_.proto_filepath_);
-
-                getline(stream_stats, name_ext_pair_stats.first, '.');
-                getline(stream_stats, name_ext_pair_stats.second, '.');
-                getline(stream_agent_data, name_ext_pair_agent_data.first, '.');
-                getline(stream_agent_data, name_ext_pair_agent_data.second, '.');
-
-                // Generate updated filename
-                output_file_stats = name_ext_pair_stats.first + "_" + datetime_str.c_str() + "." + name_ext_pair_stats.second;
-                output_file_agent_data = name_ext_pair_agent_data.first + "_" + datetime_str.c_str() + "." + name_ext_pair_agent_data.second;
-            }
-            else
-            {
-                output_file_stats = sim_stats_set_.proto_filepath_;
-                output_file_agent_data = sim_agent_data_set_.proto_filepath_;
-            }
-
-            WriteProtoToDisk(sim_stats_set_proto_msg, output_file_stats);
-            WriteProtoToDisk(sim_agent_data_set_proto_msg, output_file_agent_data);
-
-            google::protobuf::ShutdownProtobufLibrary();
+            SaveData();
 
             finished_ = true;
         }
@@ -516,6 +473,84 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
             LOG << "[INFO] Running trial " << trial_counter_ + 1 << " with same parameters." << std::endl;
         }
     }
+}
+
+void CollectivePerceptionLoopFunctions::SaveData()
+{
+    // Export SimulationStatsSet object
+    collective_perception_cpp::proto::SimulationStatsSet sim_stats_set_proto_msg;
+    collective_perception_cpp::proto::SimulationAgentDataSet sim_agent_data_set_proto_msg;
+
+    sim_stats_set_.Serialize(sim_stats_set_proto_msg);
+    sim_agent_data_set_.Serialize(sim_agent_data_set_proto_msg);
+
+    // Create parent folder name
+    auto round_1000_int_to_str = [](const float &val)
+    { return std::to_string(static_cast<int>(std::round(val * 1e3))); }; // lambda function to inflate values by 1000 and convert to string
+
+    std::string sim_parent_folder =
+        "t" + std::to_string(simulation_parameters_.num_trials_) + "_" +
+        "s" + std::to_string(simulation_parameters_.num_steps_) + "_" +
+        "tfr" +
+        round_1000_int_to_str(simulation_parameters_.tfr_range_.front()) + "-" +
+        round_1000_int_to_str(
+                (simulation_parameters_.tfr_range_.back() - simulation_parameters_.tfr_range_.front()) /
+                (simulation_parameters_.tfr_range_.size() - 1)
+            ) + "-" +
+        round_1000_int_to_str(simulation_parameters_.tfr_range_.back()) + "_sp" +
+        round_1000_int_to_str(simulation_parameters_.sp_range_.front()) + "-" +
+        round_1000_int_to_str(
+                (simulation_parameters_.sp_range_.back() - simulation_parameters_.sp_range_.front()) /
+                (simulation_parameters_.sp_range_.size() - 1)
+            ) + "-" +
+        round_1000_int_to_str(simulation_parameters_.sp_range_.back());
+
+    // Create output filename
+    std::string output_file_stats, output_file_agent_data;
+
+    if (proto_datetime_)
+    {
+        // Get current time in string form
+        time_t curr_time;
+        time(&curr_time);
+        tm *curr_tm = localtime(&curr_time);
+
+        std::string datetime_str;
+        datetime_str.resize(100);
+
+        strftime(&(datetime_str[0]), datetime_str.size(), "%m%d%y_%H%M%S", curr_tm);
+        datetime_str = std::string(datetime_str.c_str());
+
+        // Strip extension from filename
+        std::pair<std::string, std::string> name_ext_pair_stats, name_ext_pair_agent_data;
+        std::stringstream stream_stats(sim_stats_set_.proto_filepath_);
+        std::stringstream stream_agent_data(sim_agent_data_set_.proto_filepath_);
+
+        getline(stream_stats, name_ext_pair_stats.first, '.');
+        getline(stream_stats, name_ext_pair_stats.second, '.');
+        getline(stream_agent_data, name_ext_pair_agent_data.first, '.');
+        getline(stream_agent_data, name_ext_pair_agent_data.second, '.');
+
+        // Generate updated filename
+        sim_parent_folder = output_folder_ + "/" + datetime_str + "_" + sim_parent_folder;
+        output_file_stats = sim_parent_folder + "/" + name_ext_pair_stats.first + "_" + datetime_str + "." + name_ext_pair_stats.second;
+        output_file_agent_data = sim_parent_folder + "/" + name_ext_pair_agent_data.first + "_" + datetime_str + "." + name_ext_pair_agent_data.second;
+    }
+    else
+    {
+        output_file_stats = output_folder_ + "/" + sim_parent_folder + "/" + sim_stats_set_.proto_filepath_;
+        output_file_agent_data = sim_parent_folder + "/" + sim_agent_data_set_.proto_filepath_;
+    }
+
+    // Create data folder
+    std::filesystem::create_directory(output_folder_);
+    std::filesystem::create_directory(sim_parent_folder); // create simulation parent folder
+
+    // Write protobuf file
+    WriteProtoToDisk(sim_stats_set_proto_msg, output_file_stats);
+    WriteProtoToDisk(sim_agent_data_set_proto_msg, output_file_agent_data);
+
+    google::protobuf::ShutdownProtobufLibrary();
 }
 
 CColor CollectivePerceptionLoopFunctions::GetFloorColor(const CVector2 &c_position_on_plane)

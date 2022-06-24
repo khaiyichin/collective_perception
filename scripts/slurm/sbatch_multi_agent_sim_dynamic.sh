@@ -9,15 +9,20 @@
 #SBATCH --mail-user=kchin@wpi.edu
 #SBATCH --mail-type=all
 
-# This sbatch script should be run in the directory containing the .sif file
-# $1: argument for path to the scripts/ directory
+# $1: argument for path to working directory to change to, relative to the current directory
+# $2: argument for path to the scripts/ directory, relative to $1
+# $3: argument for path to the directory containing hpc_execute_multi_agent_sim_dynamic.sh, relative to $1
+# $4: argument for path to the multi_agent_sim_dynamic_no_qt.sif file, relative to $1
+# $5: argument for path to the directory for writing output data, relative to $1
 
 # Load required modules
 module load singularity/3.6.2
 
+# Change to working directory (this is so that the log files are in the correct folders)
+cd $1
+
 # Copy required files
-cp $1/examples/param/param_multi_agent_sim_dynamic.argos .
-cp $1/bash/hpc_execute_multi_agent_sim_dynamic.sh .
+cp $2/examples/param/param_multi_agent_sim_dynamic.argos $3 # copy .argos template file
 
 # Run simulation
-./hpc_execute_multi_agent_sim_dynamic.sh
+./$3/hpc_execute_multi_agent_sim_dynamic.sh $3/param_multi_agent_sim_dynamic.argos $4 $5

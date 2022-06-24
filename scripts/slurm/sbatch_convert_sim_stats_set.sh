@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH -N 1
-#SBATCH -n 30
-#SBATCH --mem=512G
+#SBATCH -n 8
+#SBATCH --mem=128G
 #SBATCH -p short
 #SBATCH -o log_%x_%j.out
 #SBATCH -e log_%x_%j.err
-#SBATCH -t 02:30:00
+#SBATCH -t 00:30:00
 #SBATCH --mail-user=kchin@wpi.edu
 #SBATCH --mail-type=all
 
@@ -22,11 +22,11 @@ module load singularity/3.6.2
 cd $1
 
 # Copy required files
-cp $2/convert_exp_data_to_viz_data_group.py .
+cp $2/convert_sim_stats_set_to_viz_data_group.py .
 cp $2/sim_modules.py .
 cp $2/viz_modules.py .
 cp $2/simulation_set_pb2.py .
 cp $2/util_pb2.py .
 
 # Run conversion
-singularity exec $4/multi_agent_sim_static.sif python3 convert_exp_data_to_viz_data_group.py $3 -s $5
+singularity exec $4/multi_agent_sim_static.sif python3 convert_sim_stats_set_to_viz_data_group.py $3 -s $5

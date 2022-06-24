@@ -106,7 +106,7 @@
             <speed value="10.0" /> <!-- in units of cm/s -->
             <num_trials value="5" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <robot_id prefix="kiv" base_num="0" /> <!-- must match the ones in the arena configuration -->
-            <path stats="data/multi_agent_sim_dynamic_stats.pbs" agent_data="data/multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
+            <path folder="data" stats="multi_agent_sim_dynamic_stats.pbs" agent_data="multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
             <verbosity level="reduced" /> <!-- "full", "reduced", "none" -->
         </collective_perception>
     </loop_functions>

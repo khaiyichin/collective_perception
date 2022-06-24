@@ -1,6 +1,5 @@
 import viz_modules as vm
 import argparse
-import numpy as np
 import matplotlib.pyplot as plt
 import timeit
 
@@ -26,10 +25,11 @@ if __name__ == "__main__":
         sensor_prob = float(args.t[1])
 
     if args.g:
-        if args.u and len(args.u) != 2: raise ValueError("Insufficient arguments for \"u\" flag!")
-        else:
-            num_agents = int(args.u[0])
-            speed = int(args.u[1])
+        if args.u:
+            if len(args.u) != 2: raise ValueError("Insufficient arguments for \"u\" flag!")
+            else:
+                speed = int(args.u[0])
+                num_agents = int(args.u[1])
 
         try:
             data = vm.VisualizationDataGroupDynamic.load(args.FILE)
@@ -53,16 +53,22 @@ if __name__ == "__main__":
     elif args.m and args.g and not args.u: # plot gridded heatmap
         vm.plot_heatmap_vdg(
             data,
-            [1, 2, 5, 10],
-            [10, 50, 100, 200],
-            ["Comms. Period = 1", "Comms. Period = 2", "Comms. Period = 5", "Comms. Period = 10"],
-            ["Num. Agents = 10", "Num. Agents = 50", "Num. Agents = 100", "Num. Agents = 200"],
+            "speed", # row_arg_str
+            [10.0, 15.0, 20.0], # row_keys
+            "num_agents", # col_arg_str
+            [10, 20, 50, 100], # col_keys
+            ["Speed = 10", "Speed = 15", "Speed = 20"], # col_labels
+            ["Num. Agents = 10", "Num. Agents = 20", "Num. Agents = 50", "Num. Agents = 100"], # row_labels
             args.CONV,
-            comms_network_str="ring"
+            title="Dynamic multi-agent simulation performance (convergence threshold: {0})".format(args.CONV)
         )
     elif args.m and args.g and args.u: # plot single heatmap from VisualizationDataGroupDynamic
         v = data.get_viz_data_obj({"num_agents": num_agents, "speed": speed})
-        vm.plot_heatmap_vd(v, args.CONV, comms_network_str="ring")
+        vm.plot_heatmap_vd(
+            v,
+            args.CONV,
+            title="Dynamic multi-agent simulation performance (convergence threshold: {0})".format(args.CONV)
+        )
 
     end = timeit.default_timer()
 

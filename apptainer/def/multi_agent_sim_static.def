@@ -15,6 +15,9 @@ From: ubuntu:20.04
     v1.0.0
     Initial release.
 
+%files
+    ../../scripts/python/requirements.txt requirements.txt
+
 %post -c /bin/bash
     # Prevent user prompts
     export DEBIAN_FRONTEND=noninteractive
@@ -32,20 +35,7 @@ From: ubuntu:20.04
 
     # Install required Python packages
     pip install --upgrade pip
-    pip install cycler==0.11.0 \
-        fonttools==4.33.3 \
-        joblib==1.1.0 \
-        kiwisolver==1.4.2 \
-        matplotlib==3.5.2 \
-        numpy==1.22.3 \
-        packaging==21.3 \
-        Pillow==9.1.0 \
-        protobuf==4.21.1 \
-        pycairo==1.21.0 \
-        pyparsing==3.0.9 \
-        python-dateutil==2.8.2 \
-        PyYAML==6.0 \
-        six==1.16.0
+    pip install -r requirements.txt
 
     # Insert additional labels
     echo "CREATED $(date)" >> $APPTAINER_LABELS

@@ -11,9 +11,6 @@ from joblib import Parallel, delayed
 from abc import ABC, abstractmethod
 
 from sim_modules import ExperimentData, Sim
-
-import sys
-sys.path.append("/home/khaiyichin/research/collective_perception/collective_perception_cpp/build/proto") # may need a better way
 import simulation_set_pb2
 
 # Default values
@@ -161,9 +158,12 @@ class VisualizationData:
 
                 else: similarity_bool = False
 
-                # Only the target fill ratio range can be different (highest level)
+                # Ensure that all the high level parameters are the same
                 if not similarity_bool:
                     raise RuntimeError("The objects in the \"{0}\" directory do not have the same parameters.".format(exp_data_obj_paths))
+
+        self.dfr_range = sorted(self.dfr_range)
+        self.sp_range = sorted(self.sp_range)
 
         self.aggregate_statistics()
 
@@ -187,8 +187,6 @@ class VisualizationData:
         setattr(simulation_set_pb2.SimulationStatsSet, "speed", sim_stats_set_msg.sim_set.speed)
         setattr(simulation_set_pb2.SimulationStatsSet, "density", sim_stats_set_msg.sim_set.density)
         setattr(simulation_set_pb2.SimulationStatsSet, "stats_obj_dict", {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.dfr_range} )
-
-        # stats_obj_dict = {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.dfr_range}
 
         for stats_packet in sim_stats_set_msg.stats_packets:
             stats_obj = Sim.SimStats(None)
@@ -411,7 +409,6 @@ class VisualizationData:
         """
 
         conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold)
-        print(target_fill_ratio, sensor_prob, conv_lst)
         acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst)
 
         return conv_lst[2]*self.comms_period, acc_lst[2]
@@ -432,7 +429,7 @@ class VisualizationDataGroupBase(ABC):
 
             if len(serialized_files) == 0: # move on to the next folder
                 continue
-            else: # pickle file found, that means the directory two levels up is needed @TODO bad assumption; dynamic case it may only be one level
+            else: # file found, that means the directory two levels up is needed; the first level only describes the inner simulation parameters (e.g., tfr or sp)
                 parent_folder, folder = os.path.split( os.path.abspath(root) )
                 exp_data_obj_folders.append(parent_folder)
 
@@ -595,7 +592,7 @@ class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
         num_agents = args["num_agents"]
         speed = args["speed"]
 
-        return self.viz_data_obj_dict[num_agents][speed]
+        return self.viz_data_obj_dict[speed][num_agents]
 
     def save(self, filepath=None, curr_time=None):
         """Serialize the class into a pickle.
@@ -622,7 +619,7 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
 
     fig_size = FIG_SIZE
     fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
-    fig.suptitle("Performance for a {0} network topology (threshold: {1})".format(kwargs["comms_network_str"], threshold), fontsize=20)
+    if kwargs["title"]: fig.suptitle(kwargs["title"], fontsize=20)
 
     # Create two groups: left for all the heatmaps, right for the color bar
     top_lvl_gs = fig.add_gridspec(1, 2, width_ratios=[10, 2.5])
@@ -691,7 +688,9 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
 
 def plot_heatmap_vdg(
     data_obj: VisualizationDataGroupBase,
+    row_arg_str: str,
     row_keys: list,
+    col_arg_str: str,
     col_keys: list,
     outer_grid_row_labels: list,
     outer_grid_col_labels: list,
@@ -704,7 +703,7 @@ def plot_heatmap_vdg(
     # Create 2 subfigures, one for the actual grid of heatmaps while the other for the colorbar
     fig_size = FIG_SIZE
     fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
-    fig.suptitle("Performance for a {0} network topology (threshold: {1})".format(kwargs["comms_network_str"], threshold), fontsize=20)
+    if kwargs["title"]: fig.suptitle(kwargs["title"], fontsize=20)
 
     # Create two groups: left for all the heatmaps, right for the color bar
     top_gs = fig.add_gridspec(1, 2, width_ratios=[10, 2.5])
@@ -727,7 +726,7 @@ def plot_heatmap_vdg(
 
         for ind_c, col in enumerate(col_keys):
 
-            v = data_obj.get_viz_data_obj({"comms_period": row, "comms_prob": 1.0, "num_agents": col})
+            v = data_obj.get_viz_data_obj({row_arg_str: row, col_arg_str: col, "comms_prob": 1.0,}) # keep communication probabily args
 
             # Compute the convergence timestamps and save the matrix of convergence values
             matrix = generate_combined_heatmap_data(v, threshold, order=(None, "convergence", "accuracy"))

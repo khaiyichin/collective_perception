@@ -5,6 +5,9 @@
 #include <unordered_map>
 #include <ctime>
 #include <cmath>
+#include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 // Buzz and ARGoS headers
 #include <buzz/argos/buzz_loop_functions.h>
@@ -155,6 +158,8 @@ private:
 
     void CreateNewPacket();
 
+    void SaveData();
+
     std::array<std::vector<Brain::ValuePair>, 3> GetAllSolverValues();
 
     std::pair<Brain::ValuePair, Brain::ValuePair> ComputeValuePairsSampleMeanAndStdDev(const std::vector<Brain::ValuePair> &input);
@@ -175,6 +180,8 @@ private:
     std::string verbose_level_;
 
     std::string id_prefix_;
+
+    std::string output_folder_;
 
     std::pair<uint32_t, uint32_t> arena_tile_count_;
 
