@@ -259,6 +259,7 @@ function observe()
     }
     else
     {
+        logerr("Invalid encounter observed!")
         return nil # invalid observation
     }
 

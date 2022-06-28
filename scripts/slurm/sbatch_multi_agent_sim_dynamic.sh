@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -N 1
-#SBATCH -n 20
+#SBATCH -n 40
 #SBATCH --mem=128G
 #SBATCH -p short
 #SBATCH -o log_%x_%j.out

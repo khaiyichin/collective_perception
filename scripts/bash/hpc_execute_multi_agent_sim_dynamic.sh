@@ -17,16 +17,20 @@ OUTPUTDIR=$3
 
 # Define varying parameters
 SPEED=(10.0 15.0 20.0 25.0) # cm/s
-AGENTS=(10 20 50 100)
-THREADS=20
+POSITION=(4.436599480604251 3.1517942390846527 2.011746925739275 1.4371645541621039) # for D = (1 2 5 10) with number of agents = 50
+DENSITY=(1 2 5 10)
+THREADS=40
 
 # Set fixed parameters
 TFR_RANGE=(0.05 0.95 19)
 SP_RANGE=(0.525 0.975 19)
 TRIALS=5
-TILES=500
+TILES=1000
 STATSPATH="multi_agent_sim_dynamic_stats.pbs"
 AGENTDATAPATH="multi_agent_sim_dynamic_agent_data.pbad"
+AGENTS=50
+WALL_THICKNESS=0.1
+ARENA_LEN=10
 
 sed -i "s/<fill_ratio_range.*/<fill_ratio_range min=\"${TFR_RANGE[0]}\" max=\"${TFR_RANGE[1]}\" steps=\"${TFR_RANGE[2]}\" \/>/" $ARGOSFILE # fill ratio range
 sed -i "s/<sensor_probability_range.*/<sensor_probability_range min=\"${SP_RANGE[0]}\" max=\"${SP_RANGE[1]}\" steps=\"${SP_RANGE[2]}\" \/>/" $ARGOSFILE # sensor prob range
@@ -35,6 +39,17 @@ sed -i "s/<arena_tiles.*/<arena_tiles tile_count_x=\"$TILES\" tile_count_y=\"$TI
 sed -i "s/<path.*/<path folder=\"$OUTPUTDIR\" stats=\"$STATSPATH\" agent_data=\"$AGENTDATAPATH\"  include_datetime=\"true\" \/>/" $ARGOSFILE # output path
 sed -i "s/<verbosity.*/<verbosity level=\"full\" \/>/" $ARGOSFILE # verbosity
 sed -i "s/<experiment.*/<experiment length=\"200\" ticks_per_second=\"10\" random_seed=\"0\" \/>/" $ARGOSFILE # experiment length
+sed -i "s/<entity.*/<entity quantity=\"$AGENTS\" max_trials=\"100\" base_num=\"0\">/" $ARGOSFILE
+if [ $AGENTS -ge 100 ]; then # thread number
+    sed -i "s/<system threads=.*/<system threads=\"$THREADS\" \/>/" $ARGOSFILE
+else
+    sed -i "s/<system threads=.*/<system threads=\"0\" \/>/" $ARGOSFILE
+fi
+sed -i "s/<arena size.*/<arena size=\"$ARENA_LEN, $ARENA_LEN, 1\" center=\"0,0,0.5\">/" $ARGOSFILE # arena size
+sed -i "s/<box id=\"wall_north\".*/<box id=\"wall_north\" size=\"10,$WALL_THICKNESS,0.5\" movable=\"false\">/" $ARGOSFILE # north wall size
+sed -i "s/<box id=\"wall_south\".*/<box id=\"wall_south\" size=\"10,$WALL_THICKNESS,0.5\" movable=\"false\">/" $ARGOSFILE # south wall size
+sed -i "s/<box id=\"wall_east\".*/<box id=\"wall_east\" size=\"$WALL_THICKNESS,10,0.5\" movable=\"false\">/" $ARGOSFILE # east wall size
+sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,10,0.5\" movable=\"false\">/" $ARGOSFILE # west wall size
 
 # Run simulations
 {
@@ -43,30 +58,30 @@ sed -i "s/<experiment.*/<experiment length=\"200\" ticks_per_second=\"10\" rando
     echo -e "\n################################### EXECUTION BEGIN ###################################"
     echo -e "################################# ${START_TIME} #################################\n"
 
-    for (( i = 0; i <= 3; i++ )) # robot speeds
+    for (( i = 0; i < 4; i++ )) # robot speeds
     do
         # Modify robot speeds
         speed=$(echo ${SPEED[i]})
         sed -i "s/<speed.*/<speed value=\"$speed\" \/>/" $ARGOSFILE
 
-        for (( j = 0; j <= 3; j++ )) # agent number
+        for (( j = 0; j < 4; j++ )) # wall positions
         do
-            agents=$(echo ${AGENTS[j]})
+            # Modify wall positions
+            pos=$(echo ${POSITION[j]})
+            sed -i "/<box id=\"wall_north\".*/{n;d}" $ARGOSFILE # remove the line after "wall_north"
+            sed -i "/<box id=\"wall_south\".*/{n;d}" $ARGOSFILE # remove the line after "wall_south"
+            sed -i "/<box id=\"wall_east\".*/{n;d}" $ARGOSFILE # remove the line after "wall_east"
+            sed -i "/<box id=\"wall_west\".*/{n;d}" $ARGOSFILE # remove the line after "wall_west"
+            sed -i "s/<box id=\"wall_north\".*/<box id=\"wall_north\" size=\"10,$WALL_THICKNESS,0.5\" movable=\"false\">\n            <body position=\"0,$pos,0\" orientation=\"0,0,0\" \/>/" $ARGOSFILE
+            sed -i "s/<box id=\"wall_south\".*/<box id=\"wall_south\" size=\"10,$WALL_THICKNESS,0.5\" movable=\"false\">\n            <body position=\"0,-$pos,0\" orientation=\"0,0,0\" \/>/" $ARGOSFILE
+            sed -i "s/<box id=\"wall_east\".*/<box id=\"wall_east\" size=\"$WALL_THICKNESS,10,0.5\" movable=\"false\">\n            <body position=\"$pos,0,0\" orientation=\"0,0,0\" \/>/" $ARGOSFILE
+            sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,10,0.5\" movable=\"false\">\n            <body position=\"-$pos,0,0\" orientation=\"0,0,0\" \/>/" $ARGOSFILE
+            sed -i "s/<position method=\"uniform\".*/<position method=\"uniform\" min=\"-$pos,-$pos,0\" max=\"$pos,$pos,0\" \/>/" $ARGOSFILE
 
-            # Modify number of threads
-            if [ $agents -ge 100 ]; then
-                sed -i "s/<system threads=.*/<system threads=\"$THREADS\" \/>/" $ARGOSFILE
-            else
-                sed -i "s/<system threads=.*/<system threads=\"0\" \/>/" $ARGOSFILE
-            fi
-
-            # Modify number of agents
-            sed -i "s/<entity.*/<entity quantity=\"$agents\" max_trials=\"100\" base_num=\"0\">/" $ARGOSFILE
-
-            singularity exec $SIFFILE /collective_perception_cpp/build/src/run_dynamic_simulations -l /dev/num -c $ARGOSFILE
+            singularity exec $SIFFILE /collective_perception/collective_perception_cpp/build/src/run_dynamic_simulations -l /dev/null -c $ARGOSFILE
 
             # Copy and move the data
-            folder="spd${speed}_agt${agents}" # concatenate string and numbers as folder name
+            folder="spd${speed}_den${DENSITY[j]}" # concatenate string and numbers as folder name
             mkdir $folder
             mv $OUTPUTDIR/* $folder
         done

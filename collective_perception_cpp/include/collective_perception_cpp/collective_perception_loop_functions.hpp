@@ -14,6 +14,7 @@
 #include <buzz/buzzvm.h>
 #include <argos3/core/simulator/entity/floor_entity.h>
 #include <argos3/plugins/simulator/entities/rab_equipped_entity.h>
+#include <argos3/plugins/simulator/entities/box_entity.h>
 
 // Local headers
 #include "arena.hpp"

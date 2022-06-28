@@ -89,7 +89,7 @@
           function.
           The user, writing the controller, defines how it is organized.
       -->
-            <params bytecode_file="/collective_perception_cpp/build/buzz/body.bo" debug_file="/collective_perception_cpp/build/buzz/body.bdb" />
+            <params bytecode_file="/collective_perception/collective_perception_cpp/build/buzz/body.bo" debug_file="/collective_perception/collective_perception_cpp/build/buzz/body.bdb" />
         </buzz_controller_kheperaiv>
 
     </controllers>
@@ -98,9 +98,9 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="/collective_perception_cpp/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
+    <loop_functions library="/collective_perception/collective_perception_cpp/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
         <collective_perception>
-            <arena_tiles tile_count_x="500" tile_count_y="500" /> <!-- number of tiles for the arena -->
+            <arena_tiles tile_count_x="1000" tile_count_y="1000" /> <!-- number of tiles for the arena -->
             <fill_ratio_range min="0.05" max="0.95" steps="19" /> <!-- range of target fill ratios -->
             <sensor_probability_range min="0.525" max="0.975" steps="19" /> <!-- range of sensor probabilities -->
             <speed value="10.0" /> <!-- in units of cm/s -->
@@ -129,29 +129,29 @@
  
       $ argos3 -q box
   -->
-    <arena size="5, 5, 1" center="0,0,0.5">
+    <arena size="10, 10, 1" center="0,0,0.5">
 
         <floor id="floor" source="loop_functions" pixels_per_meter="100" />
 
         <!-- Place four boxes in a square to delimit the arena -->
-        <box id="wall_north" size="5.25,0.1,0.5" movable="false">
-            <body position="0,2.55,0" orientation="0,0,0" />
+        <box id="wall_north" size="10,0.1,0.5" movable="false">
+            <body position="0,4.436599480604251,0" orientation="0,0,0" />
         </box>
-        <box id="wall_south" size="5.25,0.1,0.5" movable="false">
-            <body position="0,-2.55,0" orientation="0,0,0" />
+        <box id="wall_south" size="10,0.1,0.5" movable="false">
+            <body position="0,-4.436599480604251,0" orientation="0,0,0" />
         </box>
-        <box id="wall_east" size="0.1,5.25,0.5" movable="false">
-            <body position="2.55,0,0" orientation="0,0,0" />
+        <box id="wall_east" size="0.1,10,0.5" movable="false">
+            <body position="4.436599480604251,0,0" orientation="0,0,0" />
         </box>
-        <box id="wall_west" size="0.1,5.25,0.5" movable="false">
-            <body position="-2.55,0,0" orientation="0,0,0" />
+        <box id="wall_west" size="0.1,10,0.5" movable="false">
+            <body position="-4.436599480604251,0,0" orientation="0,0,0" />
         </box>
 
         <!-- Place the Khepera IV robots in the arena in random and bind it to the controller -->
         <distribute>
-            <position method="uniform" min="-2.5,-2.5,0" max="2.5,2.5,0" />
+            <position method="uniform" min="-4.436599480604251,-4.436599480604251,0" max="4.436599480604251,4.436599480604251,0" />
             <orientation method="uniform" min="0,0,0" max="360,0,0" />
-            <entity quantity="10" max_trials="100" base_num="0">
+            <entity quantity="50" max_trials="100" base_num="0">
                 <kheperaiv id="kiv" rab_data_size="50" rab_range="0.7">
                     <controller config="bck" />
                 </kheperaiv>

@@ -16,7 +16,13 @@ From: ../containers/argos_buzz_protobuf_release_no_qt.sif
     Initial release.
 
 %files
-    ../../collective_perception_cpp collective_perception_cpp
+    ../../collective_perception_cpp/argos /collective_perception/collective_perception_cpp/argos
+    ../../collective_perception_cpp/buzz /collective_perception/collective_perception_cpp/buzz
+    ../../collective_perception_cpp/include /collective_perception/collective_perception_cpp/include
+    ../../collective_perception_cpp/proto /collective_perception/collective_perception_cpp/proto
+    ../../collective_perception_cpp/src /collective_perception/collective_perception_cpp/src
+    ../../collective_perception_cpp/CMakeLists.txt /collective_perception/collective_perception_cpp/CMakeLists.txt
+    ../../scripts/python/*.py /collective_perception/scripts/python/
 
 %post -c /bin/bash
     # Prevent user prompts
@@ -26,7 +32,8 @@ From: ../containers/argos_buzz_protobuf_release_no_qt.sif
     apt update && apt upgrade -qy
 
     # Build collective_perception_cpp
-    pushd collective_perception_cpp
+    pushd collective_perception
+    cd collective_perception_cpp
     rm -rf build
     mkdir build && cd build
     cmake -DCMAKE_BUILD_TYPE=Release ..
@@ -37,4 +44,4 @@ From: ../containers/argos_buzz_protobuf_release_no_qt.sif
     echo "CREATED $(date)" >> $APPTAINER_LABELS
 
 %runscript
-    /collective_perception_cpp/build/src/run_dynamic_simulations -l /dev/null -c param_multi_agent_sim_dynamic.argos
+    /collective_perception/collective_perception_cpp/build/src/run_dynamic_simulations -l /dev/null -c param_multi_agent_sim_dynamic.argos

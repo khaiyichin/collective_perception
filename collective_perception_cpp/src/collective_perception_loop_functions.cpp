@@ -191,6 +191,41 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         assert(length_x == length_y); // only square tiles allowed
         arena_tile_size_ = length_x;
 
+        // Grab the constrained area to compute the true swarm density
+        auto &box_map = space_entity.GetEntitiesByType("box");
+
+        // Get constrained x length
+        CBoxEntity &wall_west = *any_cast<CBoxEntity *>(box_map["wall_west"]);
+        CBoxEntity &wall_east = *any_cast<CBoxEntity *>(box_map["wall_east"]);
+
+        float wall_west_thickness = wall_west.GetSize().GetX();
+        float wall_east_thickness = wall_east.GetSize().GetX();
+
+        float wall_west_pos_x = wall_west.GetEmbodiedEntity().GetOriginAnchor().Position.GetX();
+        float wall_east_pos_x = wall_east.GetEmbodiedEntity().GetOriginAnchor().Position.GetX();
+
+        assert(abs(wall_west_pos_x) == abs(wall_east_pos_x));         // ensure that walls are evenly separated
+        assert(abs(wall_west_thickness) == abs(wall_east_thickness)); // ensure that walls are equally thick
+
+        // Get constrained y length
+        CBoxEntity &wall_north = *any_cast<CBoxEntity *>(box_map["wall_north"]);
+        CBoxEntity &wall_south = *any_cast<CBoxEntity *>(box_map["wall_south"]);
+
+        float wall_north_thickness = wall_north.GetSize().GetY();
+        float wall_south_thickness = wall_south.GetSize().GetY();
+
+        float wall_north_pos_y = wall_north.GetEmbodiedEntity().GetOriginAnchor().Position.GetY();
+        float wall_south_pos_y = wall_south.GetEmbodiedEntity().GetOriginAnchor().Position.GetY();
+
+        assert(abs(wall_north_pos_y) == abs(wall_south_pos_y));         // ensure that walls are evenly separated
+        assert(abs(wall_north_thickness) == abs(wall_south_thickness)); // ensure that walls are equally thick
+
+        // Compute constrained arena area
+        float constrained_x_distance = (wall_east_pos_x - wall_west_pos_x) - wall_west_thickness;
+        float constrained_y_distance = (wall_north_pos_y - wall_south_pos_y) - wall_north_thickness;
+
+        float constrained_area = constrained_x_distance * constrained_y_distance;
+
         // Grab fill ratio ranges
         TConfigurationNode &fill_ratio_node = GetNode(col_per_root_node, "fill_ratio_range");
 
@@ -232,7 +267,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         simulation_parameters_.num_agents_ = rab_map.size();         // the number of range and bearing sensors is the same as the number of robots
         simulation_parameters_.comms_range_ = random_rab.GetRange(); // all the range and bearing sensors have the same range
         simulation_parameters_.density_ = simulation_parameters_.num_agents_ * M_PI * std::pow(simulation_parameters_.comms_range_, 2) /
-                                          (arena_size.GetX() * arena_size.GetY()); // the density is the ratio of swarm communication area to total walkable area
+                                          constrained_area; // the density is the ratio of swarm communication area to total walkable area
 
         // Grab number of trials
         GetNodeAttribute(GetNode(col_per_root_node, "num_trials"), "value", simulation_parameters_.num_trials_);
@@ -261,6 +296,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         {
             LOG << "[INFO] Collective perception loop functions verbose level = \"" << verbose_level_ << "\"" << std::endl;
             LOG << "[INFO] Specifying number of arena tiles = " << arena_x << "*" << arena_y << std::endl;
+            LOG << "[INFO] Specifying number of robots = " << simulation_parameters_.num_agents_ << std::endl;
             LOG << "[INFO] Specifying robot speed = " << simulation_parameters_.speed_ << " cm/s" << std::endl;
             LOG << "[INFO] Specifying number of trials = " << simulation_parameters_.num_trials_ << std::endl;
             LOG << "[INFO] Specifying output folder " << output_folder_ << std::endl;
@@ -494,15 +530,15 @@ void CollectivePerceptionLoopFunctions::SaveData()
         "tfr" +
         round_1000_int_to_str(simulation_parameters_.tfr_range_.front()) + "-" +
         round_1000_int_to_str(
-                (simulation_parameters_.tfr_range_.back() - simulation_parameters_.tfr_range_.front()) /
-                (simulation_parameters_.tfr_range_.size() - 1)
-            ) + "-" +
+            (simulation_parameters_.tfr_range_.back() - simulation_parameters_.tfr_range_.front()) /
+            (simulation_parameters_.tfr_range_.size() - 1)) +
+        "-" +
         round_1000_int_to_str(simulation_parameters_.tfr_range_.back()) + "_sp" +
         round_1000_int_to_str(simulation_parameters_.sp_range_.front()) + "-" +
         round_1000_int_to_str(
-                (simulation_parameters_.sp_range_.back() - simulation_parameters_.sp_range_.front()) /
-                (simulation_parameters_.sp_range_.size() - 1)
-            ) + "-" +
+            (simulation_parameters_.sp_range_.back() - simulation_parameters_.sp_range_.front()) /
+            (simulation_parameters_.sp_range_.size() - 1)) +
+        "-" +
         round_1000_int_to_str(simulation_parameters_.sp_range_.back());
 
     // Create output filename
