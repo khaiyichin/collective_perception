@@ -95,7 +95,8 @@ void SimulationAgentDataSet::Serialize(collective_perception_cpp::proto::Simulat
 RTAgentDataProtoMsg SimulationAgentDataSet::ExtractRepeatedTrialAgentDataMsg(const RepeatedTrials<std::vector<AgentData>> &vec)
 {
     RTAgentDataProtoMsg rtad_msg;
-    std::vector<MultiAgentDataProtoMsg> mad_msg_vec(num_trials_); // vector of MultiAgentData messages
+    std::vector<MultiAgentDataProtoMsg> mad_msg_vec; // vector of MultiAgentData messages
+    mad_msg_vec.reserve(num_trials_);
 
     // Iterate through each trial
     for (auto itr = vec.begin(); itr != vec.end(); ++itr)

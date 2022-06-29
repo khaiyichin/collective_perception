@@ -58,7 +58,7 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
         // Get data
         auto &agent_data = (*agt_data_vec_ptr)[index];
         agent_data.tile_occurrences.push_back(buzzobj_getint(BuzzTableGet(t_vm, "encounter")));
-        agent_data.tile_occurrences.push_back(buzzobj_getint(BuzzTableGet(t_vm, "observation")));
+        agent_data.observations.push_back(buzzobj_getint(BuzzTableGet(t_vm, "observation")));
 
         BuzzTableClose(t_vm);
     }

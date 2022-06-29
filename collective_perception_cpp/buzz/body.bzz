@@ -207,7 +207,7 @@ function observe()
     # {
     #     # Make observation using artificial noise (probability)
     #     # The actual sensor is set to have no noise
-    #     var encounter = left_front_color
+    #     var encounter = int(left_front_color)
     #     var prob = 0.0
 
     #     if (encounter == 1) # white
@@ -246,7 +246,7 @@ function observe()
 
     # Make observation using artificial noise (probability)
     # The actual sensor is set to have no noise
-    var encounter = left_front_color
+    var encounter = int(left_front_color)
     var prob = 0.0
 
     if (encounter == 1) # white
@@ -265,7 +265,7 @@ function observe()
 
     var noisy_observation = int(1-observe_noisy(encounter, prob)) # this is because black and white are flipped
 
-    debug_data["encounter"] = encounter
+    debug_data["encounter"] = 1-encounter # to maintain consistency
     debug_data["observation"] = noisy_observation
 
     total_b_tiles_obs = total_b_tiles_obs + noisy_observation
