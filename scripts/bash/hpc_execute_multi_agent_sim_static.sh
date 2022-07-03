@@ -6,7 +6,7 @@
 # multi_agent_sim_static.sif.
 
 # Verify that arguments are provided
-if [ $# == 0 ]; then
+if [ $# != 2 ]; then
     echo "Not enough arguments provided!"
     exit 1
 fi
@@ -20,6 +20,8 @@ if [ $1 != $s1 ] && [ $1 != $s2 ] && [ $1 != $s3 ] && [ $1 != $s4 ]; then
     echo "1st argument should be one of the following: \"full\", \"ring\", \"line\", \"scale-free\"!"
     exit 1
 fi
+
+SIFFILE=$2
 
 # Iterate and run scripts for different param cases
 # COMM=("full" "ring" "line" "scale-free")
@@ -61,7 +63,7 @@ sed -i "s/numObs:.*/numObs: 2000/g" param_multi_agent_sim_static.yaml
                 inc=$(echo ${INC[d]})
                 sed -i "/desFillRatios:/{n;N;N;d}" param_multi_agent_sim_static.yaml # remove the line and 2 lines after 'desFillRatios'
                 sed -i "s/desFillRatios:/desFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" param_multi_agent_sim_static.yaml
-                singularity run multi_agent_sim_static.sif
+                singularity run $SIFFILE
             done
 
             # Copy and move the data
