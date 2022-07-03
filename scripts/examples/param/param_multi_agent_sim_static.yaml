@@ -7,7 +7,8 @@ commsGraph:
 sensorProb: # sensor probability range (inclusive) to simulate
   min: 0.525
   max: 0.975
-  incSteps: 19
+  incSteps: 19 # set to -2 for uniform distribution with range [`min`, `max`)
+               # set to -3 for normal distribution with (mean=`min`, variance=`max`)
 desFillRatios: # target fill ratio range (inclusive) to simulate
   min: 0.05
   max: 0.95

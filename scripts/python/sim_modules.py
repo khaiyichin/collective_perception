@@ -13,12 +13,8 @@ import warnings
 BLACK_TILE = 1
 WHITE_TILE = 0
 POSINF = 1.0e+100
-
-# TODO:
-# implement run_sim() --> almost done; wanna figure out how to log the data using
-# HeatmapRow and HeatmapData.
-# run for fully connected data and compare with matlab
-# Create abstract functions in Sim to have the child class implement
+UNIFORM_DIST_SP_ENUM = -2
+NORMAL_DIST_SP_ENUM = -3
 
 warnings.filterwarnings("ignore", category=RuntimeWarning) # suppress warnings since division by zero occur frequently here
 
@@ -61,6 +57,9 @@ class Sim:
                 self.alpha_sample_std = np.zeros( (num_exp, num_obs + 1) )
 
             elif sim_type == "multi" and num_exp != 0 and num_obs != 0:
+                self.sp_distribution = None
+                self.sp_distributed_sample_mean = np.zeros(num_exp)
+
                 self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
                 self.alpha_sample_mean = np.zeros( (num_exp, num_obs + 1) )
                 self.x_hat_sample_std = np.zeros( (num_exp, num_obs + 1) )
@@ -77,6 +76,9 @@ class Sim:
                 self.gamma_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
 
             else: # for population with dynamic simulation data
+                self.sp_distribution = None
+                self.sp_distributed_sample_mean = None
+
                 self.x_hat_sample_mean = None
                 self.alpha_sample_mean = None
                 self.x_hat_sample_std = None
@@ -313,7 +315,19 @@ class MultiAgentSim(Sim):
 
         # Initialize data containers (to be serialized)
         self.stats = self.SimStats("multi", num_exp, num_obs, comms_period)
-        self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, sensor_prob, comms_period)
+        if sensor_prob < 0: # not actually the sensor probability; actually encoded distribution
+
+            # Decode distribution parameters
+            val = int( str(sensor_prob)[:2] )
+            param_1 = float( str( sensor_prob )[2:6] ) * 1e-3
+            param_2 = float( str( sensor_prob )[6:] ) * 1e-3
+
+            # Store parameters
+            self.generator = np.random.default_rng()
+            self.dist_params = [param_1, param_2]
+            self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, val, comms_period)
+        else:
+            self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, sensor_prob, comms_period)
 
         # Initialize non-persistent simulation data
         self.x_hat = np.zeros( (num_exp, num_agents, num_obs + 1) )
@@ -377,12 +391,42 @@ class MultiAgentSim(Sim):
 
         # Create agent objects
         agents_vprop = self.sim_data.comms_network.graph.new_vertex_property("object") # need to populate agents into the vertices
+        sensor_probs = []
 
         for vertex in self.sim_data.comms_network.graph.get_vertices():
-            agents_vprop[vertex] = Agent(self.sim_data.b_prob, self.sim_data.w_prob,
-                                         (self.compute_x_hat, self.compute_fisher_hat),
-                                         (self.compute_x_bar, self.compute_fisher_bar),
-                                         (self.compute_x, self.compute_fisher))
+            if self.sim_data.b_prob == UNIFORM_DIST_SP_ENUM:
+                b_sensor_prob = ( (self.dist_params[1] - self.dist_params[0]) * self.generator.random(self.num_exp) + self.dist_params[0] ).tolist()
+                w_sensor_prob = b_sensor_prob
+
+                sensor_probs.append(b_sensor_prob)
+
+                self.stats.sp_distribution = "uniform"
+                dist_function = self.generator.random()
+
+            elif self.sim_data.b_prob == NORMAL_DIST_SP_ENUM:
+                b_sensor_prob = ( self.generator.normal(self.dist_params[0], np.sqrt(self.dist_params[1]), self.num_exp) ).tolist()
+                w_sensor_prob = b_sensor_prob
+
+                sensor_probs.append(b_sensor_prob)
+
+                self.stats.sp_distribution = "normal"
+                dist_function = self.generator.normal()
+
+            else:
+                b_sensor_prob = self.sim_data.b_prob
+                w_sensor_prob = self.sim_data.w_prob
+
+                dist_function = None
+
+            agents_vprop[vertex] = Agent(b_sensor_prob, w_sensor_prob,
+                                        (self.compute_x_hat, self.compute_fisher_hat),
+                                        (self.compute_x_bar, self.compute_fisher_bar),
+                                        (self.compute_x, self.compute_fisher))
+
+        # @todo hacky solution to replace/update mean sensor probability
+        self.sim_data.b_prob = sensor_probs
+        self.sim_data.w_prob = sensor_probs
+        self.stats.sp_distributed_sample_mean = np.mean(sensor_probs, axis=0)
 
         self.sim_data.comms_network.agents_vp = agents_vprop
 
@@ -613,8 +657,16 @@ class Agent:
 
     def __init__(self, p_b_b, p_w_w, local_functions, social_functions, primal_functions):
 
-        self.b_prob = p_b_b
-        self.w_prob = p_w_w
+        if isinstance(p_b_b, list):
+            self.prob_counter = 0
+            self.b_prob_lst = p_b_b
+            self.w_prob_lst = p_w_w
+
+            self.b_prob = self.b_prob_lst[self.prob_counter]
+            self.w_prob = self.w_prob_lst[self.prob_counter]
+        else:
+            self.b_prob = p_b_b
+            self.w_prob = p_w_w
 
         self.total_b_tiles_obs = 0
         self.total_obs = 0
@@ -627,6 +679,11 @@ class Agent:
         self.primal_solver = self.PrimalSolver(*primal_functions)
 
     def reset(self):
+
+        if hasattr(self, "prob_counter") and self.prob_counter+1 < len(self.b_prob_lst): # for distributed sensor probabilities
+            self.prob_counter += 1
+            self.b_prob = self.b_prob_lst[self.prob_counter]
+            self.w_prob = self.w_prob_lst[self.prob_counter]
 
         self.total_b_tiles_obs = 0
         self.total_obs = 0
@@ -1018,7 +1075,17 @@ class SimParam:
         sp_max = float(yaml_config["sensorProb"]["max"])
         sp_inc = int(yaml_config["sensorProb"]["incSteps"])
 
-        self.sp_range  = np.round(np.linspace(sp_min, sp_max, sp_inc), 3).tolist()
+        # Check if uniform distribution is desired
+        if sp_inc == UNIFORM_DIST_SP_ENUM:
+            lower_bound = "{:04d}".format( int( np.round( sp_min*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
+            upper_bound = "{:04d}".format( int( np.round( sp_max*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
+            self.sp_range = [ int( str(UNIFORM_DIST_SP_ENUM) + lower_bound + upper_bound ) ] # [distribution id, lower bound incl., upper bound excl.]
+        elif sp_inc == NORMAL_DIST_SP_ENUM:
+            mean = "{:04d}".format( int( np.round( sp_min*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
+            var = "{:04d}".format( int( np.round( sp_max*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
+            self.sp_range = [ int(str(NORMAL_DIST_SP_ENUM) + mean + var) ] # [distribution id, mean, variance]
+        else:
+            self.sp_range = np.round(np.linspace(sp_min, sp_max, sp_inc), 3).tolist()
         self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3).tolist()
         self.num_obs = int(yaml_config["numObs"])
         self.num_exp = int(yaml_config["numExperiments"])
