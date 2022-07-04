@@ -121,7 +121,7 @@ if __name__ == "__main__":
             print("\nRunning cases with fill ratio = " + str(f))
 
             for p in param_obj.sp_range: # iterate through each sensor probabilities
-                print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
+                print("\tRunning case with probability = " + str(p) + "... ", end="")
                 sys.stdout.flush()
 
                 s = MultiAgentSim(param_obj, f, p)

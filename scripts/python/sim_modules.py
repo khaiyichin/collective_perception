@@ -1075,15 +1075,19 @@ class SimParam:
         sp_max = float(yaml_config["sensorProb"]["max"])
         sp_inc = int(yaml_config["sensorProb"]["incSteps"])
 
-        # Check if uniform distribution is desired
+        # Check if distributed sensor probabilities is desired
         if sp_inc == UNIFORM_DIST_SP_ENUM:
+            # Encode distribution parameters into single int in a list
             lower_bound = "{:04d}".format( int( np.round( sp_min*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
             upper_bound = "{:04d}".format( int( np.round( sp_max*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
             self.sp_range = [ int( str(UNIFORM_DIST_SP_ENUM) + lower_bound + upper_bound ) ] # [distribution id, lower bound incl., upper bound excl.]
+
         elif sp_inc == NORMAL_DIST_SP_ENUM:
+            # Encode distribution parameters into single int in a list
             mean = "{:04d}".format( int( np.round( sp_min*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
             var = "{:04d}".format( int( np.round( sp_max*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
             self.sp_range = [ int(str(NORMAL_DIST_SP_ENUM) + mean + var) ] # [distribution id, mean, variance]
+
         else:
             self.sp_range = np.round(np.linspace(sp_min, sp_max, sp_inc), 3).tolist()
         self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3).tolist()

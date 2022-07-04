@@ -36,10 +36,7 @@ if __name__ == "__main__":
                 comms_prob = float(args.u[1])
                 num_agents = int(args.u[2])
 
-        try:
-            data = vm.VisualizationDataGroupStatic.load(args.FILE)
-        except:
-            data = vm.VisualizationDataGroup.load(args.FILE) # TODO: to support legacy class; must remove after upgrade
+        data = vm.VisualizationDataGroupStatic.load(args.FILE)
 
     else:
         data = vm.VisualizationData(args.FILE)
@@ -65,7 +62,7 @@ if __name__ == "__main__":
             ["Comms. Period = 1", "Comms. Period = 2", "Comms. Period = 5", "Comms. Period = 10"],
             ["Num. Agents = 10", "Num. Agents = 20", "Num. Agents = 50", "Num. Agents = 100"],
             args.CONV,
-            title="Static multi-agent simulation performance - {0} network topology (convergence threshold: {1})".format(args.NETWORK, args.CONV)
+            # title="Static multi-agent simulation performance - {0} network topology (convergence threshold: {1})".format(args.NETWORK, args.CONV)
         )
     elif args.m and args.g and args.u: # plot single heatmap from VisualizationDataGroupStatic
         v = data.get_viz_data_obj({"comms_period": comms_period, "comms_prob": comms_prob, "num_agents": num_agents})

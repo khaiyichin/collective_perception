@@ -15,7 +15,8 @@ import simulation_set_pb2
 
 # Default values
 CONV_THRESH = 5e-3
-FIG_SIZE = (20, 12)
+FIG_SIZE = (16, 12)
+ACC_ABS_MAX = 0.25 # maximum accuracy threshold to draw in heatmap
 
 warnings.filterwarnings("ignore", category=UserWarning) # ignore UserWarning type warnings
 
@@ -185,7 +186,7 @@ class VisualizationData:
         setattr(simulation_set_pb2.SimulationStatsSet, "num_obs", sim_stats_set_msg.sim_set.num_steps)
         setattr(simulation_set_pb2.SimulationStatsSet, "comms_range", sim_stats_set_msg.sim_set.comms_range)
         setattr(simulation_set_pb2.SimulationStatsSet, "speed", sim_stats_set_msg.sim_set.speed)
-        setattr(simulation_set_pb2.SimulationStatsSet, "density", sim_stats_set_msg.sim_set.density)
+        setattr(simulation_set_pb2.SimulationStatsSet, "density", np.round(sim_stats_set_msg.sim_set.density, 3))
         setattr(simulation_set_pb2.SimulationStatsSet, "stats_obj_dict", {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.dfr_range} )
 
         for stats_packet in sim_stats_set_msg.stats_packets:
@@ -573,10 +574,10 @@ class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
             if v.speed not in self.viz_data_obj_dict:
                 self.viz_data_obj_dict[v.speed] = {}
 
-            if v.num_agents in self.viz_data_obj_dict[v.speed]:
-                raise ValueError("The data for speed={0}, num_agents={1} exists already!".format(v.speed, v.num_agents))
+            if v.density in self.viz_data_obj_dict[v.speed]:
+                raise ValueError("The data for speed={0}, density={1} exists already!".format(v.speed, v.density))
             else:
-                self.viz_data_obj_dict[v.speed][v.num_agents] = v
+                self.viz_data_obj_dict[v.speed][v.density] = v
                 self.stored_obj_counter += 1
 
     def get_viz_data_obj(self, args: dict) -> VisualizationData:
@@ -589,10 +590,10 @@ class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
         Returns:
             A VisualizationData object for the specified inputs.
         """
-        num_agents = args["num_agents"]
         speed = args["speed"]
+        density = args["density"]
 
-        return self.viz_data_obj_dict[speed][num_agents]
+        return self.viz_data_obj_dict[speed][density]
 
     def save(self, filepath=None, curr_time=None):
         """Serialize the class into a pickle.
@@ -650,10 +651,10 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
     sp_range = data_obj.sp_range
 
     tup = heatmap(
-        convert_to_img(heatmap_data, [(0,0), (conv_min, conv_max), (acc_min, acc_max)], active_channels=[1, 2]), # normalize and convert to img
+        convert_to_img(heatmap_data, [(0,0), (0, data_obj.num_obs), (0.0, ACC_ABS_MAX)], active_channels=[1, 2]), # normalize and convert to img
         ax=ax,
-        row_label="On-fire tile fill ratio",
-        col_label="Sensor probability\nP(b|b) = P(w|w)",
+        row_label="Black tile fill ratio",
+        col_label="Sensor accuracy\nP(b|b) = P(w|w)",
         xticks=sp_range,
         yticks=tfr_range
     )
@@ -703,12 +704,11 @@ def plot_heatmap_vdg(
     # Create 2 subfigures, one for the actual grid of heatmaps while the other for the colorbar
     fig_size = FIG_SIZE
     fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
-    if kwargs["title"]: fig.suptitle(kwargs["title"], fontsize=20)
 
     # Create two groups: left for all the heatmaps, right for the color bar
-    top_gs = fig.add_gridspec(1, 2, width_ratios=[10, 2.5])
+    top_gs = fig.add_gridspec(1, 2, width_ratios=[10.0, 2.0], wspace=0.25)
 
-    left_gs_group = top_gs[0].subgridspec(nrows=len(outer_grid_row_labels), ncols=len(outer_grid_col_labels), wspace=0.001)
+    left_gs_group = top_gs[0].subgridspec(nrows=len(outer_grid_row_labels), ncols=len(outer_grid_col_labels), wspace=0.05)
     right_gs_group = top_gs[1].subgridspec(1, 1)
 
     ax_lst = left_gs_group.subplots(sharex=True, sharey=True)
@@ -751,7 +751,7 @@ def plot_heatmap_vdg(
         for ind_c, col in enumerate(col_keys):
 
             tup = heatmap(
-                convert_to_img(heatmap_data_grid[ind_r][ind_c], [(0,0), (conv_min, conv_max), (acc_min, acc_max)], active_channels=[1, 2]), # normalize and convert to img
+                convert_to_img(heatmap_data_grid[ind_r][ind_c], [(0,0), (0, v.num_obs), (0.0, ACC_ABS_MAX)], active_channels=[1, 2]), # normalize and convert to img
                 ax=ax_lst[ind_r][ind_c],
                 row_label=outer_grid_row_labels[ind_r],
                 col_label=outer_grid_col_labels[ind_c],
@@ -762,49 +762,45 @@ def plot_heatmap_vdg(
             )
 
     # Add inner grid labels
-    ax_lst[-1][-1].text(20.0, 19.5, "Sensor probability\nP(b|b) = P(w|w)", fontsize=15) # sensor probability as x label
-    ax_lst[0][0].text(-5, -2, "On-fire tile fill ratio", fontsize=15) # fill ratio as y label
+    ax_lst[-1][-1].text(20.0, 20.0, "Sensor\naccuracy", fontsize=13) # sensor probability as x label
+    ax_lst[0][0].text(-5, -2, "Black tile fill ratio", fontsize=13) # fill ratio as y label
 
     # Add color legend
-    color_leg_ax = right_gs_group.subplots(subplot_kw={"aspect": 40.0})
-    color_leg_px_count = (60, 240)
-    r = np.zeros((color_leg_px_count[1], color_leg_px_count[0]))
+    color_leg_ax = right_gs_group.subplots()
+    color_leg_px_count = (70, 420)
+    r = np.zeros( (color_leg_px_count[1], color_leg_px_count[0]) )
     g = np.repeat( np.reshape( np.linspace(1.0, 0.0, color_leg_px_count[1]), (color_leg_px_count[1], 1) ), color_leg_px_count[0], axis=1 )
-    b = np.repeat( np.reshape( np.linspace(0.0, 1.0, color_leg_px_count[0]), (1, color_leg_px_count[0]) ), color_leg_px_count[1], axis=0)
+    b = np.repeat( np.reshape( np.linspace(0.0, 1.0, color_leg_px_count[0]), (1, color_leg_px_count[0]) ), color_leg_px_count[1], axis=0 )
 
     # Add color legend labels
     color_leg_ax.imshow( np.moveaxis( np.array( [r, g, b] ), 0, 2) )
-    color_leg_ax.set_ylabel("Convergence", fontsize=15)
-    color_leg_ax.set_xlabel("Accuracy", fontsize=15)
+    color_leg_ax.set_ylabel("Convergence\n(steps)", fontsize=13)
+    color_leg_ax.set_xlabel("Accuracy\n(1 - abs. error)", fontsize=13)
 
     # Add label limits for convergence
-    color_leg_ax.text(-0.1*color_leg_px_count[0], 0.995*color_leg_px_count[1], "Slow", fontsize=12, rotation=90)
-    color_leg_ax.text(-0.1*color_leg_px_count[0], 0.1*color_leg_px_count[0], "Fast", fontsize=12, rotation=90)
+    color_leg_ax.text(-0.2*color_leg_px_count[0], color_leg_px_count[1]-0.5, "Slow", fontsize=10, rotation=90, ha="center", va="bottom")
+    color_leg_ax.text(-0.2*color_leg_px_count[0], -0.5, "Fast", fontsize=10, rotation=90, ha="center", va="top")
 
     # Add label limits for accuracy
-    color_leg_ax.text(-0.01*color_leg_px_count[0], 1.02*color_leg_px_count[1], "Low", fontsize=12)
-    color_leg_ax.text(0.86*color_leg_px_count[0], 1.02*color_leg_px_count[1], "High", fontsize=12)
+    # color_leg_ax.text(-0.5, 1.04*color_leg_px_count[1], "({0})".format(1 - ACC_ABS_MAX), fontsize=10, ha="left")
+    # color_leg_ax.text(color_leg_px_count[0]-0.5, 1.04*color_leg_px_count[1], "(1.0)", fontsize=10, ha="right")
 
-    # Remove color legend
-    color_leg_ax.set_xticks([])
-    color_leg_ax.set_yticks([])
+    # Add label ticks
+    color_leg_ax.set_xticks([-0.5, color_leg_px_count[0]-0.5], ["Low\n({0})".format(1- ACC_ABS_MAX), "High\n(1.0)"], fontsize=10)
+    color_leg_ax.get_xticklabels()[0].set_ha("left")
+    color_leg_ax.get_xticklabels()[-1].set_ha("right")
+    color_leg_ax.set_yticks([-0.5, color_leg_px_count[1]-0.5], ["(0)", "({0})".format(v.num_obs)], rotation=90, fontsize=10)
+    color_leg_ax.get_yticklabels()[0].set_va("top")
+    color_leg_ax.get_yticklabels()[-1].set_va("bottom")
 
-    # Add color bar
-    # cbar_ax = right_gs_group.subplots(subplot_kw={"aspect": 15.0}) # add subplot with aspect ratio of 15
-    # cbar = plt.colorbar(tup[2], cax=cbar_ax)
-    # cbar.ax.set_ylabel("Convergence timestep (# of observations)", fontsize=15) # TODO: need to have a general version
+    # Add title
+    if "title" in kwargs: fig.suptitle(kwargs["title"], fontsize=20)
 
     # Save the heatmap
     fig.set_size_inches(*fig_size)
-    fig.savefig("/home/khaiyichin/heatmap.png", bbox_inches="tight", dpi=300)
-
-# def generate_convergence_heatmap_data(v: VisualizationData, threshold: float):
-#     """Generate the heatmap data using convergence values of the informed estimates.
-#     """
-
-#     return np.asarray(
-#         [ [ v.detect_convergence(dfr, sp, threshold)[2]*v.comms_period for sp in v.sp_range ] for dfr in v.dfr_range ]
-#     )
+    if isinstance(data_obj, VisualizationDataGroupDynamic): data_obj_type = "dyn"
+    else: data_obj_type = "sta"
+    fig.savefig("/home/khaiyichin/heatmap_"+data_obj_type+"_"+"conv{0}_s{1}_t{2}".format(int(np.round(threshold*1e3 ,3)), v.num_obs, v.num_exp)+".png", bbox_inches="tight", dpi=300)
 
 def generate_combined_heatmap_data(v: VisualizationData, threshold: float, order=(None, "convergence", "accuracy")):
     """
@@ -901,7 +897,6 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
         kwargs["activate_outer_grid_ylabel"] = True
 
     # Plot the heatmap
-    # im = ax.imshow(heatmap_data, norm=LogNorm(vmin=kwargs["vmin"], vmax=kwargs["vmax"]), cmap="jet")
     im = ax.imshow(heatmap_data)
 
     # Show all ticks and label them with the respective list entries
@@ -962,6 +957,8 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
     #         texts.append(text)
 
     return fig, ax, im
+
+def plot_scatter()
 
 def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False, convergence_thresh=CONV_THRESH):
     """Plot the time series data.

@@ -29,12 +29,9 @@ if __name__ == "__main__":
             if len(args.u) != 2: raise ValueError("Insufficient arguments for \"u\" flag!")
             else:
                 speed = int(args.u[0])
-                num_agents = int(args.u[1])
+                density = int(args.u[1])
 
-        try:
-            data = vm.VisualizationDataGroupDynamic.load(args.FILE)
-        except:
-            data = vm.VisualizationDataGroup.load(args.FILE) # TODO: to support legacy class; must remove after upgrade
+        data = vm.VisualizationDataGroupDynamic.load(args.FILE)
 
     else:
         data = vm.VisualizationData(args.FILE)
@@ -43,7 +40,7 @@ if __name__ == "__main__":
     if args.t and not args.g:
         vm.plot_timeseries(target_fill_ratio, sensor_prob, data, args.a)
     elif args.t:
-        v = data.get_viz_data_obj({"num_agents": num_agents, "speed": speed})
+        v = data.get_viz_data_obj({"speed": speed, "density": density})
 
         vm.plot_timeseries(target_fill_ratio, sensor_prob, v, args.a, args.CONV)
 
@@ -54,13 +51,13 @@ if __name__ == "__main__":
         vm.plot_heatmap_vdg(
             data,
             "speed", # row_arg_str
-            [10.0, 15.0, 20.0], # row_keys
-            "num_agents", # col_arg_str
-            [10, 20, 50, 100], # col_keys
-            ["Speed = 10", "Speed = 15", "Speed = 20"], # col_labels
-            ["Num. Agents = 10", "Num. Agents = 20", "Num. Agents = 50", "Num. Agents = 100"], # row_labels
+            [10.0, 15.0, 20.0, 25.0], # row_keys
+            "density", # col_arg_str
+            [1, 2, 5, 10], # col_keys
+            ["Speed = 10 cm/s", "Speed = 15 cm/s", "Speed = 20 cm/s", "Speed = 25 cm/s"], # col_labels
+            ["Density = 1", "Density = 2", "Density = 5", "Density = 10"], # row_labels
             args.CONV,
-            title="Dynamic multi-agent simulation performance (convergence threshold: {0})".format(args.CONV)
+            # title="Dynamic multi-agent simulation performance (convergence threshold: {0})".format(args.CONV)
         )
     elif args.m and args.g and args.u: # plot single heatmap from VisualizationDataGroupDynamic
         v = data.get_viz_data_obj({"num_agents": num_agents, "speed": speed})
