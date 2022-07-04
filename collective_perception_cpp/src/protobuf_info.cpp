@@ -92,12 +92,13 @@ int main(int argc, char **argv)
     std::cout << "\t\t"
               << "Sensor probability range"
               << "\t: "
-              << "[ ";
+              << "[ "
+              << std::fixed;
     for (const float &sp : s.sp_range_)
     {
         std::cout << sp << ", ";
     }
-    std::cout << "]" << std::endl;
+    std::cout << "]" << std::scientific << std::endl;
 
     std::cout << "\t\t"
               << "Number of Packet objects"

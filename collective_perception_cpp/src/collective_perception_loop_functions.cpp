@@ -3,8 +3,19 @@
 void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 {
     // Set robot sensor probabilities
-    BuzzPut(t_vm, "b_prob", b_prob);
-    BuzzPut(t_vm, "w_prob", w_prob);
+    if (b_prob < 0.0 && w_prob < 0.0) // probabilities according to a distribution
+    {
+        float prob = GenerateRandomSensorProbability();
+
+        BuzzPut(t_vm, "b_prob", prob);
+        BuzzPut(t_vm, "w_prob", prob);
+    }
+    else // fixed probabilities
+    {
+
+        BuzzPut(t_vm, "b_prob", b_prob);
+        BuzzPut(t_vm, "w_prob", w_prob);
+    }
 
     // Set robot speed
     BuzzPut(t_vm, "spd", spd);
@@ -34,6 +45,49 @@ void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
     // Store the local values
     ///< @todo: this should probably be done without the body; the brain only cares about the observations and neighbor values, not self
     robot_brain.StoreLocalValuePair(v);
+}
+
+float InitializeRobot::GenerateRandomSensorProbability()
+{
+    // Decode sensor probability; assumption is b_prob = w_prob
+    std::string encoded_str = std::to_string(b_prob);
+
+    // Grab the distribution identifier
+    int id = std::stoi(encoded_str.substr(0, 2));
+
+    // Grab the two parameters
+    auto decode_sp = [](const std::string &str)
+    {
+        if (str[0] == '1')
+        {
+            return std::stof(str) / 1e2;
+        }
+        else
+        {
+            return std::stof(str) / 1e3;
+        }
+    };
+
+    float param_1(decode_sp(encoded_str.substr(3, 3)));
+    float param_2(decode_sp(encoded_str.substr(6, 3)));
+
+    switch (id)
+    {
+    case -2: // uniform distribution
+    {
+        std::uniform_real_distribution<float> dist(param_1, param_2);
+        return dist(generator);
+    }
+
+    case -3: // normal distribution
+    {
+        std::normal_distribution<float> dist(param_1, std::sqrt(param_2));
+        return dist(generator);
+    }
+
+    default:
+        return 0.0;
+    }
 }
 
 void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
@@ -244,7 +298,78 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(sensor_probability_node, "max", max);
         GetNodeAttribute(sensor_probability_node, "steps", steps);
 
-        simulation_parameters_.sp_range_ = GenerateLinspace(min, max, steps);
+        if (steps < 0.0) // distributed robot sensor probabilities within each experiment/trial
+        {
+            /*
+            Since the distribution is for the sensor probability, the possible range is [0.0, 1.0].
+            A 3 decimal point precision is enforced, so the encoding will scale the values up by 1e3;
+            the only exception is for value of 1.000, in which case the scaling is by 1e2 (since the
+            parameter value will not exceed 1.0).
+
+            Encoding output rules:
+                The first element is the negative sign.
+                The second element is either 2 (uniform distribution) or 3 (normal distribution).
+                The third element is the decimal point.
+                The 4th - 6th element indicates the first distribution parameter;
+                    - If 4th element == 1, then the parameter has been scaled by 1e2.
+                    - Otherwise, the parameter has been scaled by 1e3.
+                The 7th - 9th element indicates the second distribution parameter;
+                    - If 7th element == 1, then the parameter has been scaled by 1e2.
+                    - Otherwise, the parameter has been scaled by 1e3.
+
+            Example:
+                encode_distribution(-2, 0.525, 0.975); // this gives -2.525975, which means a uniform distribution
+                                                       // with lower bound 0.525, upper bound 0.975
+
+                encode_distribution(-3, 1.0, 0.4); // this gives -3.100400, which means a normal distribution
+            */
+
+            // Encode distribution parameters into a single float value
+            auto encode_distribution = [](const int &id, const float &param_1, const float &param_2)
+            {
+                // Define lambda function to scale and convert values to string
+                auto scale_and_convert_to_str = [](const float &val)
+                {
+                    float v;
+
+                    // Ensure correct encoding rules
+                    if (val >= 1.0)
+                    {
+                        if (val == 1.0)
+                        {
+                            v = val / 10;
+                        }
+                        else
+                        {
+                            throw std::runtime_error("Invalid distribution parameter value for sensor probability!");
+                        }
+                    }
+                    else
+                    {
+                        v = val;
+                    }
+
+                    // Scale values and convert to string
+                    std::string scaled_val_str = std::to_string(int(std::round(v * 1e3)));
+
+                    // Append leading zeros
+                    if (scaled_val_str.length() < 3)
+                    {
+                        scaled_val_str.insert(0, 3 - scaled_val_str.length(), '0');
+                    }
+
+                    return scaled_val_str;
+                };
+
+                return std::stof(std::to_string(id) + "." + scale_and_convert_to_str(param_1) + scale_and_convert_to_str(param_2));
+            };
+
+            simulation_parameters_.sp_range_.push_back(encode_distribution(steps, min, max));
+        }
+        else // all robots have the same probabilities within each experiment/trial
+        {
+            simulation_parameters_.sp_range_ = GenerateLinspace(min, max, steps);
+        }
 
         // Create pairings for target fill ratios and sensor probabilities
         for (const float &tfr : simulation_parameters_.tfr_range_)
@@ -381,6 +506,23 @@ void CollectivePerceptionLoopFunctions::PostStep()
 
 void CollectivePerceptionLoopFunctions::ComputeStats()
 {
+    // Store mean value for random sensor probabilities if assigned by distribution and if unassigned
+    if (simulation_parameters_.sp_range_[0] < 0.0 &&
+        curr_stats_packet_.sp_mean_values.size() <= trial_counter_)
+    {
+        // Compute the mean value for sensor probability
+        std::vector<float> vals;
+
+        for (auto &kv : *id_brain_map_ptr_)
+        {
+            vals.push_back(kv.second.GetBProb());
+        }
+
+        float mean_val = std::reduce(vals.begin(), vals.end(), 0.0) / vals.size();
+
+        curr_stats_packet_.sp_mean_values.push_back(mean_val);
+    }
+
     // Get all agent values
     auto solver_vals = GetAllSolverValues();
     std::vector<Brain::ValuePair> local = solver_vals[0];
@@ -502,7 +644,6 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
     }
     else // more trials required for the current param set
     {
-
         // Repeat trial
         if (verbose_level_ == "full")
         {
@@ -534,12 +675,15 @@ void CollectivePerceptionLoopFunctions::SaveData()
             (simulation_parameters_.tfr_range_.size() - 1)) +
         "-" +
         round_1000_int_to_str(simulation_parameters_.tfr_range_.back()) + "_sp" +
-        round_1000_int_to_str(simulation_parameters_.sp_range_.front()) + "-" +
         round_1000_int_to_str(
-            (simulation_parameters_.sp_range_.back() - simulation_parameters_.sp_range_.front()) /
-            (simulation_parameters_.sp_range_.size() - 1)) +
+            simulation_parameters_.sp_range_.size() > 1 ? simulation_parameters_.sp_range_.front() : 0.525) + ///< todo: hack to print folder name if uniform distribution is used
         "-" +
-        round_1000_int_to_str(simulation_parameters_.sp_range_.back());
+        round_1000_int_to_str(
+            simulation_parameters_.sp_range_.size() > 1 ? (simulation_parameters_.sp_range_.back() - simulation_parameters_.sp_range_.front()) /
+                                                              (simulation_parameters_.sp_range_.size() - 1)
+                                                        : -0.002) +
+        "-" +
+        round_1000_int_to_str(simulation_parameters_.sp_range_.size() > 1 ? simulation_parameters_.sp_range_.back(): 0.975);
 
     // Create output filename
     std::string output_file_stats, output_file_agent_data;

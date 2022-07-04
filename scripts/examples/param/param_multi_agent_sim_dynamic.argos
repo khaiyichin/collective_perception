@@ -102,7 +102,14 @@
         <collective_perception>
             <arena_tiles tile_count_x="1000" tile_count_y="1000" /> <!-- number of tiles for the arena -->
             <fill_ratio_range min="0.05" max="0.95" steps="19" /> <!-- range of target fill ratios -->
-            <sensor_probability_range min="0.525" max="0.975" steps="19" /> <!-- range of sensor probabilities -->
+            <sensor_probability_range min="0.525" max="0.975" steps="19" />
+            <!--
+                range of sensor probabilities
+                `steps` must be an integer:
+                    - positive, probabilities are spread linearly from min to max
+                    - -2 indicates a uniform distribution with range [`min`, `max`)
+                    - -3 indicates a normal distribution with mean=`min`, variance=`max`
+            -->
             <speed value="10.0" /> <!-- in units of cm/s -->
             <num_trials value="5" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <robot_id prefix="kiv" base_num="0" /> <!-- must match the ones in the arena configuration -->

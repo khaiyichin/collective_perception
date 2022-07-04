@@ -31,6 +31,7 @@ message RepeatedTrialStats // combined agent statistics for repeated trials
     repeated Stats local_vals = 1;
     repeated Stats social_vals = 2;
     repeated Stats informed_vals = 3;
+    repeated float sp_mean_vals = 4 [packed = true];
 }
 
 /*

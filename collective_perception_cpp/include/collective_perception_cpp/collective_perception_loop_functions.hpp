@@ -46,8 +46,13 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
      * @param sensor_prob Initial sensor probability to be assigned to robots
      * @param spd Speed to be assigned to robots
      */
-    InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr, const float &sensor_prob, const float &spd)
-        : id_brain_map_ptr(id_brain_ptr), b_prob(sensor_prob), w_prob(sensor_prob), spd(spd) {}
+    inline InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr, const float &sensor_prob, const float &spd)
+        : id_brain_map_ptr(id_brain_ptr), b_prob(sensor_prob), w_prob(sensor_prob), spd(spd)
+    {
+        // Initialize generator
+        std::random_device rd;
+        generator = std::default_random_engine(rd());
+    }
 
     /**
      * @brief Overload the () operator (used to initialize each robot using BuzzForeachVM())
@@ -57,11 +62,15 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
      */
     virtual void operator()(const std::string &str_robot_id, buzzvm_t t_vm);
 
+    float GenerateRandomSensorProbability();
+
     float b_prob;
 
     float w_prob;
 
     float spd;
+
+    std::default_random_engine generator;
 
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr; ///< Pointer to unordered map containing robot IDs and corresponding Brain instances
 };

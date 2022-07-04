@@ -29,6 +29,7 @@ SimulationStatsSet::SimulationStatsSet(collective_perception_cpp::proto::Simulat
         auto &local_vals_msg = rts_msg_ptr->local_vals();
         auto &social_vals_msg = rts_msg_ptr->social_vals();
         auto &informed_vals_msg = rts_msg_ptr->informed_vals();
+        auto &sp_mean_vals_msg = rts_msg_ptr->sp_mean_vals();
 
         // Iterate through different trials of values
         for (size_t i = 0; i < num_trials_; ++i)
@@ -82,6 +83,11 @@ SimulationStatsSet::SimulationStatsSet(collective_perception_cpp::proto::Simulat
                       std::back_insert_iterator(informed.confidence_sample_std));
 
             packet.repeated_informed_values.push_back(informed);
+
+            // Copy random sensor probability mean values
+            std::copy(sp_mean_vals_msg.begin(),
+                      sp_mean_vals_msg.end(),
+                      std::back_insert_iterator(packet.sp_mean_values));
         }
 
         // Insert populated StatsPacket object
@@ -113,6 +119,9 @@ void SimulationStatsSet::Serialize(collective_perception_cpp::proto::SimulationS
         packet_msg_ptr->set_num_steps(num_steps_);
         packet_msg_ptr->set_density(density_);
         packet_msg_ptr->set_speed(speed_);
+
+        *((stats_packet_msg_ptr->mutable_rts())->mutable_sp_mean_vals()) =
+            {stats_packet_itr->sp_mean_values.begin(), stats_packet_itr->sp_mean_values.end()};
 
         // Store RepeatedTrialStats object for repeated trials
         *(stats_packet_msg_ptr->mutable_rts()) = ExtractRepeatedTrialStatsMsg({stats_packet_itr->repeated_local_values,

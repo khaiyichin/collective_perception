@@ -102,6 +102,8 @@ struct StatsPacket : Packet
     RepeatedTrials<Stats> repeated_social_values; ///< Social values for repeated trials
 
     RepeatedTrials<Stats> repeated_informed_values; ///< Social values for repeated trials
+
+    RepeatedTrials<float> sp_mean_values; ///< mean values for random sensor probabilities
 };
 
 struct AgentDataPacket : Packet

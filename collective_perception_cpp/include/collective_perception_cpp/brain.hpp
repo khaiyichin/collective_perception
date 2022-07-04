@@ -143,6 +143,10 @@ public:
      */
     inline std::string GetId() { return id_; }
 
+    inline float GetBProb() { return b_prob_; }
+
+    inline float GetWProb() { return w_prob_; }
+
     /**
      * @brief Solve values
      *

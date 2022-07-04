@@ -42,7 +42,6 @@ public:
 
     std::string proto_filepath_;
 
-protected:
     template <typename T>
     inline void Deserialize(T &msg)
     {
@@ -81,6 +80,7 @@ protected:
         *(sim_set_msg_ptr->mutable_sp_range()) = {sp_range_.begin(), sp_range_.end()};
     }
 
+protected:
     template <typename T>
     inline T GetPacket(const float &tfr, const float &sp, PacketDict<T> &packets_ref)
     {
