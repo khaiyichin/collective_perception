@@ -48,7 +48,7 @@ class Sim:
         """Class for storing statistics of simulation experiments.
         """
 
-        def __init__(self, sim_type, num_exp=0, num_obs=0, comms_period=1):
+        def __init__(self, sim_type, num_exp=0, num_obs=0, comms_period=1, num_agents=0):
 
             if sim_type == "single" and num_exp != 0 and num_obs != 0:
                 self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
@@ -59,6 +59,11 @@ class Sim:
             elif sim_type == "multi" and num_exp != 0 and num_obs != 0:
                 self.sp_distribution = None
                 self.sp_distributed_sample_mean = np.zeros(num_exp)
+
+                # @todo: temporary hack to show individual robot values; in the future this should be stored
+                # elsewhere
+                self.x = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
+                self.gamma = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
 
                 self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
                 self.alpha_sample_mean = np.zeros( (num_exp, num_obs + 1) )
@@ -314,7 +319,7 @@ class MultiAgentSim(Sim):
         super().__init__(num_exp, num_obs, des_fill_ratio, sim_param_obj.filename_suffix_1)
 
         # Initialize data containers (to be serialized)
-        self.stats = self.SimStats("multi", num_exp, num_obs, comms_period)
+        self.stats = self.SimStats("multi", num_exp, num_obs, comms_period, num_agents)
         if sensor_prob < 0: # not actually the sensor probability; actually encoded distribution
 
             # Decode distribution parameters
@@ -472,6 +477,10 @@ class MultiAgentSim(Sim):
             self.compute_sample_std(e)
 
             self.reset_agents()
+
+        # @todo: clean this up to its own function
+        self.stats.x = self.x
+        self.stats.gamma = self.gamma
 
     def run_sim(self, experiment_index):
 
