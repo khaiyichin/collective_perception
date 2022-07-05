@@ -33,7 +33,7 @@ class Sim:
             self.num_obs = num_obs
             self.b_prob = sensor_prob # P(black|black)
             self.w_prob = sensor_prob # P(white|white)
-            self.comms_graph = None
+            self.comms_network_str = None
             self.comms_period = comms_period
 
             if sim_type == "single":
@@ -349,6 +349,8 @@ class MultiAgentSim(Sim):
     def setup_comms_graph(self, graph_type, comms_prob):
 
         # Add edges depending on the type of graph desired
+        self.sim_data.comms_network_str = graph_type
+
         if graph_type == "full":
             self.sim_data.comms_network = self._create_complete_graph()
         elif graph_type == "line":
@@ -420,6 +422,7 @@ class MultiAgentSim(Sim):
             else:
                 b_sensor_prob = self.sim_data.b_prob
                 w_sensor_prob = self.sim_data.w_prob
+                sensor_probs = [sensor_probs]
 
                 dist_function = None
 
@@ -429,8 +432,10 @@ class MultiAgentSim(Sim):
                                         (self.compute_x, self.compute_fisher))
 
         # @todo hacky solution to replace/update mean sensor probability
-        self.sim_data.b_prob = sensor_probs
-        self.sim_data.w_prob = sensor_probs
+        if self.stats.sp_distribution:
+            self.sim_data.b_prob = sensor_probs
+            self.sim_data.w_prob = sensor_probs
+
         self.stats.sp_distributed_sample_mean = np.mean(sensor_probs, axis=0)
 
         self.sim_data.comms_network.agents_vp = agents_vprop
