@@ -74,7 +74,7 @@ def parse_yaml_param_file(yaml_filepath):
 
     return param_obj
 
-def run_sim_parallel(param_obj, target_fill_ratio):
+def run_sim_parallel_tfr(param_obj, target_fill_ratio):
     print("\nRunning cases with fill ratio = " + str(target_fill_ratio))
 
     outputs = []
@@ -86,6 +86,15 @@ def run_sim_parallel(param_obj, target_fill_ratio):
         outputs.append((target_fill_ratio, p, s.stats, s.sim_data))
 
     return outputs
+
+
+def run_sim_parallel_sp(param_obj, target_fill_ratio, sensor_prob):
+    print("\tRunning case with probability = " + str(sensor_prob) + "... ")
+
+    s = MultiAgentSim(param_obj, target_fill_ratio, sensor_prob)
+    s.run() # run the multi agent simulation
+
+    return (target_fill_ratio, sensor_prob, s.stats, s.sim_data)
 
 if __name__ == "__main__":
 
@@ -107,12 +116,24 @@ if __name__ == "__main__":
 
     # Execute simulated experiments
     if args.p: # parallel simulation runs
-        lst_of_lst_outputs = Parallel(n_jobs=-1, verbose=100)(delayed(run_sim_parallel)(param_obj, f) for f in param_obj.dfr_range)
-        outputs = [output_tup for target_fill_ratio_outputs_lst in lst_of_lst_outputs
-                   for output_tup in target_fill_ratio_outputs_lst]
 
-        # Insert the simulation object into the data object
-        [data.insert_sim_obj(o[0], o[1], o[2], o[3]) for o in outputs]
+        if len(param_obj.dfr_range) == 1: # in the case when there's only one specific target fill ratio case
+
+            tfr = param_obj.dfr_range[0]
+
+            print("\nRunning cases with fill ratio = " + str(tfr))
+
+            lst_of_outputs = Parallel(n_jobs=-1, verbose=100)(delayed(run_sim_parallel_sp)(param_obj, tfr, sp) for sp in param_obj.sp_range)
+
+            [data.insert_sim_obj(output[0], output[1], output[2], output[3]) for output in lst_of_outputs]
+
+        else:
+            lst_of_lst_outputs = Parallel(n_jobs=-1, verbose=100)(delayed(run_sim_parallel_tfr)(param_obj, f) for f in param_obj.dfr_range)
+            outputs = [output_tup for target_fill_ratio_outputs_lst in lst_of_lst_outputs
+                    for output_tup in target_fill_ratio_outputs_lst]
+
+            # Insert the simulation object into the data object
+            [data.insert_sim_obj(o[0], o[1], o[2], o[3]) for o in outputs]
 
     else: # sequential simulation runs
         start = timeit.default_timer()

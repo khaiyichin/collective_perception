@@ -422,7 +422,7 @@ class MultiAgentSim(Sim):
             else:
                 b_sensor_prob = self.sim_data.b_prob
                 w_sensor_prob = self.sim_data.w_prob
-                sensor_probs = [sensor_probs]
+                sensor_probs = [b_sensor_prob]
 
                 dist_function = None
 
