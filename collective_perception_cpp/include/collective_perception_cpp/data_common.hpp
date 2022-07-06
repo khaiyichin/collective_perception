@@ -66,11 +66,11 @@ struct Packet
 
     float comms_range;
 
-    float target_fill_ratio;
+    double target_fill_ratio;
 
-    float b_prob;
+    double b_prob;
 
-    float w_prob;
+    double w_prob;
 
     unsigned int num_agents;
 
@@ -91,11 +91,12 @@ struct StatsPacket : Packet
 
     /**
      * @brief Construct a new StatsPacket object
-     * 
+     *
      * @param n Number of trials
      */
     inline StatsPacket(const unsigned int &n)
-        : repeated_local_values(n), repeated_social_values(n), repeated_informed_values(n) {}
+        : repeated_local_values(n), repeated_social_values(n), repeated_informed_values(n),
+          agent_informed_estimate(n, std::vector<std::vector<float>>()), agent_informed_confidence(n, std::vector<std::vector<float>>()) {}
 
     RepeatedTrials<Stats> repeated_local_values; ///< Local values for repeated trials
 
@@ -104,6 +105,11 @@ struct StatsPacket : Packet
     RepeatedTrials<Stats> repeated_informed_values; ///< Social values for repeated trials
 
     RepeatedTrials<float> sp_mean_values; ///< mean values for random sensor probabilities
+
+    // @todo need to find a better way to store these values
+    RepeatedTrials<std::vector<std::vector<float>>> agent_informed_estimate; ///< (num_trials, num_agents, num_observations+1) vector of vector of vectors
+
+    RepeatedTrials<std::vector<std::vector<float>>> agent_informed_confidence; ///< (num_trials, num_agents, num_observations+1) vector of vector of vectors
 };
 
 struct AgentDataPacket : Packet
@@ -112,7 +118,7 @@ struct AgentDataPacket : Packet
 
     /**
      * @brief Construct a new AgentDataPacket object
-     * 
+     *
      * @param n Number of trials
      * @param m Number of agents
      */

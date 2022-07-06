@@ -401,30 +401,26 @@ class MultiAgentSim(Sim):
         sensor_probs = []
 
         for vertex in self.sim_data.comms_network.graph.get_vertices():
-            if self.sim_data.b_prob == UNIFORM_DIST_SP_ENUM:
+            if self.sim_data.b_prob == UNIFORM_DIST_SP_ENUM: # sensor probability is an encoded value for a uniform distributed sensor probability
                 b_sensor_prob = ( (self.dist_params[1] - self.dist_params[0]) * self.generator.random(self.num_exp) + self.dist_params[0] ).tolist()
                 w_sensor_prob = b_sensor_prob
 
                 sensor_probs.append(b_sensor_prob)
 
                 self.stats.sp_distribution = "uniform"
-                dist_function = self.generator.random()
 
-            elif self.sim_data.b_prob == NORMAL_DIST_SP_ENUM:
+            elif self.sim_data.b_prob == NORMAL_DIST_SP_ENUM: # sensor probability is an encoded value for a normal distributed sensor probability
                 b_sensor_prob = ( self.generator.normal(self.dist_params[0], np.sqrt(self.dist_params[1]), self.num_exp) ).tolist()
                 w_sensor_prob = b_sensor_prob
 
                 sensor_probs.append(b_sensor_prob)
 
                 self.stats.sp_distribution = "normal"
-                dist_function = self.generator.normal()
 
-            else:
+            else: # homogeneous sensor probability
                 b_sensor_prob = self.sim_data.b_prob
                 w_sensor_prob = self.sim_data.w_prob
                 sensor_probs = [b_sensor_prob]
-
-                dist_function = None
 
             agents_vprop[vertex] = Agent(b_sensor_prob, w_sensor_prob,
                                         (self.compute_x_hat, self.compute_fisher_hat),

@@ -36,9 +36,9 @@ public:
 
     float speed_;
 
-    std::vector<float> tfr_range_;
+    std::vector<double> tfr_range_;
 
-    std::vector<float> sp_range_;
+    std::vector<double> sp_range_;
 
     std::string proto_filepath_;
 
@@ -104,8 +104,7 @@ protected:
     inline void InsertPacket(const T &packet, PacketDict<T> &packets_ref)
     {
         int tfr_internal = RoundToMultiple(ConvertToInternalUnits(packet.target_fill_ratio), 5);
-        int sp_internal = RoundToMultiple(ConvertToInternalUnits(packet.b_prob), 5);
-
+        int sp_internal =  packet.b_prob < 0.0 ? packet.b_prob : RoundToMultiple(ConvertToInternalUnits(packet.b_prob), 5);
         packets_ref[tfr_internal][sp_internal] = packet;
     }
 

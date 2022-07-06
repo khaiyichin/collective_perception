@@ -120,13 +120,48 @@ void SimulationStatsSet::Serialize(collective_perception_cpp::proto::SimulationS
         packet_msg_ptr->set_density(density_);
         packet_msg_ptr->set_speed(speed_);
 
-        *((stats_packet_msg_ptr->mutable_rts())->mutable_sp_mean_vals()) =
-            {stats_packet_itr->sp_mean_values.begin(), stats_packet_itr->sp_mean_values.end()};
+        // Store agent informed values into SwarmInformedValues messages
+        std::vector<SIVProtoMsg> siv_msg_vec(num_trials_);
+
+        for (size_t i = 0; i < num_trials_; ++i)
+        {
+            SIVProtoMsg siv_msg; // SwarmInformedValues message
+            std::vector<AIVProtoMsg> aiv_msg_vec(num_agents_);
+
+            // Define lambda function to populate AgentInformedValues message
+            auto lambda = [](const std::vector<float> &agent_estimates, const std::vector<float> &agent_confidences)
+            {
+                AIVProtoMsg output_aiv_msg;
+                *(output_aiv_msg.mutable_x()) = {agent_estimates.begin(), agent_estimates.end()};
+                *(output_aiv_msg.mutable_conf()) = {agent_confidences.begin(), agent_confidences.end()};
+
+                return output_aiv_msg;
+            };
+
+            // Apply lambda function to populate protobuf message
+            std::transform(
+                stats_packet_itr->agent_informed_estimate[i].begin(),
+                stats_packet_itr->agent_informed_estimate[i].end(),
+                stats_packet_itr->agent_informed_confidence[i].begin(),
+                aiv_msg_vec.begin(),
+                lambda);
+
+            *(siv_msg.mutable_agent_informed_vals()) = {aiv_msg_vec.begin(), aiv_msg_vec.end()};
+            siv_msg_vec[i] = siv_msg;
+        }
 
         // Store RepeatedTrialStats object for repeated trials
         *(stats_packet_msg_ptr->mutable_rts()) = ExtractRepeatedTrialStatsMsg({stats_packet_itr->repeated_local_values,
                                                                                stats_packet_itr->repeated_social_values,
                                                                                stats_packet_itr->repeated_informed_values});
+
+        // Store average sensor probability values
+        *((stats_packet_msg_ptr->mutable_rts())->mutable_sp_mean_vals()) =
+            {stats_packet_itr->sp_mean_values.begin(), stats_packet_itr->sp_mean_values.end()};
+
+        // Store agent informed values
+        *(stats_packet_msg_ptr->mutable_rts()->mutable_swarm_informed_vals()) =
+            {siv_msg_vec.begin(), siv_msg_vec.end()};
     }
 }
 

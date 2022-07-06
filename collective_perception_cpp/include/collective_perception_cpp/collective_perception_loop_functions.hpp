@@ -46,7 +46,7 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
      * @param sensor_prob Initial sensor probability to be assigned to robots
      * @param spd Speed to be assigned to robots
      */
-    inline InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr, const float &sensor_prob, const float &spd)
+    inline InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr, const double &sensor_prob, const float &spd)
         : id_brain_map_ptr(id_brain_ptr), b_prob(sensor_prob), w_prob(sensor_prob), spd(spd)
     {
         // Initialize generator
@@ -64,9 +64,9 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
 
     float GenerateRandomSensorProbability();
 
-    float b_prob;
+    double b_prob;
 
-    float w_prob;
+    double w_prob;
 
     float spd;
 
@@ -197,9 +197,9 @@ private:
 
     std::pair<float, float> arena_lower_lim_;
 
-    std::vector<std::pair<float, float>> tfr_sp_ranges_;
+    std::vector<std::pair<double, double>> tfr_sp_ranges_;
 
-    std::vector<std::pair<float, float>>::iterator curr_tfr_sp_range_itr_;
+    std::vector<std::pair<double, double>>::iterator curr_tfr_sp_range_itr_;
 
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr_ = std::make_shared<RobotIdBrainMap>(); ///< Pointer to unordered map containing robot IDs and Brain instances
 

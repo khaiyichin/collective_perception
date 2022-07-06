@@ -83,7 +83,7 @@ int main(int argc, char **argv)
               << "Target fill ratio range"
               << "\t\t: "
               << "[ ";
-    for (const float &tfr : s.tfr_range_)
+    for (const double &tfr : s.tfr_range_)
     {
         std::cout << tfr << ", ";
     }
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
               << "\t: "
               << "[ "
               << std::fixed;
-    for (const float &sp : s.sp_range_)
+    for (const double &sp : s.sp_range_)
     {
         std::cout << sp << ", ";
     }

@@ -12,6 +12,8 @@ using RTStatsProtoMsg = collective_perception_cpp::proto::RepeatedTrialStats;
 using StatsProtoMsg = collective_perception_cpp::proto::RepeatedTrialStats::Stats;
 using SimSetMsg = collective_perception_cpp::proto::SimulationSet;
 using PacketMsg = collective_perception_cpp::proto::Packet;
+using SIVProtoMsg = collective_perception_cpp::proto::RepeatedTrialStats::SwarmInformedValues;
+using AIVProtoMsg = collective_perception_cpp::proto::RepeatedTrialStats::AgentInformedValues;
 
 /**
  * @brief Class to store all statistics from all the experiments

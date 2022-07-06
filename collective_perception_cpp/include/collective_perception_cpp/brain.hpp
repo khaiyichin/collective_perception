@@ -68,7 +68,7 @@ public:
          * @brief Construct a new Solver object
          *
          */
-        Solver() {}
+        Solver() : local_vals(ValuePair(0.5, 0.0)) {}
 
         /**
          * @brief Solve for local values

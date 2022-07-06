@@ -210,7 +210,10 @@ class VisualizationData:
             stats_obj.x_bar_sample_mean, stats_obj.rho_sample_mean, stats_obj.x_bar_sample_std, stats_obj.rho_sample_std = zip(*repeated_trial_social_vals)
             stats_obj.x_sample_mean, stats_obj.gamma_sample_mean, stats_obj.x_sample_std, stats_obj.gamma_sample_std = zip(*repeated_trial_informed_vals)
 
-
+            # Extract x and conf and sp_mean_vals
+            stats_obj.sp_distributed_sample_mean = stats_packet.rts.sp_mean_vals # why mean vals, not just one value?
+            agent_informed_est = [[a.x for a in siv.agent_informed_vals] for siv in stats_packet.rts.swarm_informed_vals]
+            agent_informed_conf = [[a.conf for a in siv.agent_informed_vals] for siv in stats_packet.rts.swarm_informed_vals]
 
             #### TODO NEED FIXING: REMOVE AFTER LEGACY DATA IS FIXED (RE-REPLICATED WITH UPDATED PROGRAM) ####
             # Temporary fix to bug that computes additional value in the beginning
@@ -265,6 +268,10 @@ class VisualizationData:
             stats_obj.gamma_sample_mean = np.array( [*stats_obj.gamma_sample_mean] )
             stats_obj.x_sample_std = np.array( [*stats_obj.x_sample_std] )
             stats_obj.gamma_sample_std = np.array( [*stats_obj.gamma_sample_std] )
+
+            stats_obj.sp_distributed_sample_mean = np.asarray(stats_obj.sp_distributed_sample_mean)
+            stats_obj.x = np.asarray(agent_informed_est) # (num_trials, num_agents, num_steps) ndarray
+            stats_obj.gamma = np.asarray(agent_informed_conf) # (num_trials, num_agents, num_steps) ndarray
 
             sim_stats_set_msg.stats_obj_dict[np.round(stats_packet.packet.tfr, 3)][np.round(stats_packet.packet.b_prob, 3)] = stats_obj
 
@@ -323,7 +330,8 @@ class VisualizationData:
 
             self.agg_stats_dict[dfr_key] = temp_dict
 
-    def detect_convergence(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH):
+    # @todo modify this method to compute based on input of informed curve(s), not to compute all values!
+    def detect_convergence(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=True, individual=False):
         """Compute the point in time when convergence is achieved.
 
         This computes the convergence timestep (# of observations) for the local, social,
@@ -334,16 +342,12 @@ class VisualizationData:
             target_fill_ratio: The target fill ratio used in the simulation.
             sensor_prob: The sensor probability used in the simulation.
             threshold: A float parametrizing the difference threshold.
+            aggregate: Flag to choose whether to compute for aggregate data.
 
         Returns:
-            The 3 indices at which convergence criterion is achieved.
+            The 3 indices at which convergence criterion is achieved. If `aggregate` == True, each of the 3
+            outputs is a scalar; otherwise, they are lists of indices.
         """
-
-        curves = [
-            self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean, # length of self.num_obs + 1
-            self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean, # length of self.num_obs / self.comms_period + 1
-            self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean, # length of self.num_obs / self.comms_period + 1
-        ]
 
         """
         Methodology in computing convergence:
@@ -367,12 +371,48 @@ class VisualizationData:
                 if running_ind == len(curve): # found it or it's the last point
                     return ref_ind
 
-        # Go through all the curves
-        conv_ind = Parallel(n_jobs=3, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves)
+        # Check type of curve to compute
+        if aggregate and not individual:
+            curves = [
+                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean, # length of self.num_obs + 1
+                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean, # length of self.num_obs / self.comms_period + 1
+                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean, # length of self.num_obs / self.comms_period + 1
+            ]
+
+            # Go through all the curves
+            conv_ind = Parallel(n_jobs=3, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves)
+
+        elif individual and not aggregate: # @todo: only computing for informed estimate!
+
+            # Split the curve by trials; each element in trial_curves is a (num_agents, num_obs+1) ndarray
+            curves = [*self.stats_obj_dict[target_fill_ratio][sensor_prob].x] # curves is a array of num_exp elements
+
+            # Go through all the curves
+            conv_ind = [None for i in range(self.num_exp)]
+
+            for ind, curves in enumerate(curves):
+                conv_ind[ind] = Parallel(n_jobs=-1, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves)
+
+            return conv_ind # @todo: this is a temporary hack! must remove to outside of statement
+
+        elif not aggregate and not individual:
+            curves = [
+                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_hat_sample_mean, # (num_exp, num_obs+1) ndarray
+                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_bar_sample_mean, # (num_exp, num_obs+1) ndarray
+                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_sample_mean, # (num_exp, num_obs+1) ndarray
+            ]
+
+            # Go through all the curves
+            conv_ind = [None, None, None]
+
+            conv_ind[0] = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[0])
+            conv_ind[1] = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[1])
+            conv_ind[2] = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[2])
 
         return conv_ind[0], conv_ind[1], conv_ind[2]
 
-    def compute_accuracy(self, target_fill_ratio: float, sensor_prob: float, conv_ind_lst=None):
+    # @todo: modify this equation to compute accuracy based on input curve(s)
+    def compute_accuracy(self, target_fill_ratio: float, sensor_prob: float, conv_ind_lst=None, aggregate=True):
         """Compute the estimate accuracy with respect to the target fill ratio.
 
         If the list of convergence indices is not provided, then convergence indices will be
@@ -383,36 +423,57 @@ class VisualizationData:
             target_fill_ratio: The target fill ratio used in the simulation.
             sensor_prob: The sensor probability used in the simulation.
             conv_ind_lst: The list of 3 convergence indices.
+            aggregate: Flag to choose whether to compute for aggregate data.
 
         Returns:
-            The 3 accuracies.
+            The 3 accuracies. If `aggregate` == True, each of the 3 outputs is a scalar; otherwise,
+            they are lists of accuracies.
         """
 
         if conv_ind_lst is None:
-            conv_ind_lst = self.detect_convergence(target_fill_ratio, sensor_prob)
+            conv_ind_lst = self.detect_convergence(target_fill_ratio, sensor_prob, aggregate)
 
-        acc_x_hat = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean[conv_ind_lst[0]] - target_fill_ratio)
-        acc_x_bar = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean[conv_ind_lst[1]] - target_fill_ratio)
-        acc_x = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean[conv_ind_lst[2]] - target_fill_ratio)
+        if aggregate:
+            acc_x_hat = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean[conv_ind_lst[0]] - target_fill_ratio)
+            acc_x_bar = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean[conv_ind_lst[1]] - target_fill_ratio)
+            acc_x = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean[conv_ind_lst[2]] - target_fill_ratio)
+
+        else:
+            acc_x_hat = [
+                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_hat_sample_mean[ind][conv_ind] - target_fill_ratio)
+                for ind, conv_ind in enumerate(conv_ind_lst[0])
+            ]
+            acc_x_bar = [
+                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_bar_sample_mean[ind][conv_ind] - target_fill_ratio)
+                for ind, conv_ind in enumerate(conv_ind_lst[1])
+            ]
+            acc_x = [
+                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_sample_mean[ind][conv_ind] - target_fill_ratio)
+                for ind, conv_ind in enumerate(conv_ind_lst[2])
+            ]
 
         return acc_x_hat, acc_x_bar, acc_x
 
-    def get_informed_estimate_metrics(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH):
+    def get_informed_estimate_metrics(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=True):
         """Get the accuracy and convergence of informed estimates.
 
         Args:
             target_fill_ratio: The target fill ratio used in the simulations.
             sensor_prob: The sensor probability used in the simulation.
             threshold: A float parametrizing the difference threshold.
+            aggregate: Flag to choose whether to compute for aggregate data.
 
         Returns:
             A tuple of convergence (taking communication period into account) and accuracy values for the informed estimate.
         """
 
-        conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold)
-        acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst)
+        # conv_lst = self.detect_convergence(curve) @todo abstract implementation of detect_convergence
+        conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold, aggregate)
+        acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst, aggregate)
 
-        return conv_lst[2]*self.comms_period, acc_lst[2]
+        conv_output = conv_lst[2]*self.comms_period if aggregate else [i*self.comms_period for i in conv_lst[2]]
+
+        return conv_output, acc_lst[2]
 
 class VisualizationDataGroupBase(ABC):
 
@@ -847,22 +908,18 @@ def convert_to_img(heatmap_ndarr: np.ndarray, limits: list, active_channels = [0
         The same heatmap normalized and axis-flipped to an image with (m,n,3) dimensions.
     """
 
-    def normalize(arr, min_val, max_val):
-        arr_range = max_val - min_val
-        return ( arr_range - ( arr - min_val ) ) / arr_range
-
     if 0 in active_channels:
-        channel_0 = normalize(heatmap_ndarr[0], limits[0][0], limits[0][1])
+        channel_0 = normalize(heatmap_ndarr[0], limits[0][0], limits[0][1], True)
         assert (np.all(channel_0 <= 1.0) and np.all(channel_0 >= 0.0)), "Normalized channel 0 values exceed [0.0, 1.0] range"
     else: channel_0 = np.zeros(heatmap_ndarr[0].shape)
 
     if 1 in active_channels:
-        channel_1 = normalize(heatmap_ndarr[1], limits[1][0], limits[1][1])
+        channel_1 = normalize(heatmap_ndarr[1], limits[1][0], limits[1][1], True)
         assert (np.all(channel_1 <= 1.0) and np.all(channel_1 >= 0.0)), "Normalized channel 1 values exceed [0.0, 1.0] range"
     else: channel_1 = np.zeros(heatmap_ndarr[1].shape)
 
     if 2 in active_channels:
-        channel_2 = normalize(heatmap_ndarr[2], limits[2][0], limits[2][1])
+        channel_2 = normalize(heatmap_ndarr[2], limits[2][0], limits[2][1], True)
         assert (np.all(channel_2 <= 1.0) and np.all(channel_2 >= 0.0)), "Normalized channel 2 values exceed [0.0, 1.0] range"
     else: channel_2 = np.zeros(heatmap_ndarr[2].shape)
 
@@ -958,7 +1015,104 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
 
     return fig, ax, im
 
-def plot_scatter()
+def plot_scatter(data_obj: VisualizationDataGroupBase, threshold: float, args):
+
+    fig_size = (8,5)
+    fig, ax_lst = plt.subplots(1, 2, tight_layout=True, figsize=fig_size, dpi=175, gridspec_kw={"width_ratios": [7, 1]})
+
+    if isinstance(data_obj, VisualizationDataGroupStatic):
+        period = args["comms_period"]
+        n = args["num_agents"]
+        tfr = args["tfr"]
+        sp = args["sp"]
+
+        # Get VisualizationData object
+        v = data_obj.get_viz_data_obj({"comms_period": period, "num_agents": n, "comms_prob": 1.0})
+
+        # Get performance metrics for all trials
+        conv_min = np.inf
+        conv_max = -np.inf
+        acc_min = np.inf
+        acc_max = -np.inf
+
+        if isinstance(tfr, list): # sp is fixed
+            manipulated_var = tfr
+            fixed = "sp"
+
+        else: # tfr is fixed
+            manipulated_var = sp
+            fixed = "tfr"
+
+        # Create the scatter plots
+        for ind, var in enumerate(manipulated_var):
+
+            if fixed == "sp":
+                conv_lst, acc_lst = v.get_informed_estimate_metrics(var, sp, threshold, False)
+            elif fixed == "tfr":
+                conv_lst, acc_lst = v.get_informed_estimate_metrics(tfr, var, threshold, False)
+
+            # Compute minimum and maximum values
+            conv_min = np.amin([conv_min, np.amin(conv_lst)])
+            conv_max = np.amax([conv_max, np.amax(conv_lst)])
+            acc_min = np.amin([acc_min, np.amin(acc_lst)])
+            acc_max = np.amax([acc_max, np.amax(acc_lst)])
+
+            conv_norm = normalize(np.asarray(conv_lst), 0, v.num_obs)
+            # acc_norm = normalize(np.asarray(acc_lst), 0, ACC_ABS_MAX)
+
+            scatter([conv_norm, acc_lst], [ind]*len(conv_lst), ax_lst[0], vmin=0, vmax=len(sp)-1)
+
+        print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
+        print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
+
+    elif isinstance(data_obj, VisualizationDataGroupDynamic):
+        pass
+    else:
+        raise RuntimeError("Unknown `data_obj` type!")
+
+    ax_lst[0].set_xlabel("Normalized Convergence")
+    ax_lst[0].set_ylabel("Absolute Error")
+    ax_lst[0].set_xlim(0, 1.0)
+    ax_lst[0].set_ylim(0, 0.175)
+
+    ax_lst[0].grid()
+
+    # Create color bar
+    color_bar_img = list(zip(*[list(range(len(manipulated_var)))])) # size of len(manipulated_var) x 1 list
+    ax_lst[1].imshow(color_bar_img, aspect=2, cmap="nipy_spectral")
+
+    # Modify tick labels
+    ax_lst[1].yaxis.set_label_position("right")
+    ax_lst[1].yaxis.tick_right()
+    ax_lst[1].set_xticks([])
+    ax_lst[1].set_yticks(list(range(len(manipulated_var))), manipulated_var, fontsize=10)
+
+    if fixed == "tfr":
+        ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=10)
+        filename_param = "tfr{0}".format(int(tfr*1e3))
+    elif fixed == "sp":
+        ax_lst[1].set_ylabel("Target fill ratios", fontsize=10)
+        filename_param = "tfr{0}".format(int(sp*1e3))
+
+    # Save the scatter plot
+    if isinstance(data_obj, VisualizationDataGroupDynamic):
+        data_obj_type = "dyn"
+        filename_param += "_"
+    else:
+        data_obj_type = "sta"
+        filename_param += "_prd{0}_cprob{1}_agt{2}".format(period, 1, n)
+    fig.savefig(
+        "/home/khaiyichin/scatter_" +
+        data_obj_type +
+        "_" +
+        "conv{0}_s{1}_t{2}_{3}".format(int(np.round(threshold*1e3 ,3)), v.num_obs, v.num_exp, filename_param)+".png", bbox_inches="tight", dpi=300)
+
+def scatter(scatter_data, scatter_data_id: int, ax=None, vmin=None, vmax=None):
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        ax.scatter(scatter_data[0], scatter_data[1], c=scatter_data_id, cmap="nipy_spectral", vmin=vmin, vmax=vmax)
 
 def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False, convergence_thresh=CONV_THRESH):
     """Plot the time series data.
@@ -1104,6 +1258,52 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     adjust_subplot_legend_and_axis(fig_x_hat, ax_x_hat)
     adjust_subplot_legend_and_axis(fig_x_bar, ax_x_bar)
     adjust_subplot_legend_and_axis(fig_x, ax_x)
+
+def plot_individual_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, convergence_thresh=CONV_THRESH):
+
+    # Create figure and axes handles
+    fig_lst = [None for i in range(data_obj.num_exp)]
+    ax_lst = [None for i in range(data_obj.num_exp)]
+
+    abscissa_values_x = list(range(0, data_obj.num_obs + 1*data_obj.comms_period, data_obj.comms_period))
+
+    # Compute convergence
+    conv_lst = data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh, False, True)
+
+    # Plot data
+    for i in range(data_obj.num_exp):
+
+        fig_lst[i], ax_lst[i] = plt.subplots(2, sharex=True)
+        fig_lst[i].set_size_inches(8,6)
+
+        stats_obj = data_obj.stats_obj_dict[target_fill_ratio][sensor_prob]
+
+        # Plot time evolution of informed estimates and confidences by iterating through agents
+        for j in range(data_obj.num_agents):
+            traj_x = ax_lst[i][0].plot(abscissa_values_x, stats_obj.x[i][j]) # draw estimate trajectory
+            ax_lst[i][0].axvline(abscissa_values_x[conv_lst[i][j]], color=traj_x[0].get_c(), linestyle=":") # draw convergence line
+
+            traj_conf = ax_lst[i][1].plot(abscissa_values_x, stats_obj.gamma[i][j]) # draw confidence trajectory
+            ax_lst[i][0].axvline(abscissa_values_x[conv_lst[i][j]], color=traj_conf[0].get_c(), linestyle=":") # draw convergence line
+
+        # Set axis properties
+        ax_lst[i][0].set_title("{0} agents' informed values (fill ratio: {1}, sensor: {2})".format(data_obj.num_agents, target_fill_ratio, sensor_prob))
+        ax_lst[i][0].set_ylabel("Informed estimates")
+        ax_lst[i][0].set_ylim(0, 1.0)
+        ax_lst[i][1].set_ylim(10e-3, 10e5)
+        ax_lst[i][1].set_ylabel("Informed confidences")
+        ax_lst[i][1].set_xlabel("Observations")
+        ax_lst[i][1].set_yscale("log")
+
+        # Turn on grid lines
+        activate_subplot_grid_lines(ax_lst[i])
+
+        # Adjust legend location and plot sizes
+        # adjust_subplot_legend_and_axis(fig_x, ax_lst[i])
+
+def normalize(arr, min_val, max_val, flip=False):
+    arr_range = max_val - min_val
+    return ( arr_range - ( arr - min_val ) ) / arr_range if flip else ( arr - min_val ) / arr_range
 
 def compute_std_bounds(mean_val, std_val):
     return [ np.add(mean_val, std_val),  np.subtract(mean_val, std_val) ]
