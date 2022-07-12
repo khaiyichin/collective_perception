@@ -9,6 +9,8 @@ from datetime import datetime
 import warnings
 from joblib import Parallel, delayed
 from abc import ABC, abstractmethod
+import argparse
+import timeit
 
 from sim_modules import ExperimentData, Sim
 import simulation_set_pb2
@@ -388,10 +390,10 @@ class VisualizationData:
             curves = [*self.stats_obj_dict[target_fill_ratio][sensor_prob].x] # curves is a array of num_exp elements
 
             # Go through all the curves
-            conv_ind = [None for i in range(self.num_exp)]
+            conv_ind = [None for i in range(self.num_exp)] # ends up being (num_exp, num_agents, 1) size
 
-            for ind, curves in enumerate(curves):
-                conv_ind[ind] = Parallel(n_jobs=-1, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves)
+            for ind, agt_curves in enumerate(curves):
+                conv_ind[ind] = Parallel(n_jobs=-1, verbose=0)(delayed(parallel_inner_loop)(c) for c in agt_curves)
 
             return conv_ind # @todo: this is a temporary hack! must remove to outside of statement
 
@@ -454,7 +456,7 @@ class VisualizationData:
 
         return acc_x_hat, acc_x_bar, acc_x
 
-    def get_informed_estimate_metrics(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=True):
+    def get_informed_estimate_metrics(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=False):
         """Get the accuracy and convergence of informed estimates.
 
         Args:
@@ -474,6 +476,54 @@ class VisualizationData:
         conv_output = conv_lst[2]*self.comms_period if aggregate else [i*self.comms_period for i in conv_lst[2]]
 
         return conv_output, acc_lst[2]
+
+    def get_individual_informed_estimate_metrics(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH):
+
+        conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold, aggregate=False, individual=True) # (num_exp, num_agents, 1) size
+        acc_output = [] # should end up as (num_exp, num_agents, 1) size
+
+        for trial_ind in range(self.num_exp):
+            err = [
+                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x[trial_ind][agt_ind][agt_conv_ind] - target_fill_ratio)
+                        for agt_ind, agt_conv_ind in enumerate(conv_lst)
+            ]
+            acc_output.append(err[0])
+
+        conv_output = [[agt_conv_ind*self.comms_period for agt_conv_ind in trial] for trial in conv_lst]
+
+        return conv_output, acc_output
+
+    def save(self, filepath=None, curr_time=None):
+        """Serialize the class into a pickle.
+        """
+
+        # Get current time
+        if curr_time is None:
+            curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
+
+        if filepath:
+            root, ext = os.path.splitext(filepath)
+            save_path = root + "_" + curr_time + ext
+        else:
+            save_path = "viz_data_" + curr_time + ".pkl"
+
+        with open(save_path, "wb") as fopen:
+            pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
+
+        print("\nSaved VisualizationData object at: {0}.\n".format( os.path.abspath(save_path) ) )
+
+    @classmethod
+    def load(cls, filepath):
+        """Load pickled data.
+        """
+
+        with open(filepath, "rb") as fopen:
+            obj = pickle.load(fopen)
+
+        # Verify the unpickled object
+        assert isinstance(obj, cls)
+
+        return obj
 
 class VisualizationDataGroupBase(ABC):
 
@@ -502,6 +552,26 @@ class VisualizationDataGroupBase(ABC):
         """Get VisualizationData object.
         """
         raise NotImplementedError("get_viz_data_obj function not implemented.")
+
+    def get_tfr_range(self):
+
+        # Get the first VisualizationData object
+        viz_data_obj = list(self.viz_data_obj_dict.values())[0]
+
+        while not isinstance(viz_data_obj, VisualizationData):
+            viz_data_obj = list(self.viz_data_obj_dict.values())[0]
+
+        return viz_data_obj.dfr_range
+
+    def get_sp_range(self):
+
+        # Get the first VisualizationData object
+        viz_data_obj = list(self.viz_data_obj_dict.values())[0]
+
+        while not isinstance(viz_data_obj, VisualizationData):
+            viz_data_obj = list(self.viz_data_obj_dict.values())[0]
+
+        return viz_data_obj.sp_range
 
     @abstractmethod
     def save(self, filepath=None, curr_time=None):
@@ -543,7 +613,7 @@ class VisualizationDataGroupStatic(VisualizationDataGroupBase):
         data_folder: A string specifying the directory containing all the ExperimentData files.
     """
 
-    def __init__(self, data_folder):
+    def __init__(self, data_folder=""):
 
         super().__init__(data_folder, ".pkl")
 
@@ -575,11 +645,8 @@ class VisualizationDataGroupStatic(VisualizationDataGroupBase):
         Returns:
             A VisualizationData object for the specified inputs.
         """
-        comms_period = args["comms_period"]
-        comms_prob = args["comms_prob"]
-        num_agents = args["num_agents"]
 
-        return self.viz_data_obj_dict[comms_period][comms_prob][num_agents]
+        return self.viz_data_obj_dict[ args["comms_period"] ][ args["comms_prob"] ][ args["num_agents"] ]
 
     def save(self, filepath=None, curr_time=None):
         """Serialize the class into a pickle.
@@ -600,10 +667,6 @@ class VisualizationDataGroupStatic(VisualizationDataGroupBase):
 
         print( "\nSaved VisualizationDataGroupStatic object containing {0} items at: {1}.\n".format( self.stored_obj_counter, os.path.abspath(save_path) ) )
 
-# TODO: legacy class; must remove after upgrade complete
-class VisualizationDataGroup(VisualizationDataGroupStatic):
-    pass
-
 class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
     """Class to store VisualizationData objects for dynamic simulations.
 
@@ -613,9 +676,10 @@ class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
 
     This class is intended to store VisualizationData objects with the same:
         - number of experiments,
+        - number of agents,
     and with varying:
         - robot speed, and
-        - number of agents.
+        - swarm density.
     The target fill ratios and sensor probabilities are already varied (with fixed ranges) in the
     stored VisualizationData objects.
 
@@ -651,10 +715,8 @@ class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
         Returns:
             A VisualizationData object for the specified inputs.
         """
-        speed = args["speed"]
-        density = args["density"]
 
-        return self.viz_data_obj_dict[speed][density]
+        return self.viz_data_obj_dict[ args["speed"] ][ args["density"] ]
 
     def save(self, filepath=None, curr_time=None):
         """Serialize the class into a pickle.
@@ -881,7 +943,7 @@ def generate_combined_heatmap_data(v: VisualizationData, threshold: float, order
 
         for sp in v.sp_range:
 
-            tup = v.get_informed_estimate_metrics(tfr, sp, threshold)
+            tup = v.get_informed_estimate_metrics(tfr, sp, threshold, True)
             conv_layer_row.append(tup[0])
             acc_layer_row.append(tup[1])
 
@@ -1015,67 +1077,98 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
 
     return fig, ax, im
 
-def plot_scatter(data_obj: VisualizationDataGroupBase, threshold: float, args):
+def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual=True):
 
-    fig_size = (8,5)
-    fig, ax_lst = plt.subplots(1, 2, tight_layout=True, figsize=fig_size, dpi=175, gridspec_kw={"width_ratios": [7, 1]})
+    # Define variables depending on individual vs. average and static vs. dynamic
+    if individual:
+        informed_est_method = data_obj.get_individual_informed_estimate_metrics
 
-    if isinstance(data_obj, VisualizationDataGroupStatic):
+    else:
+        informed_est_method = data_obj.get_informed_estimate_metrics
+
+    if args["data_type"] == "static":
         period = args["comms_period"]
         n = args["num_agents"]
-        tfr = args["tfr"]
-        sp = args["sp"]
+        filename_param_1 = "prd{0}_cprob{1}_agt{2}".format(int(period), 1, int(n))
+        data_obj_type = "sta"
+        ylim = 0.125 # @todo: temporary hack
 
-        # Get VisualizationData object
-        v = data_obj.get_viz_data_obj({"comms_period": period, "num_agents": n, "comms_prob": 1.0})
+    elif args["data_type"] == "dynamic":
+        speed = args["speed"]
+        density = args["density"]
+        filename_param_1 = "spd{0}_den{1}".format(int(speed), int(density))
+        data_obj_type = "dyn"
+        ylim = 0.225 # @todo: temporary hack
 
-        # Get performance metrics for all trials
-        conv_min = np.inf
-        conv_max = -np.inf
-        acc_min = np.inf
-        acc_max = -np.inf
+    tfr = args["tfr"]
+    sp = args["sp"]
 
-        if isinstance(tfr, list): # sp is fixed
-            manipulated_var = tfr
-            fixed = "sp"
+    # Create figures for plotting
+    fig_size = (6,4)
+    fig, ax_lst = plt.subplots(1, 2, tight_layout=True, figsize=fig_size, dpi=175, gridspec_kw={"width_ratios": [7, 1]})
 
-        else: # tfr is fixed
-            manipulated_var = sp
-            fixed = "tfr"
+    # Get performance metrics for all trials
+    conv_min = np.inf
+    conv_max = -np.inf
+    acc_min = np.inf
+    acc_max = -np.inf
 
-        # Create the scatter plots
-        for ind, var in enumerate(manipulated_var):
+    if isinstance(tfr, list): # sp is fixed
+        manipulated_var = tfr
+        fixed = "sp"
 
-            if fixed == "sp":
-                conv_lst, acc_lst = v.get_informed_estimate_metrics(var, sp, threshold, False)
-            elif fixed == "tfr":
-                conv_lst, acc_lst = v.get_informed_estimate_metrics(tfr, var, threshold, False)
+    elif isinstance(sp, list): # tfr is fixed
+        manipulated_var = sp
+        fixed = "tfr"
 
-            # Compute minimum and maximum values
-            conv_min = np.amin([conv_min, np.amin(conv_lst)])
-            conv_max = np.amax([conv_max, np.amax(conv_lst)])
-            acc_min = np.amin([acc_min, np.amin(acc_lst)])
-            acc_max = np.amax([acc_max, np.amax(acc_lst)])
+    else: # both tfr and sp are scalar
+        fixed = "tfr"
+        manipulated_var = [sp]
 
-            conv_norm = normalize(np.asarray(conv_lst), 0, v.num_obs)
-            # acc_norm = normalize(np.asarray(acc_lst), 0, ACC_ABS_MAX)
+    # Create the scatter plots
+    median_lst = []
+    for ind, var in enumerate(manipulated_var):
 
-            scatter([conv_norm, acc_lst], [ind]*len(conv_lst), ax_lst[0], vmin=0, vmax=len(sp)-1)
+        if fixed == "sp":
+            conv_lst, acc_lst = informed_est_method(var, sp, threshold)
+        elif fixed == "tfr":
+            conv_lst, acc_lst = informed_est_method(tfr, var, threshold)
 
-        print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
-        print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
+        # Compute minimum and maximum values
+        conv_min = np.amin([conv_min, np.amin(conv_lst)])
+        conv_max = np.amax([conv_max, np.amax(conv_lst)])
+        acc_min = np.amin([acc_min, np.amin(acc_lst)])
+        acc_max = np.amax([acc_max, np.amax(acc_lst)])
 
-    elif isinstance(data_obj, VisualizationDataGroupDynamic):
-        pass
-    else:
-        raise RuntimeError("Unknown `data_obj` type!")
+        # @todo: maybe give them individual marker types? for now just make all the ones in the same trial the same, i.e., flatten data
+        conv_lst = [c for i in conv_lst for c in i]
+        acc_lst = [c for i in acc_lst for c in i]
+
+        conv_norm = normalize(np.asarray(conv_lst), 0, data_obj.num_obs).tolist()
+        # acc_norm = normalize(np.asarray(acc_lst), 0, ACC_ABS_MAX)
+
+        # Calculate median
+        median_lst.append( (np.median(conv_norm), np.median(acc_lst)) )
+        scatter([conv_norm, acc_lst], [ind]*len(conv_lst), ax_lst[0], vmin=0, vmax=len(manipulated_var)-1, edgecolors="none", alpha=0.2, s=25) # general transparent data
+
+    scatter( list(zip(*median_lst)), range(len(median_lst)), ax_lst[0], vmin=0, vmax=len(manipulated_var)-1, edgecolors="black", alpha=1.0, s=50) # median
+
+    print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
+    print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
 
     ax_lst[0].set_xlabel("Normalized Convergence")
     ax_lst[0].set_ylabel("Absolute Error")
     ax_lst[0].set_xlim(0, 1.0)
-    ax_lst[0].set_ylim(0, 0.175)
-
+    ax_lst[0].set_ylim(0, ylim)
+    ax_lst[0].xaxis.set_tick_params(labelsize=6)
+    ax_lst[0].yaxis.set_tick_params(labelsize=6)
     ax_lst[0].grid()
+
+    # Decode distribution values
+    distributed_case = [(ind, val) for ind, val in enumerate(manipulated_var) if val < 0.0]
+    if distributed_case:
+        for ind, val in distributed_case:
+            manipulated_var[ind] = decode_sp_distribution_key(val)
 
     # Create color bar
     color_bar_img = list(zip(*[list(range(len(manipulated_var)))])) # size of len(manipulated_var) x 1 list
@@ -1085,34 +1178,37 @@ def plot_scatter(data_obj: VisualizationDataGroupBase, threshold: float, args):
     ax_lst[1].yaxis.set_label_position("right")
     ax_lst[1].yaxis.tick_right()
     ax_lst[1].set_xticks([])
-    ax_lst[1].set_yticks(list(range(len(manipulated_var))), manipulated_var, fontsize=10)
+    ax_lst[1].set_yticks(list(range(len(manipulated_var))), manipulated_var, fontsize=6)
 
     if fixed == "tfr":
         ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=10)
-        filename_param = "tfr{0}".format(int(tfr*1e3))
+        filename_param_2 = "tfr{0}".format(int(tfr*1e3))
     elif fixed == "sp":
         ax_lst[1].set_ylabel("Target fill ratios", fontsize=10)
-        filename_param = "tfr{0}".format(int(sp*1e3))
+        filename_param_2 = "tfr{0}".format(int(sp*1e3))
 
     # Save the scatter plot
-    if isinstance(data_obj, VisualizationDataGroupDynamic):
-        data_obj_type = "dyn"
-        filename_param += "_"
-    else:
-        data_obj_type = "sta"
-        filename_param += "_prd{0}_cprob{1}_agt{2}".format(period, 1, n)
+    filename_param = "{0}_{1}".format(filename_param_2, filename_param_1)
+
     fig.savefig(
-        "/home/khaiyichin/scatter_" +
+        "scatter_" +
         data_obj_type +
         "_" +
-        "conv{0}_s{1}_t{2}_{3}".format(int(np.round(threshold*1e3 ,3)), v.num_obs, v.num_exp, filename_param)+".png", bbox_inches="tight", dpi=300)
+        "conv{0}_s{1}_t{2}_{3}".format(
+            int(np.round(threshold*1e3, 3)),
+            int(data_obj.num_obs),
+            int(data_obj.num_exp),
+            filename_param
+        ) +
+        ".png",
+    bbox_inches="tight", dpi=300)
 
-def scatter(scatter_data, scatter_data_id: int, ax=None, vmin=None, vmax=None):
+def scatter(scatter_data, scatter_data_id: int, ax=None, vmin=None, vmax=None, **kwargs):
 
     if ax is None:
         fig, ax = plt.subplots()
     else:
-        ax.scatter(scatter_data[0], scatter_data[1], c=scatter_data_id, cmap="nipy_spectral", vmin=vmin, vmax=vmax)
+        ax.scatter(scatter_data[0], scatter_data[1], c=scatter_data_id, cmap="nipy_spectral", vmin=vmin, vmax=vmax, **kwargs)
 
 def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False, convergence_thresh=CONV_THRESH):
     """Plot the time series data.
@@ -1298,8 +1394,23 @@ def plot_individual_timeseries(target_fill_ratio, sensor_prob, data_obj: Visuali
         # Turn on grid lines
         activate_subplot_grid_lines(ax_lst[i])
 
-        # Adjust legend location and plot sizes
-        # adjust_subplot_legend_and_axis(fig_x, ax_lst[i])
+def decode_sp_distribution_key(encoded_val):
+
+    assert encoded_val < 0.0
+
+    encoded_val_str = str(-encoded_val)
+
+    # Decode ID
+    if encoded_val_str[0] == "2":
+        id = "U"
+    elif encoded_val_str[0] == "3":
+        id = "N"
+
+    # Decode parameters
+    param_1 = float(encoded_val_str[1:5]) * 1e-3
+    param_2 = float(encoded_val_str[5:]) * 1e-3
+
+    return "{0}({1}, {2})".format(id, param_1, param_2)
 
 def normalize(arr, min_val, max_val, flip=False):
     arr_range = max_val - min_val
@@ -1322,3 +1433,172 @@ def adjust_subplot_legend_and_axis(subplot_fig, subplot_ax):
 
     handles, labels = subplot_ax[1].get_legend_handles_labels()
     subplot_fig.legend(handles, labels, loc="center right", bbox_to_anchor=(box_2.width*1.25, 0.5))
+
+class Visualizer:
+    def __init__(self, data_type):
+        if data_type == "static":
+            v_type_str = "ExperimentData pickle"
+            u_types_str = "communications period, communication probability, and number of agents"
+
+            self.data_type = "static"
+            self.u_types_lst = ["comms_period", "comms_prob", "num_agents"]
+            self.vd_cls = VisualizationDataGroupStatic
+
+        elif data_type == "dynamic":
+            v_type_str = "SimulationStatsSet protobuf"
+            u_types_str = "robot speed and swarm density"
+
+            self.data_type = "dynamic"
+            self.u_types_lst = ["speed", "density"]
+            self.vd_cls = VisualizationDataGroupDynamic
+        else:
+            raise ValueError("Unknown data type {0}!".format(data_type))
+
+        # Create common arguments
+        parser = argparse.ArgumentParser(description="Visualize {0} multi-agent simulation data".format(data_type))
+        parser.add_argument("FILE", type=str, \
+            help="path to folder containing serialized {0} files or path to a VisualizationDataGroup pickle file (see the \"g\" flag)".format(v_type_str))
+        parser.add_argument("CONV", type=float, \
+            help="convergence threshold value")
+        parser.add_argument("-g", action="store_true", \
+            help="flag to indicate if the path is pointing to a VisualizationDataGroup pickle file")
+        parser.add_argument("-a", action="store_true", \
+            help="flag to use aggregate data instead of data from individual trials (exclusive with the \"-i\" flag)")
+        parser.add_argument("-i", action="store_true", \
+            help="flag to show individual agent data (only used for time series and scatter plot data with the \"-U\" flag; exclusive with the \"-a\" flag)")
+        parser.add_argument("-s", action="store_true", \
+            help="flag to show the plots")
+
+        # Add subparsing arguments
+        viz_type_subparser = parser.add_subparsers(dest="viz_type", required=True, help ="commands for visualization type")
+        series_subparser = viz_type_subparser.add_parser("series", help="visualize time series data")
+        heatmap_subparser = viz_type_subparser.add_parser("heatmap", help="visualize heatmap data")
+        scatter_subparser = viz_type_subparser.add_parser("scatter", help="visualize scatter data")
+
+        # Time series plot options
+        series_subparser.add_argument("-TFR", required=True, type=float, help="single target fill ratio to use in plotting time series data")
+        series_subparser.add_argument("-SP", required=True, type=float, help="single sensor probability to use in plotting time series data")
+        series_subparser.add_argument("-U", required=True, nargs="*", type=float, help="{0} to use in plotting time series data".format(u_types_str))
+
+        # Heatmap plot options
+        heatmap_subparser.add_argument("-u", nargs="*", \
+            help="(optional) {0} to use in plotting single heatmap data".format(u_types_str))
+        heatmap_subparser.add_argument("-RSTR", nargs="+", type=str, help="outer grid row labels (must match number of \"ROW\" arguments)")
+        heatmap_subparser.add_argument("-ROW", nargs="+", type=float, help="outer grid row coordinates")
+        heatmap_subparser.add_argument("-CSTR", nargs="+", type=str, help="outer grid column labels (must match number of \"COL\" arguments)")
+        heatmap_subparser.add_argument("-COL", nargs="+", type=float, help="outer grid column coordinates")
+
+        # Scatter plot options
+        scatter_subparser.add_argument("-tfr", nargs="+", type=float, help="(optional) target fill ratio to use in plotting scatter data (must provide single \"-sp\" argument if this is not provided)")
+        scatter_subparser.add_argument("-sp", nargs="+", type=float, help="(optional) sensor probability to use in plotting scatter data (must provide single \"-tfr\" argument if this is not provided)")
+        scatter_subparser.add_argument("-U", required=True, nargs="*", type=float, help="{0} to use in plotting scatter data".format(u_types_str))
+
+        args = parser.parse_args()
+
+        self.load_data(args)
+
+        start = timeit.default_timer()
+
+        self.generate_plot(args)
+
+        end = timeit.default_timer()
+
+        print('Elapsed time:', end-start)
+
+        if args.s: plt.show()
+
+    def load_data(self, args):
+
+        # Check whether to load VisualizationDataGroup object
+        if args.g:
+            data = self.vd_cls.load(args.FILE)
+
+            # Load specific VisualizationData object from VisualizationDataGroup object
+            try:
+                u_args = args.u
+            except Exception as e:
+                try:
+                    u_args = args.U
+                except Exception as e:
+                    u_args = None
+
+            if u_args:
+                if (self.data_type == "static") and (len(u_args) != len(self.u_types_lst)):
+                    raise ValueError("Insufficient arguments for \"u\" or \"U\" flag!")
+                else:
+
+                    self.sim_args = {
+                        "data_type": self.data_type,
+                        self.u_types_lst[0]: float(u_args[0]),
+                        self.u_types_lst[1]: float(u_args[1])
+                    }
+
+                    if self.data_type == "static":
+                        self.sim_args.update({self.u_types_lst[2]: float(u_args[2])})
+
+                    self.data = data.get_viz_data_obj(self.sim_args)
+        else:
+            self.data = VisualizationData(args.FILE)
+
+        # Load target fill ratios (inner parameter)
+        try:
+            args_tfr = args.TFR
+        except Exception as e:
+            try:
+                args_tfr = args.tfr
+            except Exception as e:
+                args_tfr = None
+
+        if args_tfr:
+            self.tfr = [float(i) for i in args_tfr] if len(args_tfr) > 1 else float(*args_tfr)
+        else:
+            self.tfr = self.data.tfr_range if isinstance(self.data, VisualizationData) else self.data.get_tfr_range()
+
+        # Load sensor probabilities (inner parameter)
+        try:
+            args_sp = args.SP
+        except Exception as e:
+            try:
+                args_sp = args.sp
+            except Exception as e:
+                args_sp = None
+
+        if args_sp:
+            self.sp = [float(i) for i in args_sp] if len(args_sp) > 1 else float(*args_sp)
+        else:
+            self.sp = self.data.sp_range if isinstance(self.data, VisualizationData) else self.data.get_sp_range()
+
+    def generate_plot(self, args):
+
+        if args.viz_type == "series":
+
+            # Check whether only one specific target fill ratio and sensor probability has been specified
+            if isinstance(self.tfr, list) or isinstance(self.sp, list):
+                raise ValueError("Only a single target fill ratio and a single sensor probability allowed!")
+
+            else:
+                if args.i: plot_individual_timeseries(self.tfr, self.sp, self.data, args.CONV)
+                else: plot_timeseries(self.tfr, self.sp, self.data, args.a, args.CONV)
+
+        elif args.viz_type == "heatmap":
+
+            # Check whether to plot single or gridded heatmap
+            if isinstance(self.data, VisualizationData): plot_heatmap_vd(self.data, args.CONV)
+            else:
+                plot_heatmap_vdg(self.data,
+                    self.u_types_lst[0],
+                    [float(i) for i in args.ROW] if len(args.ROW) > 1 else float(*args.ROW),
+                    self.u_types_lst[-1],
+                    [float(i) for i in args.COL] if len(args.COL) > 1 else float(*args.COL),
+                    args.ROWSTR,
+                    args.COLSTR,
+                    args.CONV
+                )
+
+        elif args.viz_type == "scatter":
+
+            if not isinstance(self.data, VisualizationData): raise NotImplementedError("Scatter plot for VisualizationDataGroup not implemented!")
+            else:
+                self.sim_args.update({"tfr": self.tfr, "sp": self.sp})
+
+                plot_scatter(self.data, args.CONV, self.sim_args, args.i)

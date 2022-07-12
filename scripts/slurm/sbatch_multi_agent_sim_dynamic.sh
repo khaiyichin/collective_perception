@@ -10,9 +10,9 @@
 #SBATCH --mail-type=all
 
 # $1: argument for path to working directory to change to, relative to the current directory
-# $2: argument for path to the scripts/ directory, relative to $1
+# $2: argument for the absolute path to the scripts/ directory
 # $3: argument for path to the directory containing hpc_execute_multi_agent_sim_dynamic.sh, relative to $1
-# $4: argument for path to the multi_agent_sim_dynamic_no_qt.sif file, relative to $1
+# $4: argument for the absolute path to the multi_agent_sim_dynamic_no_qt.sif file
 # $5: argument for path to the directory for writing output data, relative to $1
 
 # Load required modules
