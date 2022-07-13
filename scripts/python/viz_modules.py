@@ -786,7 +786,7 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
         convert_to_img(heatmap_data, [(0,0), (0, data_obj.num_obs), (0.0, ACC_ABS_MAX)], active_channels=[1, 2]), # normalize and convert to img
         ax=ax,
         row_label="Black tile fill ratio",
-        col_label="Sensor accuracy\nP(b|b) = P(w|w)",
+        col_label="Sensor accuracy",
         xticks=sp_range,
         yticks=tfr_range
     )
