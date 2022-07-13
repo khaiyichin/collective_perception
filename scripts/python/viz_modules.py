@@ -333,7 +333,7 @@ class VisualizationData:
             self.agg_stats_dict[dfr_key] = temp_dict
 
     # @todo modify this method to compute based on input of informed curve(s), not to compute all values!
-    def detect_convergence(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=True, individual=False):
+    def detect_convergence(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=False, individual=False):
         """Compute the point in time when convergence is achieved.
 
         This computes the convergence timestep (# of observations) for the local, social,
@@ -382,7 +382,7 @@ class VisualizationData:
             ]
 
             # Go through all the curves
-            conv_ind = Parallel(n_jobs=3, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves)
+            output = Parallel(n_jobs=3, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves)
 
         elif individual and not aggregate: # @todo: only computing for informed estimate!
 
@@ -395,7 +395,7 @@ class VisualizationData:
             for ind, agt_curves in enumerate(curves):
                 conv_ind[ind] = Parallel(n_jobs=-1, verbose=0)(delayed(parallel_inner_loop)(c) for c in agt_curves)
 
-            return conv_ind # @todo: this is a temporary hack! must remove to outside of statement
+            output = ([], [], conv_ind) # @todo: this is a temporary hack! must remove to outside of statement
 
         elif not aggregate and not individual:
             curves = [
@@ -405,16 +405,16 @@ class VisualizationData:
             ]
 
             # Go through all the curves
-            conv_ind = [None, None, None]
+            conv_x_hat = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[0])
+            conv_x_bar = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[1])
+            conv_x = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[2])
 
-            conv_ind[0] = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[0])
-            conv_ind[1] = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[1])
-            conv_ind[2] = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[2])
+            output = (conv_x_hat, conv_x_bar, conv_x)
 
-        return conv_ind[0], conv_ind[1], conv_ind[2]
+        return output
 
     # @todo: modify this equation to compute accuracy based on input curve(s)
-    def compute_accuracy(self, target_fill_ratio: float, sensor_prob: float, conv_ind_lst=None, aggregate=True):
+    def compute_accuracy(self, target_fill_ratio: float, sensor_prob: float, conv_ind_lst=None, aggregate=False, individual=False):
         """Compute the estimate accuracy with respect to the target fill ratio.
 
         If the list of convergence indices is not provided, then convergence indices will be
@@ -433,12 +433,25 @@ class VisualizationData:
         """
 
         if conv_ind_lst is None:
-            conv_ind_lst = self.detect_convergence(target_fill_ratio, sensor_prob, aggregate)
+            conv_ind_lst = self.detect_convergence(target_fill_ratio, sensor_prob, aggregate, individual)
 
-        if aggregate:
+        if aggregate and not individual:
             acc_x_hat = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean[conv_ind_lst[0]] - target_fill_ratio)
             acc_x_bar = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean[conv_ind_lst[1]] - target_fill_ratio)
             acc_x = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean[conv_ind_lst[2]] - target_fill_ratio)
+
+            output = ([acc_x_hat], [acc_x_bar], [acc_x])
+
+        elif individual and not aggregate: # only interested in informed estimates
+            output = []
+            for trial_ind in range(self.num_exp):
+                err = [
+                    abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x[trial_ind][agt_ind][agt_conv_ind] - target_fill_ratio)
+                            for agt_ind, agt_conv_ind in enumerate(conv_ind_lst[2])
+                ]
+                output.append(err[0])
+
+            output = ([], [], output) # to maintain output consistency
 
         else:
             acc_x_hat = [
@@ -454,7 +467,9 @@ class VisualizationData:
                 for ind, conv_ind in enumerate(conv_ind_lst[2])
             ]
 
-        return acc_x_hat, acc_x_bar, acc_x
+            output = (acc_x_hat, acc_x_bar, acc_x)
+
+        return output
 
     def get_informed_estimate_metrics(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=False):
         """Get the accuracy and convergence of informed estimates.
@@ -473,23 +488,18 @@ class VisualizationData:
         conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold, aggregate)
         acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst, aggregate)
 
-        conv_output = conv_lst[2]*self.comms_period if aggregate else [i*self.comms_period for i in conv_lst[2]]
+        conv_output = [conv_lst[2]*self.comms_period] if aggregate else [i*self.comms_period for i in conv_lst[2]]
+        acc_output = [i for i in acc_lst[2]]
 
-        return conv_output, acc_lst[2]
+        return conv_output, acc_output
 
     def get_individual_informed_estimate_metrics(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH):
 
-        conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold, aggregate=False, individual=True) # (num_exp, num_agents, 1) size
-        acc_output = [] # should end up as (num_exp, num_agents, 1) size
+        conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold, aggregate=False, individual=True)
+        acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst, False, True)
 
-        for trial_ind in range(self.num_exp):
-            err = [
-                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x[trial_ind][agt_ind][agt_conv_ind] - target_fill_ratio)
-                        for agt_ind, agt_conv_ind in enumerate(conv_lst)
-            ]
-            acc_output.append(err[0])
-
-        conv_output = [[agt_conv_ind*self.comms_period for agt_conv_ind in trial] for trial in conv_lst]
+        conv_output = [[agt_conv_ind*self.comms_period for agt_conv_ind in trial] for trial in conv_lst[2]] # (num_exp, num_agents, 1) size
+        acc_output = acc_lst[2] # should end up as (num_exp, num_agents, 1) size
 
         return conv_output, acc_output
 
@@ -559,7 +569,7 @@ class VisualizationDataGroupBase(ABC):
         viz_data_obj = list(self.viz_data_obj_dict.values())[0]
 
         while not isinstance(viz_data_obj, VisualizationData):
-            viz_data_obj = list(self.viz_data_obj_dict.values())[0]
+            viz_data_obj = list(viz_data_obj.values())[0]
 
         return viz_data_obj.dfr_range
 
@@ -569,7 +579,7 @@ class VisualizationDataGroupBase(ABC):
         viz_data_obj = list(self.viz_data_obj_dict.values())[0]
 
         while not isinstance(viz_data_obj, VisualizationData):
-            viz_data_obj = list(self.viz_data_obj_dict.values())[0]
+            viz_data_obj = list(viz_data_obj.values())[0]
 
         return viz_data_obj.sp_range
 
@@ -743,11 +753,10 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
 
     fig_size = FIG_SIZE
     fig = plt.figure(tight_layout=True, figsize=fig_size, dpi=175)
-    if kwargs["title"]: fig.suptitle(kwargs["title"], fontsize=20)
 
     # Create two groups: left for all the heatmaps, right for the color bar
-    top_lvl_gs = fig.add_gridspec(1, 2, width_ratios=[10, 2.5])
-    left_gs_group = top_lvl_gs[0].subgridspec(nrows=1, ncols=1, wspace=0.001)
+    top_lvl_gs = fig.add_gridspec(1, 2, width_ratios=[10, 2.0])
+    left_gs_group = top_lvl_gs[0].subgridspec(nrows=1, ncols=1)
     right_gs_group = top_lvl_gs[1].subgridspec(1, 1)
 
     ax = left_gs_group.subplots()
@@ -795,16 +804,21 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
     color_leg_ax.set_xlabel("Accuracy", fontsize=15)
 
     # Add label limits for convergence
-    color_leg_ax.text(-0.1*color_leg_px_count[0], 0.995*color_leg_px_count[1], "Slow", fontsize=12, rotation=90)
-    color_leg_ax.text(-0.1*color_leg_px_count[0], 0.1*color_leg_px_count[0], "Fast", fontsize=12, rotation=90)
+    color_leg_ax.text(-0.2*color_leg_px_count[0], color_leg_px_count[1]-0.5, "Slow", fontsize=10, rotation=90, ha="center", va="bottom")
+    color_leg_ax.text(-0.2*color_leg_px_count[0], -0.5, "Fast", fontsize=10, rotation=90, ha="center", va="top")
+    # color_leg_ax.text(-0.1*color_leg_px_count[0], 0.995*color_leg_px_count[1], "Slow", fontsize=12, rotation=90)
+    # color_leg_ax.text(-0.1*color_leg_px_count[0], 0.1*color_leg_px_count[0], "Fast", fontsize=12, rotation=90)
 
-    # Add label limits for accuracy
-    color_leg_ax.text(-0.01*color_leg_px_count[0], 1.02*color_leg_px_count[1], "Low", fontsize=12)
-    color_leg_ax.text(0.86*color_leg_px_count[0], 1.02*color_leg_px_count[1], "High", fontsize=12)
+    # Add label ticks
+    color_leg_ax.set_xticks([-0.5, color_leg_px_count[0]-0.5], ["Low\n({0})".format(1- ACC_ABS_MAX), "High\n(1.0)"], fontsize=10)
+    color_leg_ax.get_xticklabels()[0].set_ha("left")
+    color_leg_ax.get_xticklabels()[-1].set_ha("right")
+    color_leg_ax.set_yticks([-0.5, color_leg_px_count[1]-0.5], ["(0)", "({0})".format(data_obj.num_obs)], rotation=90, fontsize=10)
+    color_leg_ax.get_yticklabels()[0].set_va("top")
+    color_leg_ax.get_yticklabels()[-1].set_va("bottom")
 
-    # Remove color legend
-    color_leg_ax.set_xticks([])
-    color_leg_ax.set_yticks([])
+    # Add title
+    if "title" in kwargs: fig.suptitle(kwargs["title"], fontsize=20)
 
     # Save the heatmap
     fig.set_size_inches(*fig_size)
@@ -944,8 +958,8 @@ def generate_combined_heatmap_data(v: VisualizationData, threshold: float, order
         for sp in v.sp_range:
 
             tup = v.get_informed_estimate_metrics(tfr, sp, threshold, True)
-            conv_layer_row.append(tup[0])
-            acc_layer_row.append(tup[1])
+            conv_layer_row.append(*tup[0])
+            acc_layer_row.append(*tup[1])
 
         conv_layer.append(conv_layer_row)
         acc_layer.append(acc_layer_row)
@@ -1141,8 +1155,8 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         acc_max = np.amax([acc_max, np.amax(acc_lst)])
 
         # @todo: maybe give them individual marker types? for now just make all the ones in the same trial the same, i.e., flatten data
-        conv_lst = [c for i in conv_lst for c in i]
-        acc_lst = [c for i in acc_lst for c in i]
+        if individual: conv_lst = [c for i in conv_lst for c in i]
+        if individual: acc_lst = [c for i in acc_lst for c in i]
 
         conv_norm = normalize(np.asarray(conv_lst), 0, data_obj.num_obs).tolist()
         # acc_norm = normalize(np.asarray(acc_lst), 0, ACC_ABS_MAX)
@@ -1239,37 +1253,51 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
 
     # Plot for all experiments
     if not agg_data:
-        for n in range(data_obj.num_exp):
+
+        # Compute the convergence timestamps
+        conv_ind_x_hat, conv_ind_x_bar, conv_ind_x = \
+            data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh, False, False)
+
+        for i in range(data_obj.num_exp):
             stats_obj = data_obj.stats_obj_dict[target_fill_ratio][sensor_prob]
 
             # Plot time evolution of local estimates and confidences
-            x_hat_bounds = compute_std_bounds(stats_obj.x_hat_sample_mean[n], stats_obj.x_hat_sample_std[n])
-            alpha_bounds = compute_std_bounds(stats_obj.alpha_sample_mean[n], stats_obj.alpha_sample_std[n])
+            x_hat_bounds = compute_std_bounds(stats_obj.x_hat_sample_mean[i], stats_obj.x_hat_sample_std[i])
+            alpha_bounds = compute_std_bounds(stats_obj.alpha_sample_mean[i], stats_obj.alpha_sample_std[i])
 
-            ax_x_hat[0].plot(abscissa_values_x_hat, stats_obj.x_hat_sample_mean[n], label="Exp {}".format(n))
+            traj_x_hat = ax_x_hat[0].plot(abscissa_values_x_hat, stats_obj.x_hat_sample_mean[i], label="Exp {}".format(i))
+            ax_x_hat[0].axvline(abscissa_values_x_hat[conv_ind_x_hat[i]], color=traj_x_hat[0].get_c(), linestyle=":")
+            ax_x_hat[0].axhline(target_fill_ratio, color="black", linestyle="--")
             ax_x_hat[0].fill_between(abscissa_values_x_hat, x_hat_bounds[0], x_hat_bounds[1], alpha=0.2)
 
-            ax_x_hat[1].plot(abscissa_values_x_hat, stats_obj.alpha_sample_mean[n], label="Exp {}".format(n))
+            traj_x_hat_conf = ax_x_hat[1].plot(abscissa_values_x_hat, stats_obj.alpha_sample_mean[i], label="Exp {}".format(i))
+            ax_x_hat[1].axvline(abscissa_values_x[conv_ind_x_hat[i]], color=traj_x_hat_conf[0].get_c(), linestyle=":") # draw convergence line
             ax_x_hat[1].fill_between(abscissa_values_x_hat, alpha_bounds[0], alpha_bounds[1], alpha=0.2)
 
             # Plot time evolution of social estimates and confidences
-            x_bar_bounds = compute_std_bounds(stats_obj.x_bar_sample_mean[n], stats_obj.x_bar_sample_std[n])
-            rho_bounds = compute_std_bounds(stats_obj.rho_sample_mean[n], stats_obj.rho_sample_std[n])
+            x_bar_bounds = compute_std_bounds(stats_obj.x_bar_sample_mean[i], stats_obj.x_bar_sample_std[i])
+            rho_bounds = compute_std_bounds(stats_obj.rho_sample_mean[i], stats_obj.rho_sample_std[i])
 
-            ax_x_bar[0].plot(abscissa_values_x_bar, stats_obj.x_bar_sample_mean[n], label="Exp {}".format(n))
+            traj_x_bar = ax_x_bar[0].plot(abscissa_values_x_bar, stats_obj.x_bar_sample_mean[i], label="Exp {}".format(i))
+            ax_x_bar[0].axvline(abscissa_values_x_bar[conv_ind_x_bar[i]], color=traj_x_bar[0].get_c(), linestyle=":")
+            ax_x_bar[0].axhline(target_fill_ratio, color="black", linestyle="--")
             ax_x_bar[0].fill_between(abscissa_values_x_bar, x_bar_bounds[0], x_bar_bounds[1], alpha=0.2)
 
-            ax_x_bar[1].plot(abscissa_values_x_bar, stats_obj.rho_sample_mean[n], label="Exp {}".format(n))
+            traj_x_bar_conf = ax_x_bar[1].plot(abscissa_values_x_bar, stats_obj.rho_sample_mean[i], label="Exp {}".format(i))
+            ax_x_bar[1].axvline(abscissa_values_x[conv_ind_x_bar[i]], color=traj_x_bar_conf[0].get_c(), linestyle=":") # draw convergence line
             ax_x_bar[1].fill_between(abscissa_values_x_bar, rho_bounds[0], rho_bounds[1], alpha=0.2)
 
             # Plot time evolution of informed estimates and confidences
-            x_bounds = compute_std_bounds(stats_obj.x_sample_mean[n], stats_obj.x_sample_std[n])
-            gamma_bounds = compute_std_bounds(stats_obj.gamma_sample_mean[n], stats_obj.gamma_sample_std[n])
+            x_bounds = compute_std_bounds(stats_obj.x_sample_mean[i], stats_obj.x_sample_std[i])
+            gamma_bounds = compute_std_bounds(stats_obj.gamma_sample_mean[i], stats_obj.gamma_sample_std[i])
 
-            ax_x[0].plot(abscissa_values_x, stats_obj.x_sample_mean[n], label="Exp {}".format(n))
+            traj_x = ax_x[0].plot(abscissa_values_x, stats_obj.x_sample_mean[i], label="Exp {}".format(i))
+            ax_x[0].axvline(abscissa_values_x_bar[conv_ind_x[i]], color=traj_x[0].get_c(), linestyle=":")
+            ax_x[0].axhline(target_fill_ratio, color="black", linestyle="--")
             ax_x[0].fill_between(abscissa_values_x, x_bounds[0], x_bounds[1], alpha=0.2)
 
-            ax_x[1].plot(abscissa_values_x, stats_obj.gamma_sample_mean[n], label="Exp {}".format(n))
+            traj_x_conf = ax_x[1].plot(abscissa_values_x, stats_obj.gamma_sample_mean[i], label="Exp {}".format(i))
+            ax_x[1].axvline(abscissa_values_x[conv_ind_x[i]], color=traj_x_conf[0].get_c(), linestyle=":") # draw convergence line
             ax_x[1].fill_between(abscissa_values_x, gamma_bounds[0], gamma_bounds[1], alpha=0.2)
 
     else:
@@ -1279,7 +1307,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
 
         # Compute the convergence timestamps
         conv_ind_x_hat, conv_ind_x_bar, conv_ind_x = \
-            data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh)
+            data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh, True, False)
 
         # Plot time evolution of local estimates and confidences
         x_hat_bounds = compute_std_bounds(agg_stats_obj.x_hat_mean, agg_stats_obj.x_hat_std)
@@ -1363,8 +1391,8 @@ def plot_individual_timeseries(target_fill_ratio, sensor_prob, data_obj: Visuali
 
     abscissa_values_x = list(range(0, data_obj.num_obs + 1*data_obj.comms_period, data_obj.comms_period))
 
-    # Compute convergence
-    conv_lst = data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh, False, True)
+    # Compute convergence for informed estimates
+    conv_lst = data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh, False, True)[2]
 
     # Plot data
     for i in range(data_obj.num_exp):
@@ -1442,7 +1470,7 @@ class Visualizer:
 
             self.data_type = "static"
             self.u_types_lst = ["comms_period", "comms_prob", "num_agents"]
-            self.vd_cls = VisualizationDataGroupStatic
+            self.vdg_cls = VisualizationDataGroupStatic
 
         elif data_type == "dynamic":
             v_type_str = "SimulationStatsSet protobuf"
@@ -1450,7 +1478,7 @@ class Visualizer:
 
             self.data_type = "dynamic"
             self.u_types_lst = ["speed", "density"]
-            self.vd_cls = VisualizationDataGroupDynamic
+            self.vdg_cls = VisualizationDataGroupDynamic
         else:
             raise ValueError("Unknown data type {0}!".format(data_type))
 
@@ -1483,10 +1511,10 @@ class Visualizer:
         # Heatmap plot options
         heatmap_subparser.add_argument("-u", nargs="*", \
             help="(optional) {0} to use in plotting single heatmap data".format(u_types_str))
-        heatmap_subparser.add_argument("-RSTR", nargs="+", type=str, help="outer grid row labels (must match number of \"ROW\" arguments)")
-        heatmap_subparser.add_argument("-ROW", nargs="+", type=float, help="outer grid row coordinates")
-        heatmap_subparser.add_argument("-CSTR", nargs="+", type=str, help="outer grid column labels (must match number of \"COL\" arguments)")
-        heatmap_subparser.add_argument("-COL", nargs="+", type=float, help="outer grid column coordinates")
+        heatmap_subparser.add_argument("-rstr", nargs="+", type=str, help="(optional) outer grid row labels (must match number of \"ROW\" arguments; unused if \"-u\" arguments are used)")
+        heatmap_subparser.add_argument("-row", nargs="+", type=float, help="(optional) outer grid row coordinates (unused if \"-u\" arguments are used)")
+        heatmap_subparser.add_argument("-cstr", nargs="+", type=str, help="(optional) outer grid column labels (must match number of \"COL\" arguments; unused if \"-u\" arguments are used)")
+        heatmap_subparser.add_argument("-col", nargs="+", type=float, help="(optional) outer grid column coordinates (unused if \"-u\" arguments are used)")
 
         # Scatter plot options
         scatter_subparser.add_argument("-tfr", nargs="+", type=float, help="(optional) target fill ratio to use in plotting scatter data (must provide single \"-sp\" argument if this is not provided)")
@@ -1511,7 +1539,7 @@ class Visualizer:
 
         # Check whether to load VisualizationDataGroup object
         if args.g:
-            data = self.vd_cls.load(args.FILE)
+            self.data = self.vdg_cls.load(args.FILE)
 
             # Load specific VisualizationData object from VisualizationDataGroup object
             try:
@@ -1536,7 +1564,8 @@ class Visualizer:
                     if self.data_type == "static":
                         self.sim_args.update({self.u_types_lst[2]: float(u_args[2])})
 
-                    self.data = data.get_viz_data_obj(self.sim_args)
+                    self.data = self.data.get_viz_data_obj(self.sim_args)
+
         else:
             self.data = VisualizationData(args.FILE)
 
@@ -1550,9 +1579,13 @@ class Visualizer:
                 args_tfr = None
 
         if args_tfr:
-            self.tfr = [float(i) for i in args_tfr] if len(args_tfr) > 1 else float(*args_tfr)
+            if isinstance(args_tfr, list):
+                if len(args_tfr) > 1: self.tfr = [float(i) for i in args_tfr] # multiple values in a list
+                else: self.tfr = float(*args_tfr) # single value in a list
+            else:
+                self.tfr = float(args_tfr) # single scalar value
         else:
-            self.tfr = self.data.tfr_range if isinstance(self.data, VisualizationData) else self.data.get_tfr_range()
+            self.tfr = self.data.dfr_range if isinstance(self.data, VisualizationData) else self.data.get_tfr_range()
 
         # Load sensor probabilities (inner parameter)
         try:
@@ -1564,7 +1597,11 @@ class Visualizer:
                 args_sp = None
 
         if args_sp:
-            self.sp = [float(i) for i in args_sp] if len(args_sp) > 1 else float(*args_sp)
+            if isinstance(args_sp, list):
+                if len(args_sp) > 1: self.sp = [float(i) for i in args_sp] #multiple values in a list
+                else: self.sp = float(*args_sp) # single value in a list
+            else:
+                self.sp = float(args_sp) # single scalar value
         else:
             self.sp = self.data.sp_range if isinstance(self.data, VisualizationData) else self.data.get_sp_range()
 
@@ -1587,11 +1624,11 @@ class Visualizer:
             else:
                 plot_heatmap_vdg(self.data,
                     self.u_types_lst[0],
-                    [float(i) for i in args.ROW] if len(args.ROW) > 1 else float(*args.ROW),
+                    [float(i) for i in args.row] if len(args.row) > 1 else float(*args.row),
                     self.u_types_lst[-1],
-                    [float(i) for i in args.COL] if len(args.COL) > 1 else float(*args.COL),
-                    args.ROWSTR,
-                    args.COLSTR,
+                    [float(i) for i in args.col] if len(args.col) > 1 else float(*args.col),
+                    args.rstr,
+                    args.cstr,
                     args.CONV
                 )
 
