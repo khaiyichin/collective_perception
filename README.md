@@ -1,5 +1,30 @@
 # Collective Consensus Project
 
+**README still a work in progress**
+
+## Scripts
+- `slurm`: scripts to run jobs using the SLURM batch manager on a HPC cluster.
+  <!-- - how to use the slurm scripts?
+    - what arguments are required?
+    - where do you run them from? -->
+- `bash`: scripts to execute multi-parameter simulations.
+  <!-- - Describe bash scripts:
+    - how can they be used? -->
+- `examples`: example scripts.
+  <!-- - how to use the .argos xml script?
+    - usage of loop functions? -->
+- `python`: (will be moved to standalone folder for package management) static simulator
+  <!-- - Describe modules:
+    - how to use the classes, what do the classes do and where do they fit?
+  - Describe python scripts:
+    - how can they be used?
+    - what arguments are needed? -->
+
+## Apptainer definition files
+<!-- - what is the def file for?
+  - what steps to build sif file?
+  - how does it work with the bash scripts to run hpc simulation? -->
+
 ## MATLAB Scripts
 The MATLAB scripts are mostly for quick prototyping and data processing/visualization.
 
