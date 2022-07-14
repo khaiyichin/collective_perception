@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 """Load and convert SimulationStatsSet protobuf files into a VisualizationDataGroupDynamic object.
 """
 
-import viz_modules as vm
+import collective_perception_py.viz_modules as vm
 import argparse
 
 if __name__ == "__main__":

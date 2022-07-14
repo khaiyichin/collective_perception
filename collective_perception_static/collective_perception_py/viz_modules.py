@@ -12,8 +12,8 @@ from abc import ABC, abstractmethod
 import argparse
 import timeit
 
-from sim_modules import ExperimentData, Sim
-import simulation_set_pb2
+from .sim_modules import ExperimentData, Sim
+from pb2 import simulation_set_pb2
 
 # Default values
 CONV_THRESH = 5e-3

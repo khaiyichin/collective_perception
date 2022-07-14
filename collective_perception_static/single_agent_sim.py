@@ -1,4 +1,4 @@
-from sim_modules import SingleAgentSim, HeatmapData, HeatmapRow, SimParam
+from collective_perception_py.sim_modules import SingleAgentSim, HeatmapData, HeatmapRow, SimParam
 
 import numpy as np
 import os

@@ -2,6 +2,9 @@
 
 **README still a work in progress**
 
+## Dependencies
+- Protobuf (highly recommended to install this from source, instead from using the package manager)
+
 ## Scripts
 - `slurm`: scripts to run jobs using the SLURM batch manager on a HPC cluster.
   <!-- - how to use the slurm scripts?

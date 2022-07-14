@@ -6,3 +6,6 @@ containers/
 *.bo
 *.bdb
 *.pkl
+dist/
+build/
+*.egg-info

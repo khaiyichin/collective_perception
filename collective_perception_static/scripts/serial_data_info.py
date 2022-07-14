@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 """Display information of the serialized data. 
 """
 
-from sim_modules import ExperimentData
+from collective_perception_py.sim_modules import ExperimentData
 import argparse
 
 if __name__ == "__main__":
