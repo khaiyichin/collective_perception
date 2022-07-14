@@ -6,7 +6,6 @@ matplotlib==3.5.2
 numpy==1.22.3
 packaging==21.3
 Pillow==9.1.1
-protobuf==4.21.1
 protoletariat==0.9.4
 pyparsing==3.0.9
 python-dateutil==2.8.2

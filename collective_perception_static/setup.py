@@ -9,7 +9,7 @@ class GenerateProtolPb2Command(setuptools.command.install.install):
     def run(self):
 
         # Define paths to protobuf schema
-        proto_path = os.path.abspath("../collective_perception_cpp/proto")
+        proto_path = os.path.abspath("../collective_perception_dynamic/proto")
         util_proto_path = os.path.join(proto_path, "util.proto")
         simulation_set_proto_path = os.path.join(proto_path, "simulation_set.proto")
         pb2_relative_dir_path = "pb2"
@@ -57,6 +57,7 @@ setuptools.setup(
         "scripts/visualize_multi_agent_data_dynamic.py",
         "scripts/serial_data_info.py",
         "scripts/convert_exp_data_to_viz_data_group.py",
-        "scripts/convert_sim_stats_set_to_viz_data_group.py"
+        "scripts/convert_sim_stats_set_to_viz_data_group.py",
+        "scripts/multi_agent_sim_static.py"
     ]
 )

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from collective_perception_py.sim_modules import MultiAgentSim, ExperimentData, SimParam
 
 import numpy as np
