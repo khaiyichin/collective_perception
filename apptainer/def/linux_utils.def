@@ -1,0 +1,28 @@
+Bootstrap: docker
+From: ubuntu:20.04
+
+%labels
+    AUTHOR khaiyichin@gmail.com
+    VERSION 1.0.0
+    NAME linux_utils
+
+%help
+    SUMMARY
+    This container contains the environment setup containing basic Linux utilities.
+
+    CHANGELOG
+    v1.0.0
+    Initial release.
+
+%post -c /bin/bash
+    # Prevent user prompts
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Install packages
+    apt update && apt install pigz tree
+
+    # Upgrade packages
+    apt upgrade -qy
+
+    # Insert additional labels
+    echo "CREATED $(date)" >> $APPTAINER_LABELS

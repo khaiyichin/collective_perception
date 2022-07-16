@@ -78,7 +78,7 @@ sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,1
             sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,10,0.5\" movable=\"false\">\n            <body position=\"-$pos,0,0\" orientation=\"0,0,0\" \/>/" $ARGOSFILE
             sed -i "s/<position method=\"uniform\".*/<position method=\"uniform\" min=\"-$pos,-$pos,0\" max=\"$pos,$pos,0\" \/>/" $ARGOSFILE
 
-            singularity exec $SIFFILE /collective_perception/collective_perception_cpp/build/src/run_dynamic_simulations -l /dev/null -c $ARGOSFILE
+            singularity exec $SIFFILE /collective_perception/collective_perception_dynamic/build/src/run_dynamic_simulations -l /dev/null -c $ARGOSFILE
 
             # Copy and move the data
             folder="spd${speed}_den${DENSITY[j]}" # concatenate string and numbers as folder name

@@ -46,17 +46,17 @@ sed -i "s/numObs:.*/numObs: 2000/g" $PARAMFILE
 
     sed -i "s/type:.*/type: \"$COMM\"/g" $PARAMFILE # communication network graph type
 
-    for (( b = 0; b <= 3; b++ )) # comms period
+    for (( b = 0; b < 4; b++ )) # comms period
     do
         period=$(echo ${PERIOD[b]})
         sed -i "s/commsPeriod:.*/commsPeriod: $period/" $PARAMFILE
 
-        for (( c = 0; c <= 4; c++ )) # agent number
+        for (( c = 0; c < 5; c++ )) # agent number
         do
             agents=$(echo ${AGENTS[c]})
             sed -i "s/numAgents:.*/numAgents: $agents/" $PARAMFILE
 
-            for (( d = 0; d <= 0; d++ )) # fill ratios
+            for (( d = 0; d < 1; d++ )) # fill ratios
             do
                 min=$(echo ${MIN[d]})
                 max=$(echo ${MAX[d]})

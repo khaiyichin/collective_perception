@@ -1,19 +1,18 @@
 #!/bin/bash
 
-# Copy required python scripts to working directory
+# Change to working directory
 CURR_DIR=$(pwd)
 echo "Changing to working directory: $1";
 pushd $1
 
-# Copy scripts
-cp $CURR_DIR/../python/requirements.txt .
+REQTXT=$2 # path to requirements.txt
 
 # Create virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
 # Install required packages
-pip install --upgrade pip && pip install -r requirements.txt
+pip install --upgrade pip && pip install -r $REQTXT
 
 # Integrate graph-tool
 pushd .venv/lib/python*/site-packages/

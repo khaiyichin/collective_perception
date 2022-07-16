@@ -1,0 +1,69 @@
+Bootstrap: localimage
+From: ../containers/argos_buzz_protobuf_release_no_qt.sif
+
+%labels
+    AUTHOR khaiyichin@gmail.com
+    VERSION 1.0.0
+    NAME multi_agent_sim_dynamic
+
+%help
+    SUMMARY
+    This container contains the environment setup to execute the simulation for
+    both the static (Python-based) and dynamic multi-agent simulation (ARGoS-based).
+
+    CHANGELOG
+    v1.0.0
+    Initial release.
+
+%files
+    ../../collective_perception_dynamic/argos /collective_perception/collective_perception_dynamic/argos
+    ../../collective_perception_dynamic/buzz /collective_perception/collective_perception_dynamic/buzz
+    ../../collective_perception_dynamic/include /collective_perception/collective_perception_dynamic/include
+    ../../collective_perception_dynamic/proto /collective_perception/collective_perception_dynamic/proto
+    ../../collective_perception_dynamic/src /collective_perception/collective_perception_dynamic/src
+    ../../collective_perception_dynamic/CMakeLists.txt /collective_perception/collective_perception_dynamic/CMakeLists.txt
+
+    ../../collective_perception_static/collective_perception_py/ /collective_perception/collective_perception_static/collective_perception_py
+    ../../collective_perception_static/pb2 /collective_perception/collective_perception_static/pb2
+    ../../collective_perception_static/scripts /collective_perception/collective_perception_static/scripts
+    ../../collective_perception_static/setup.py /collective_perception/collective_perception_static/setup.py
+    ../../collective_perception_static/requirements.txt /collective_perception/collective_perception_static/requirements.txt
+
+%post -c /bin/bash
+    # Prevent user prompts
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Update and upgrade packages
+    apt update && apt upgrade -qy
+
+    # Build collective_perception_dynamic
+    pushd collective_perception/collective_perception_dynamic
+    rm -rf build
+    mkdir build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j$(nproc)
+    popd
+
+    # Install graph-tool dependencies
+    apt install -q -y gnupg ca-certificates python3.8-dev python3-pip libcairo2-dev
+
+    # Install graph-tool
+    echo "deb [ arch=amd64 ] https://downloads.skewed.de/apt focal main" >> /etc/apt/sources.list
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-key 612DEFB798507F25
+    apt update && apt install -qy python3-graph-tool
+
+    # Upgrade packages
+    apt upgrade -qy
+
+    # Install required Python packages
+    pip install --upgrade pip
+    pip install -r /collective_perception/collective_perception_static/requirements.txt
+
+    # Install collective_perception_static
+    pushd collective_perception/collective_perception_static
+    python3 setup.py install
+    popd
+
+    # Insert additional labels
+    echo "CREATED $(date)" >> $APPTAINER_LABELS
+    echo "PYTHON3_VERSION $(python3 --version)" >> $APPTAINER_LABELS

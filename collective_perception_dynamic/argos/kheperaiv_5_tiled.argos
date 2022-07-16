@@ -98,7 +98,7 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="/home/khaiyichin/research/collective_perception/collective_perception_cpp/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
+    <loop_functions library="/home/khaiyichin/research/collective_perception/collective_perception_dynamic/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
         <collective_perception>
             <arena_tiles tile_count_x="500" tile_count_y="500" /> <!-- number of tiles for the arena -->
             <fill_ratio_range min="0.05" max="0.95" steps="1" /> <!-- range of target fill ratios -->

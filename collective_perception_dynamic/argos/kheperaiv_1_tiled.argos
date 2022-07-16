@@ -98,7 +98,7 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="/home/khaiyichin/research/collective_perception/collective_perception_cpp/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
+    <loop_functions library="/home/khaiyichin/research/collective_perception/collective_perception_dynamic/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
         <collective_perception arena_tile_count_x="20" arena_tile_count_y="20" fill_ratio="0.75" />
         <!-- arena_tile_count_x and arena_tile_count_y is used to list the number of tiles for the x and y direction; the actual length is determined
                  by the arena tag -->

@@ -1271,7 +1271,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
             ax_x_hat[0].fill_between(abscissa_values_x_hat, x_hat_bounds[0], x_hat_bounds[1], alpha=0.2)
 
             traj_x_hat_conf = ax_x_hat[1].plot(abscissa_values_x_hat, stats_obj.alpha_sample_mean[i], label="Exp {}".format(i))
-            ax_x_hat[1].axvline(abscissa_values_x[conv_ind_x_hat[i]], color=traj_x_hat_conf[0].get_c(), linestyle=":") # draw convergence line
+            ax_x_hat[1].axvline(abscissa_values_x_hat[conv_ind_x_hat[i]], color=traj_x_hat_conf[0].get_c(), linestyle=":") # draw convergence line
             ax_x_hat[1].fill_between(abscissa_values_x_hat, alpha_bounds[0], alpha_bounds[1], alpha=0.2)
 
             # Plot time evolution of social estimates and confidences
