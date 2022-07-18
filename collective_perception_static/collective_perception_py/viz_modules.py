@@ -111,9 +111,9 @@ class VisualizationData:
 
                 # Common parameters
                 self.num_agents = obj.num_agents
-                self.num_exp = obj.num_exp
-                self.num_obs = obj.num_obs
-                self.dfr_range = obj.dfr_range
+                self.num_trials = obj.num_trials
+                self.num_steps = obj.num_steps
+                self.tfr_range = obj.tfr_range
                 self.sp_range = obj.sp_range
                 self.stats_obj_dict = obj.stats_obj_dict
                 self.agg_stats_dict = {} # to be populated later
@@ -143,21 +143,21 @@ class VisualizationData:
 
                 # Common parameters
                 similarity_bool = similarity_bool and (self.num_agents == obj.num_agents)
-                similarity_bool = similarity_bool and (self.num_exp == obj.num_exp)
-                similarity_bool = similarity_bool and (self.num_obs == obj.num_obs)
+                similarity_bool = similarity_bool and (self.num_trials == obj.num_trials)
+                similarity_bool = similarity_bool and (self.num_steps == obj.num_steps)
 
                 # Check to see if either target fill ratio range or sensor probability range matches
                 if (self.sp_range == obj.sp_range): # sensor probability matches
 
                     # Update the dictionary of tfr-sp_dict key-value pair
-                    self.dfr_range.extend(obj.dfr_range)
+                    self.tfr_range.extend(obj.tfr_range)
                     self.stats_obj_dict.update(obj.stats_obj_dict)
 
-                elif (self.dfr_range == obj.dfr_range): # target fill ratio matches
+                elif (self.tfr_range == obj.tfr_range): # target fill ratio matches
 
                     # Update the internal dictionary of sp-stats key-value pair
                     self.sp_range.extend(obj.sp_range)
-                    [self.stats_obj_dict[i].update(obj.stats_obj_dict[i]) for i in obj.dfr_range]
+                    [self.stats_obj_dict[i].update(obj.stats_obj_dict[i]) for i in obj.tfr_range]
 
                 else: similarity_bool = False
 
@@ -165,7 +165,7 @@ class VisualizationData:
                 if not similarity_bool:
                     raise RuntimeError("The objects in the \"{0}\" directory do not have the same parameters.".format(exp_data_obj_paths))
 
-        self.dfr_range = sorted(self.dfr_range)
+        self.tfr_range = sorted(self.tfr_range)
         self.sp_range = sorted(self.sp_range)
 
         self.aggregate_statistics()
@@ -182,14 +182,14 @@ class VisualizationData:
         # Add dynamic class member variables (remove abstraction layers)
         setattr(simulation_set_pb2.SimulationStatsSet, "sim_type", sim_stats_set_msg.sim_set.sim_type)
         setattr(simulation_set_pb2.SimulationStatsSet, "num_agents", sim_stats_set_msg.sim_set.num_agents)
-        setattr(simulation_set_pb2.SimulationStatsSet, "num_exp", sim_stats_set_msg.sim_set.num_trials)
-        setattr(simulation_set_pb2.SimulationStatsSet, "dfr_range", np.round(sim_stats_set_msg.sim_set.tfr_range, 3).tolist())
+        setattr(simulation_set_pb2.SimulationStatsSet, "num_trials", sim_stats_set_msg.sim_set.num_trials)
+        setattr(simulation_set_pb2.SimulationStatsSet, "tfr_range", np.round(sim_stats_set_msg.sim_set.tfr_range, 3).tolist())
         setattr(simulation_set_pb2.SimulationStatsSet, "sp_range", np.round(sim_stats_set_msg.sim_set.sp_range, 3).tolist())
-        setattr(simulation_set_pb2.SimulationStatsSet, "num_obs", sim_stats_set_msg.sim_set.num_steps)
+        setattr(simulation_set_pb2.SimulationStatsSet, "num_steps", sim_stats_set_msg.sim_set.num_steps)
         setattr(simulation_set_pb2.SimulationStatsSet, "comms_range", sim_stats_set_msg.sim_set.comms_range)
         setattr(simulation_set_pb2.SimulationStatsSet, "speed", sim_stats_set_msg.sim_set.speed)
         setattr(simulation_set_pb2.SimulationStatsSet, "density", np.round(sim_stats_set_msg.sim_set.density, 3))
-        setattr(simulation_set_pb2.SimulationStatsSet, "stats_obj_dict", {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.dfr_range} )
+        setattr(simulation_set_pb2.SimulationStatsSet, "stats_obj_dict", {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.tfr_range} )
 
         for stats_packet in sim_stats_set_msg.stats_packets:
             stats_obj = Sim.SimStats(None)
@@ -288,7 +288,7 @@ class VisualizationData:
 
         self.agg_stats_dict = {}
 
-        for dfr_key, sp_dict in self.stats_obj_dict.items():
+        for tfr_key, sp_dict in self.stats_obj_dict.items():
 
             temp_dict = {}
 
@@ -330,7 +330,7 @@ class VisualizationData:
 
                 temp_dict[sp_key] = agg_stats_obj
 
-            self.agg_stats_dict[dfr_key] = temp_dict
+            self.agg_stats_dict[tfr_key] = temp_dict
 
     # @todo modify this method to compute based on input of informed curve(s), not to compute all values!
     def detect_convergence(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=False, individual=False):
@@ -376,9 +376,9 @@ class VisualizationData:
         # Check type of curve to compute
         if aggregate and not individual:
             curves = [
-                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean, # length of self.num_obs + 1
-                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean, # length of self.num_obs / self.comms_period + 1
-                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean, # length of self.num_obs / self.comms_period + 1
+                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean, # length of self.num_steps + 1
+                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean, # length of self.num_steps / self.comms_period + 1
+                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean, # length of self.num_steps / self.comms_period + 1
             ]
 
             # Go through all the curves
@@ -386,11 +386,11 @@ class VisualizationData:
 
         elif individual and not aggregate: # @todo: only computing for informed estimate!
 
-            # Split the curve by trials; each element in trial_curves is a (num_agents, num_obs+1) ndarray
-            curves = [*self.stats_obj_dict[target_fill_ratio][sensor_prob].x] # curves is a array of num_exp elements
+            # Split the curve by trials; each element in trial_curves is a (num_agents, num_steps+1) ndarray
+            curves = [*self.stats_obj_dict[target_fill_ratio][sensor_prob].x] # curves is a array of num_trials elements
 
             # Go through all the curves
-            conv_ind = [None for i in range(self.num_exp)] # ends up being (num_exp, num_agents, 1) size
+            conv_ind = [None for i in range(self.num_trials)] # ends up being (num_trials, num_agents, 1) size
 
             for ind, agt_curves in enumerate(curves):
                 conv_ind[ind] = Parallel(n_jobs=-1, verbose=0)(delayed(parallel_inner_loop)(c) for c in agt_curves)
@@ -399,9 +399,9 @@ class VisualizationData:
 
         elif not aggregate and not individual:
             curves = [
-                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_hat_sample_mean, # (num_exp, num_obs+1) ndarray
-                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_bar_sample_mean, # (num_exp, num_obs+1) ndarray
-                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_sample_mean, # (num_exp, num_obs+1) ndarray
+                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_hat_sample_mean, # (num_trials, num_steps+1) ndarray
+                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_bar_sample_mean, # (num_trials, num_steps+1) ndarray
+                self.stats_obj_dict[target_fill_ratio][sensor_prob].x_sample_mean, # (num_trials, num_steps+1) ndarray
             ]
 
             # Go through all the curves
@@ -444,7 +444,7 @@ class VisualizationData:
 
         elif individual and not aggregate: # only interested in informed estimates
             output = []
-            for trial_ind in range(self.num_exp):
+            for trial_ind in range(self.num_trials):
                 err = [
                     abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x[trial_ind][agt_ind][agt_conv_ind] - target_fill_ratio)
                             for agt_ind, agt_conv_ind in enumerate(conv_ind_lst[2])
@@ -498,8 +498,8 @@ class VisualizationData:
         conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold, aggregate=False, individual=True)
         acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst, False, True)
 
-        conv_output = [[agt_conv_ind*self.comms_period for agt_conv_ind in trial] for trial in conv_lst[2]] # (num_exp, num_agents, 1) size
-        acc_output = acc_lst[2] # should end up as (num_exp, num_agents, 1) size
+        conv_output = [[agt_conv_ind*self.comms_period for agt_conv_ind in trial] for trial in conv_lst[2]] # (num_trials, num_agents, 1) size
+        acc_output = acc_lst[2] # should end up as (num_trials, num_agents, 1) size
 
         return conv_output, acc_output
 
@@ -571,7 +571,7 @@ class VisualizationDataGroupBase(ABC):
         while not isinstance(viz_data_obj, VisualizationData):
             viz_data_obj = list(viz_data_obj.values())[0]
 
-        return viz_data_obj.dfr_range
+        return viz_data_obj.tfr_range
 
     def get_sp_range(self):
 
@@ -779,11 +779,11 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
     print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
 
     # Extract the target fill ratio and sensor probability ranges (simply taken from the last VisualizationData object)
-    tfr_range = data_obj.dfr_range
+    tfr_range = data_obj.tfr_range
     sp_range = data_obj.sp_range
 
     tup = heatmap(
-        convert_to_img(heatmap_data, [(0,0), (0, data_obj.num_obs), (0.0, ACC_ABS_MAX)], active_channels=[1, 2]), # normalize and convert to img
+        convert_to_img(heatmap_data, [(0,0), (0, data_obj.num_steps), (0.0, ACC_ABS_MAX)], active_channels=[1, 2]), # normalize and convert to img
         ax=ax,
         row_label="Black tile fill ratio",
         col_label="Sensor accuracy",
@@ -813,7 +813,7 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
     color_leg_ax.set_xticks([-0.5, color_leg_px_count[0]-0.5], ["Low\n({0})".format(1- ACC_ABS_MAX), "High\n(1.0)"], fontsize=10)
     color_leg_ax.get_xticklabels()[0].set_ha("left")
     color_leg_ax.get_xticklabels()[-1].set_ha("right")
-    color_leg_ax.set_yticks([-0.5, color_leg_px_count[1]-0.5], ["(0)", "({0})".format(data_obj.num_obs)], rotation=90, fontsize=10)
+    color_leg_ax.set_yticks([-0.5, color_leg_px_count[1]-0.5], ["(0)", "({0})".format(data_obj.num_steps)], rotation=90, fontsize=10)
     color_leg_ax.get_yticklabels()[0].set_va("top")
     color_leg_ax.get_yticklabels()[-1].set_va("bottom")
 
@@ -880,7 +880,7 @@ def plot_heatmap_vdg(
     print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
 
     # Extract the inner grid ranges (simply taken from the last VisualizationData object)
-    dfr_range = v.dfr_range
+    tfr_range = v.tfr_range
     sp_range = v.sp_range
 
     # Plot heatmap data
@@ -888,12 +888,12 @@ def plot_heatmap_vdg(
         for ind_c, col in enumerate(col_keys):
 
             tup = heatmap(
-                convert_to_img(heatmap_data_grid[ind_r][ind_c], [(0,0), (0, v.num_obs), (0.0, ACC_ABS_MAX)], active_channels=[1, 2]), # normalize and convert to img
+                convert_to_img(heatmap_data_grid[ind_r][ind_c], [(0,0), (0, v.num_steps), (0.0, ACC_ABS_MAX)], active_channels=[1, 2]), # normalize and convert to img
                 ax=ax_lst[ind_r][ind_c],
                 row_label=outer_grid_row_labels[ind_r],
                 col_label=outer_grid_col_labels[ind_c],
                 xticks=sp_range,
-                yticks=dfr_range,
+                yticks=tfr_range,
                 activate_outer_grid_xlabel=True if ind_r == len(outer_grid_row_labels) - 1 else False,
                 activate_outer_grid_ylabel=True if ind_c == 0 else False
             )
@@ -926,7 +926,7 @@ def plot_heatmap_vdg(
     color_leg_ax.set_xticks([-0.5, color_leg_px_count[0]-0.5], ["Low\n({0})".format(1- ACC_ABS_MAX), "High\n(1.0)"], fontsize=10)
     color_leg_ax.get_xticklabels()[0].set_ha("left")
     color_leg_ax.get_xticklabels()[-1].set_ha("right")
-    color_leg_ax.set_yticks([-0.5, color_leg_px_count[1]-0.5], ["(0)", "({0})".format(v.num_obs)], rotation=90, fontsize=10)
+    color_leg_ax.set_yticks([-0.5, color_leg_px_count[1]-0.5], ["(0)", "({0})".format(v.num_steps)], rotation=90, fontsize=10)
     color_leg_ax.get_yticklabels()[0].set_va("top")
     color_leg_ax.get_yticklabels()[-1].set_va("bottom")
 
@@ -937,7 +937,7 @@ def plot_heatmap_vdg(
     fig.set_size_inches(*fig_size)
     if isinstance(data_obj, VisualizationDataGroupDynamic): data_obj_type = "dyn"
     else: data_obj_type = "sta"
-    fig.savefig("/home/khaiyichin/heatmap_"+data_obj_type+"_"+"conv{0}_s{1}_t{2}".format(int(np.round(threshold*1e3 ,3)), v.num_obs, v.num_exp)+".png", bbox_inches="tight", dpi=300)
+    fig.savefig("/home/khaiyichin/heatmap_"+data_obj_type+"_"+"conv{0}_s{1}_t{2}".format(int(np.round(threshold*1e3 ,3)), v.num_steps, v.num_trials)+".png", bbox_inches="tight", dpi=300)
 
 def generate_combined_heatmap_data(v: VisualizationData, threshold: float, order=(None, "convergence", "accuracy")):
     """
@@ -947,11 +947,11 @@ def generate_combined_heatmap_data(v: VisualizationData, threshold: float, order
             as the accuracy heatmap. The 2nd array is populated with zeros.
     """
 
-    output = np.zeros(shape=(3, len(v.dfr_range), len(v.sp_range)))
+    output = np.zeros(shape=(3, len(v.tfr_range), len(v.sp_range)))
     conv_layer = []
     acc_layer = []
 
-    for tfr in v.dfr_range:
+    for tfr in v.tfr_range:
         conv_layer_row = []
         acc_layer_row = []
 
@@ -1158,7 +1158,7 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         if individual: conv_lst = [c for i in conv_lst for c in i]
         if individual: acc_lst = [c for i in acc_lst for c in i]
 
-        conv_norm = normalize(np.asarray(conv_lst), 0, data_obj.num_obs).tolist()
+        conv_norm = normalize(np.asarray(conv_lst), 0, data_obj.num_steps).tolist()
         # acc_norm = normalize(np.asarray(acc_lst), 0, ACC_ABS_MAX)
 
         # Calculate median
@@ -1210,8 +1210,8 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         "_" +
         "conv{0}_s{1}_t{2}_{3}".format(
             int(np.round(threshold*1e3, 3)),
-            int(data_obj.num_obs),
-            int(data_obj.num_exp),
+            int(data_obj.num_steps),
+            int(data_obj.num_trials),
             filename_param
         ) +
         ".png",
@@ -1247,9 +1247,9 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     fig_x, ax_x = plt.subplots(2, sharex=True)
     fig_x.set_size_inches(8,6)
 
-    abscissa_values_x_hat = list(range(data_obj.num_obs + 1))
-    abscissa_values_x_bar = list(range(0, data_obj.num_obs + 1*data_obj.comms_period, data_obj.comms_period))
-    abscissa_values_x = list(range(0, data_obj.num_obs + 1*data_obj.comms_period, data_obj.comms_period))
+    abscissa_values_x_hat = list(range(data_obj.num_steps + 1))
+    abscissa_values_x_bar = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
+    abscissa_values_x = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
 
     # Plot for all experiments
     if not agg_data:
@@ -1258,7 +1258,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
         conv_ind_x_hat, conv_ind_x_bar, conv_ind_x = \
             data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh, False, False)
 
-        for i in range(data_obj.num_exp):
+        for i in range(data_obj.num_trials):
             stats_obj = data_obj.stats_obj_dict[target_fill_ratio][sensor_prob]
 
             # Plot time evolution of local estimates and confidences
@@ -1386,16 +1386,16 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
 def plot_individual_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, convergence_thresh=CONV_THRESH):
 
     # Create figure and axes handles
-    fig_lst = [None for i in range(data_obj.num_exp)]
-    ax_lst = [None for i in range(data_obj.num_exp)]
+    fig_lst = [None for i in range(data_obj.num_trials)]
+    ax_lst = [None for i in range(data_obj.num_trials)]
 
-    abscissa_values_x = list(range(0, data_obj.num_obs + 1*data_obj.comms_period, data_obj.comms_period))
+    abscissa_values_x = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
 
     # Compute convergence for informed estimates
     conv_lst = data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh, False, True)[2]
 
     # Plot data
-    for i in range(data_obj.num_exp):
+    for i in range(data_obj.num_trials):
 
         fig_lst[i], ax_lst[i] = plt.subplots(2, sharex=True)
         fig_lst[i].set_size_inches(8,6)
@@ -1585,7 +1585,7 @@ class Visualizer:
             else:
                 self.tfr = float(args_tfr) # single scalar value
         else:
-            self.tfr = self.data.dfr_range if isinstance(self.data, VisualizationData) else self.data.get_tfr_range()
+            self.tfr = self.data.tfr_range if isinstance(self.data, VisualizationData) else self.data.get_tfr_range()
 
         # Load sensor probabilities (inner parameter)
         try:

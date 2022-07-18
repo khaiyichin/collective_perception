@@ -4,12 +4,12 @@ sensorProb:
   max: 1.0
   incSteps: 19
   # incSteps: 4
-desFillRatios:
+targFillRatios:
   min: 0.05
   max: 0.95
   incSteps: 19
   # incSteps: 5
-numExperiments: 200
-numObs: 1000
+numTrials: 200
+numSteps: 1000
 writeAllData: False
 ...

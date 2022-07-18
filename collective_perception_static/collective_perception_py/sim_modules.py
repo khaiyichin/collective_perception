@@ -26,59 +26,59 @@ class Sim:
         """Class for storing simulation data that can be used replicate experimental results.
         """
 
-        def __init__(self, sim_type, num_exp, num_agents, num_obs, sensor_prob, comms_period):
+        def __init__(self, sim_type, num_trials, num_agents, num_steps, sensor_prob, comms_period):
             self.sim_type = sim_type
-            self.num_exp = num_exp
+            self.num_trials = num_trials
             self.num_agents = num_agents
-            self.num_obs = num_obs
+            self.num_steps = num_steps
             self.b_prob = sensor_prob # P(black|black)
             self.w_prob = sensor_prob # P(white|white)
             self.comms_network_str = None
             self.comms_period = comms_period
 
             if sim_type == "single":
-                self.tiles = np.zeros( (num_exp, num_obs) )
-                self.agent_obs = np.zeros( (num_exp, num_obs) )
+                self.tiles = np.zeros( (num_trials, num_steps) )
+                self.agent_obs = np.zeros( (num_trials, num_steps) )
 
             elif sim_type == "multi":
-                self.tiles = np.zeros( (num_exp, num_agents, num_obs) )
-                self.agent_obs = np.zeros( (num_exp, num_agents, num_obs) )
+                self.tiles = np.zeros( (num_trials, num_agents, num_steps) )
+                self.agent_obs = np.zeros( (num_trials, num_agents, num_steps) )
 
     class SimStats:
         """Class for storing statistics of simulation experiments.
         """
 
-        def __init__(self, sim_type, num_exp=0, num_obs=0, comms_period=1, num_agents=0):
+        def __init__(self, sim_type, num_trials=0, num_steps=0, comms_period=1, num_agents=0):
 
-            if sim_type == "single" and num_exp != 0 and num_obs != 0:
-                self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
-                self.alpha_sample_mean = np.zeros( (num_exp, num_obs + 1) )
-                self.x_hat_sample_std = np.zeros( (num_exp, num_obs + 1) )
-                self.alpha_sample_std = np.zeros( (num_exp, num_obs + 1) )
+            if sim_type == "single" and num_trials != 0 and num_steps != 0:
+                self.x_hat_sample_mean = np.zeros( (num_trials, num_steps + 1) )
+                self.alpha_sample_mean = np.zeros( (num_trials, num_steps + 1) )
+                self.x_hat_sample_std = np.zeros( (num_trials, num_steps + 1) )
+                self.alpha_sample_std = np.zeros( (num_trials, num_steps + 1) )
 
-            elif sim_type == "multi" and num_exp != 0 and num_obs != 0:
+            elif sim_type == "multi" and num_trials != 0 and num_steps != 0:
                 self.sp_distribution = None
-                self.sp_distributed_sample_mean = np.zeros(num_exp)
+                self.sp_distributed_sample_mean = np.zeros(num_trials)
 
                 # @todo: temporary hack to show individual robot values; in the future this should be stored
                 # elsewhere
-                self.x = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
-                self.gamma = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
+                self.x = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
+                self.gamma = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
 
-                self.x_hat_sample_mean = np.zeros( (num_exp, num_obs + 1) )
-                self.alpha_sample_mean = np.zeros( (num_exp, num_obs + 1) )
-                self.x_hat_sample_std = np.zeros( (num_exp, num_obs + 1) )
-                self.alpha_sample_std = np.zeros( (num_exp, num_obs + 1) )
+                self.x_hat_sample_mean = np.zeros( (num_trials, num_steps + 1) )
+                self.alpha_sample_mean = np.zeros( (num_trials, num_steps + 1) )
+                self.x_hat_sample_std = np.zeros( (num_trials, num_steps + 1) )
+                self.alpha_sample_std = np.zeros( (num_trials, num_steps + 1) )
 
-                self.x_bar_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
-                self.rho_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
-                self.x_bar_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
-                self.rho_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
+                self.x_bar_sample_mean = np.zeros( (num_trials, num_steps//comms_period + 1) )
+                self.rho_sample_mean = np.zeros( (num_trials, num_steps//comms_period + 1) )
+                self.x_bar_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
+                self.rho_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
 
-                self.x_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
-                self.gamma_sample_mean = np.zeros( (num_exp, num_obs//comms_period + 1) )
-                self.x_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
-                self.gamma_sample_std = np.zeros( (num_exp, num_obs//comms_period + 1) )
+                self.x_sample_mean = np.zeros( (num_trials, num_steps//comms_period + 1) )
+                self.gamma_sample_mean = np.zeros( (num_trials, num_steps//comms_period + 1) )
+                self.x_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
+                self.gamma_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
 
             else: # for population with dynamic simulation data
                 self.sp_distribution = None
@@ -99,12 +99,12 @@ class Sim:
                 self.x_sample_std = None
                 self.gamma_sample_std = None
 
-    def __init__(self, num_exp, num_obs, des_fill_ratio, main_filename_suffix):
-        self.num_exp = num_exp
-        self.num_obs = num_obs
+    def __init__(self, num_trials, num_steps, des_fill_ratio, main_filename_suffix):
+        self.num_trials = num_trials
+        self.num_steps = num_steps
         self.des_fill_ratio = des_fill_ratio
         self.avg_fill_ratio = 0.0
-        self.tiles_record = np.empty( (self.num_exp, self.num_obs) )
+        self.tiles_record = np.empty( (self.num_trials, self.num_steps) )
         self.main_filename_suffix = main_filename_suffix
 
     def generate_tiles(self, num_agents=1):
@@ -114,18 +114,18 @@ class Sim:
             num_agents: Number of tiles rows to generate, only used in multi-agent simulations.
 
         Returns:
-            A 1-D (single agent simulation) or a (num_agents x self.num_obs) 2-D numpy array
+            A 1-D (single agent simulation) or a (num_agents x self.num_steps) 2-D numpy array
              of binary tiles (multi-agent simulation).
         """
 
         # Draw bernoulli samples for tiles based on desired fill ratio
         if num_agents > 1:
-            tiles = np.random.binomial(1, self.des_fill_ratio * np.ones((num_agents, self.num_obs)))
+            tiles = np.random.binomial(1, self.des_fill_ratio * np.ones((num_agents, self.num_steps)))
 
         else:
-            tiles = np.random.binomial(1, self.des_fill_ratio * np.ones(self.num_obs) )
+            tiles = np.random.binomial(1, self.des_fill_ratio * np.ones(self.num_steps) )
 
-            assert(len(tiles) == self.num_obs)
+            assert(len(tiles) == self.num_steps)
 
         return tiles
 
@@ -201,26 +201,26 @@ class Sim:
 
 class SingleAgentSim(Sim):
 
-    def __init__(self, num_exp, num_obs, des_fill_ratio, b_prob, w_prob, main_f_suffix):
+    def __init__(self, num_trials, num_steps, des_fill_ratio, b_prob, w_prob, main_f_suffix):
 
-        super().__init__(num_exp, num_obs, des_fill_ratio, main_f_suffix)
+        super().__init__(num_trials, num_steps, des_fill_ratio, main_f_suffix)
 
         self.b_prob = b_prob # P(black|black)
         self.w_prob = w_prob # P(white|white)
-        self.agent_obs = np.zeros( (num_exp, num_obs) )
-        self.agent_avg_black_obs = np.zeros( (num_exp, num_obs) )
+        self.agent_obs = np.zeros( (num_trials, num_steps) )
+        self.agent_avg_black_obs = np.zeros( (num_trials, num_steps) )
 
         # Define data members
-        self.f_hat = np.zeros( (num_exp, num_obs) )
-        self.fisher_inv = np.zeros( (num_exp, num_obs) )
-        self.f_hat_sample_mean = np.zeros( num_obs )
-        self.fisher_inv_sample_mean = np.zeros( num_obs )
-        self.f_hat_sample_std = np.zeros( num_obs )
-        self.fisher_inv_sample_std = np.zeros( num_obs )
-        self.f_hat_sample_min = np.zeros( num_obs )
-        self.fisher_inv_sample_min = np.zeros( num_obs )
-        self.f_hat_sample_max = np.zeros( num_obs )
-        self.fisher_inv_sample_max = np.zeros( num_obs )
+        self.f_hat = np.zeros( (num_trials, num_steps) )
+        self.fisher_inv = np.zeros( (num_trials, num_steps) )
+        self.f_hat_sample_mean = np.zeros( num_steps )
+        self.fisher_inv_sample_mean = np.zeros( num_steps )
+        self.f_hat_sample_std = np.zeros( num_steps )
+        self.fisher_inv_sample_std = np.zeros( num_steps )
+        self.f_hat_sample_min = np.zeros( num_steps )
+        self.fisher_inv_sample_min = np.zeros( num_steps )
+        self.f_hat_sample_max = np.zeros( num_steps )
+        self.fisher_inv_sample_max = np.zeros( num_steps )
 
     def run(self, data_flag = False):
         self.run_sim()
@@ -261,7 +261,7 @@ class SingleAgentSim(Sim):
         # Compute the denominator term for the estimated fill ratio calculation
         denom = self.b_prob + self.w_prob - 1.0
 
-        for exp_ind in range(self.num_exp):
+        for exp_ind in range(self.num_trials):
             prev_obs = 0
             curr_obs = 0
 
@@ -295,7 +295,7 @@ class SingleAgentSim(Sim):
             self.tiles_record[exp_ind] = tiles
 
             # Compute the average tile ratio up to this simulation experiment
-            self.avg_fill_ratio =  (exp_ind)/(exp_ind+1) * self.avg_fill_ratio + 1/(exp_ind+1) * sum(tiles)/self.num_obs
+            self.avg_fill_ratio =  (exp_ind)/(exp_ind+1) * self.avg_fill_ratio + 1/(exp_ind+1) * sum(tiles)/self.num_steps
 
     def write_data_to_csv(self):
         """Write simulation data to CSV files.
@@ -312,14 +312,14 @@ class MultiAgentSim(Sim):
     def __init__(self, sim_param_obj, des_fill_ratio, sensor_prob):
 
         num_agents = sim_param_obj.num_agents
-        num_exp = sim_param_obj.num_exp
-        num_obs = sim_param_obj.num_obs
+        num_trials = sim_param_obj.num_trials
+        num_steps = sim_param_obj.num_steps
         comms_period = sim_param_obj.comms_period
 
-        super().__init__(num_exp, num_obs, des_fill_ratio, sim_param_obj.filename_suffix_1)
+        super().__init__(num_trials, num_steps, des_fill_ratio, sim_param_obj.filename_suffix_1)
 
         # Initialize data containers (to be serialized)
-        self.stats = self.SimStats("multi", num_exp, num_obs, comms_period, num_agents)
+        self.stats = self.SimStats("multi", num_trials, num_steps, comms_period, num_agents)
         if sensor_prob < 0: # not actually the sensor probability; actually encoded distribution
 
             # Decode distribution parameters
@@ -330,17 +330,17 @@ class MultiAgentSim(Sim):
             # Store parameters
             self.generator = np.random.default_rng()
             self.dist_params = [param_1, param_2]
-            self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, val, comms_period)
+            self.sim_data = self.SimData("multi", num_trials, num_agents, num_steps, val, comms_period)
         else:
-            self.sim_data = self.SimData("multi", num_exp, num_agents, num_obs, sensor_prob, comms_period)
+            self.sim_data = self.SimData("multi", num_trials, num_agents, num_steps, sensor_prob, comms_period)
 
         # Initialize non-persistent simulation data
-        self.x_hat = np.zeros( (num_exp, num_agents, num_obs + 1) )
-        self.alpha = np.zeros( (num_exp, num_agents, num_obs + 1) )
-        self.x_bar = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
-        self.rho = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
-        self.x = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
-        self.gamma = np.zeros( (num_exp, num_agents, num_obs//comms_period + 1) )
+        self.x_hat = np.zeros( (num_trials, num_agents, num_steps + 1) )
+        self.alpha = np.zeros( (num_trials, num_agents, num_steps + 1) )
+        self.x_bar = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
+        self.rho = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
+        self.x = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
+        self.gamma = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
 
         # Setup up communication graph
         self.setup_comms_graph(sim_param_obj.comms_graph_str, sim_param_obj.comms_prob)
@@ -402,7 +402,7 @@ class MultiAgentSim(Sim):
 
         for vertex in self.sim_data.comms_network.graph.get_vertices():
             if self.sim_data.b_prob == UNIFORM_DIST_SP_ENUM: # sensor probability is an encoded value for a uniform distributed sensor probability
-                b_sensor_prob = ( (self.dist_params[1] - self.dist_params[0]) * self.generator.random(self.num_exp) + self.dist_params[0] ).tolist()
+                b_sensor_prob = ( (self.dist_params[1] - self.dist_params[0]) * self.generator.random(self.num_trials) + self.dist_params[0] ).tolist()
                 w_sensor_prob = b_sensor_prob
 
                 sensor_probs.append(b_sensor_prob)
@@ -410,7 +410,7 @@ class MultiAgentSim(Sim):
                 self.stats.sp_distribution = "uniform"
 
             elif self.sim_data.b_prob == NORMAL_DIST_SP_ENUM: # sensor probability is an encoded value for a normal distributed sensor probability
-                b_sensor_prob = ( self.generator.normal(self.dist_params[0], np.sqrt(self.dist_params[1]), self.num_exp) ).tolist()
+                b_sensor_prob = ( self.generator.normal(self.dist_params[0], np.sqrt(self.dist_params[1]), self.num_trials) ).tolist()
                 w_sensor_prob = b_sensor_prob
 
                 sensor_probs.append(b_sensor_prob)
@@ -470,7 +470,7 @@ class MultiAgentSim(Sim):
 
     def run(self):
 
-        for e in range(self.num_exp):
+        for e in range(self.num_trials):
             self.run_sim(e)
 
             self.compute_sample_mean(e)
@@ -518,7 +518,7 @@ class MultiAgentSim(Sim):
         informed_conf.append(i["conf"])
 
         # Go through each tile observation
-        while curr_iteration < self.num_obs:
+        while curr_iteration < self.num_steps:
 
             # Execute observation phase
             local_obs_dict, local_val_dict = self.run_observation_phase(self.sim_data.tiles[experiment_index][:, curr_iteration])
@@ -601,12 +601,12 @@ class MultiAgentSim(Sim):
                 a1.communicate_rx( a2.communicate_tx() )
                 a2.communicate_rx( a1.communicate_tx() )
 
-        # Make the agents perform social (dual) and primal computation
+        # Make the agents perform social (dual) and informed computation
         for v in self.sim_data.comms_network.graph.vertices():
             agent = self.sim_data.comms_network.agents_vp[v]
 
             agent.solve_social()
-            agent.solve_primal()
+            agent.solve_informed()
 
             social_values["x"].append(agent.get_x_bar())
             social_values["conf"].append(agent.get_rho())
@@ -665,7 +665,7 @@ class CommsNetwork:
 
 class Agent:
 
-    def __init__(self, p_b_b, p_w_w, local_functions, social_functions, primal_functions):
+    def __init__(self, p_b_b, p_w_w, local_functions, social_functions, informed_functions):
 
         if isinstance(p_b_b, list):
             self.prob_counter = 0
@@ -686,7 +686,7 @@ class Agent:
 
         self.local_solver = self.LocalSolver(*local_functions)
         self.social_solver = self.SocialSolver(*social_functions)
-        self.primal_solver = self.PrimalSolver(*primal_functions)
+        self.informed_solver = self.InformedSolver(*informed_functions)
 
     def reset(self):
 
@@ -703,7 +703,7 @@ class Agent:
 
         self.local_solver.reset()
         self.social_solver.reset()
-        self.primal_solver.reset()
+        self.informed_solver.reset()
 
     def observe(self, encounter, obs_function):
 
@@ -761,10 +761,10 @@ class Agent:
         self.comms_round_collected_est = []
         self.comms_round_collected_conf = []
 
-    def solve_primal(self):
-        """Compute the final estimate using the primal function.
+    def solve_informed(self):
+        """Compute the final estimate using the informed function.
         """
-        self.primal_solver.solve(self.local_solver.x, self.local_solver.conf,
+        self.informed_solver.solve(self.local_solver.x, self.local_solver.conf,
                                  self.social_solver.x, self.social_solver.conf)
 
     def get_x_hat(self): return self.local_solver.x
@@ -775,9 +775,9 @@ class Agent:
 
     def get_rho(self): return self.social_solver.conf
 
-    def get_x(self): return self.primal_solver.x
+    def get_x(self): return self.informed_solver.x
 
-    def get_gamma(self): return self.primal_solver.conf
+    def get_gamma(self): return self.informed_solver.conf
 
     def get_curr_obs(self): return self.curr_obs
 
@@ -829,7 +829,7 @@ class Agent:
             # Compute the social confidence
             self.conf = self.conf_func(conf_arr)
 
-    class PrimalSolver:
+    class InformedSolver:
 
         def __init__(self, primal_est_func, primal_conf_func):
             self.x = 0.0
@@ -860,15 +860,15 @@ class ExperimentData:
     def __init__(self, sim_param_obj):
         self.sim_type = "static"
         self.num_agents = sim_param_obj.num_agents
-        self.num_exp = sim_param_obj.num_exp
-        self.num_obs = sim_param_obj.num_obs
+        self.num_trials = sim_param_obj.num_trials
+        self.num_steps = sim_param_obj.num_steps
         self.graph_type = sim_param_obj.comms_graph_str
         self.comms_period = sim_param_obj.comms_period
         self.comms_prob = sim_param_obj.comms_prob
-        self.dfr_range = sim_param_obj.dfr_range
+        self.tfr_range = sim_param_obj.tfr_range
         self.sp_range = sim_param_obj.sp_range
-        self.stats_obj_dict = {i: {j: None for j in self.sp_range} for i in self.dfr_range}
-        self.sim_data_obj_dict = {i: {j: None for j in self.sp_range} for i in self.dfr_range}
+        self.stats_obj_dict = {i: {j: None for j in self.sp_range} for i in self.tfr_range}
+        self.sim_data_obj_dict = {i: {j: None for j in self.sp_range} for i in self.tfr_range}
 
     def insert_sim_obj(self, des_fill_ratio, sensor_prob, stats_obj: Sim.SimStats, sim_data_obj: Sim.SimData):
 
@@ -946,10 +946,10 @@ class HeatmapData:
 
     def __init__(self, sim_param_obj):
 
-        self.num_exp = sim_param_obj.num_exp
-        self.num_obs = sim_param_obj.num_obs
+        self.num_trials = sim_param_obj.num_trials
+        self.num_steps = sim_param_obj.num_steps
         self.sensor_prob_range = sim_param_obj.sp_range
-        self.fill_ratio_range = sim_param_obj.dfr_range
+        self.fill_ratio_range = sim_param_obj.tfr_range
         self.main_filename_suffix = sim_param_obj.full_suffix
 
         self.f_hat_data = {"mean": [], "min": [], "max": []}
@@ -1077,9 +1077,9 @@ class SimParam:
     def __init__(self, yaml_config):
 
         # Common parameters
-        dfr_min = float(yaml_config["desFillRatios"]["min"])
-        dfr_max = float(yaml_config["desFillRatios"]["max"])
-        dfr_inc = int(yaml_config["desFillRatios"]["incSteps"])
+        tfr_min = float(yaml_config["targFillRatios"]["min"])
+        tfr_max = float(yaml_config["targFillRatios"]["max"])
+        tfr_inc = int(yaml_config["targFillRatios"]["incSteps"])
 
         sp_min = float(yaml_config["sensorProb"]["min"])
         sp_max = float(yaml_config["sensorProb"]["max"])
@@ -1100,9 +1100,9 @@ class SimParam:
 
         else:
             self.sp_range = np.round(np.linspace(sp_min, sp_max, sp_inc), 3).tolist()
-        self.dfr_range = np.round(np.linspace(dfr_min, dfr_max, dfr_inc), 3).tolist()
-        self.num_obs = int(yaml_config["numObs"])
-        self.num_exp = int(yaml_config["numExperiments"])
+        self.tfr_range = np.round(np.linspace(tfr_min, tfr_max, tfr_inc), 3).tolist()
+        self.num_steps = int(yaml_config["numSteps"])
+        self.num_trials = int(yaml_config["numTrials"])
         self.write_all = yaml_config["writeAllData"]
 
         # Multi-agent simulation parameters
@@ -1126,17 +1126,17 @@ class SimParam:
         else:
             sensor_prob_inc = self.sp_range[1] - self.sp_range[0]
 
-        if len(self.dfr_range) == 1:
+        if len(self.tfr_range) == 1:
             fill_ratio_inc = 0
         else:
-            fill_ratio_inc = self.dfr_range[1] - self.dfr_range[0]
+            fill_ratio_inc = self.tfr_range[1] - self.tfr_range[0]
 
         # Define filename descriptors
         min_sensor_prob, max_sensor_prob = int(self.sp_range[0]*1e2), int(self.sp_range[-1]*1e2)
-        min_des_fill_ratio, max_des_fill_ratio = int(self.dfr_range[0]*1e2), int(self.dfr_range[-1]*1e2)
+        min_des_fill_ratio, max_des_fill_ratio = int(self.tfr_range[0]*1e2), int(self.tfr_range[-1]*1e2)
         p_inc, f_inc = int(sensor_prob_inc*1e2), int(fill_ratio_inc*1e2)
 
-        self.filename_suffix_1 = "_e" +str(self.num_exp) + "_o" + str(self.num_obs) # describing number of experiments and observations
+        self.filename_suffix_1 = "_e" +str(self.num_trials) + "_o" + str(self.num_steps) # describing number of experiments and observations
 
         prob_suffix = "_p" + str(min_sensor_prob) + "-" + str(p_inc) + "-" + str(max_sensor_prob)
         f_suffix = "_f" + str(min_des_fill_ratio) + "-" + str(f_inc) + "-" + str(max_des_fill_ratio)

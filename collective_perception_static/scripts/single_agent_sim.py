@@ -83,7 +83,7 @@ if __name__ == "__main__":
     hm = HeatmapData(param_obj)
 
     # Run simulations
-    for f in param_obj.dfr_range: # iterate through each desired fill ratio
+    for f in param_obj.tfr_range: # iterate through each desired fill ratio
 
         # Create HeatmapRow object
         hr = HeatmapRow()
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         for p in param_obj.sp_range: # iterate through each sensor probabilities
             print("\tRunning case with probability ratio = " + str(p) + "... ", end="")
 
-            s = SingleAgentSim(param_obj.num_exp, param_obj.num_obs, f, p, p, param_obj.filename_suffix_1)
+            s = SingleAgentSim(param_obj.num_trials, param_obj.num_steps, f, p, p, param_obj.filename_suffix_1)
             s.run(param_obj.write_all) # run the single agent simulation
 
             hr.populate(s) # populate one heatmap row for both f_hat and fisher_inv

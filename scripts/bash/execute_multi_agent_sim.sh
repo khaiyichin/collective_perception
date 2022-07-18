@@ -38,8 +38,8 @@ MAX=(0.3 0.6 0.9 0.95)
 INC=(6 6 6 1)
 
 # Set fixed parameters
-sed -i "s/numExperiments:.*/numExperiments: 5/g" param_multi_agent_sim.yaml
-sed -i "s/numObs:.*/numObs: 1000/g" param_multi_agent_sim.yaml
+sed -i "s/numTrials:.*/numTrials: 5/g" param_multi_agent_sim.yaml
+sed -i "s/numSteps:.*/numSteps: 1000/g" param_multi_agent_sim.yaml
 
 # Run simulations
 {
@@ -67,8 +67,8 @@ sed -i "s/numObs:.*/numObs: 1000/g" param_multi_agent_sim.yaml
                     min=$(echo ${MIN[d]})
                     max=$(echo ${MAX[d]})
                     inc=$(echo ${INC[d]})
-                    sed -i "/desFillRatios:/{n;N;N;d}" param_multi_agent_sim.yaml
-                    sed -i "s/desFillRatios:/desFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" param_multi_agent_sim.yaml
+                    sed -i "/targFillRatios:/{n;N;N;d}" param_multi_agent_sim.yaml
+                    sed -i "s/targFillRatios:/targFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" param_multi_agent_sim.yaml
                     python3 multi_agent_sim.py -p # run parallel
                 done
 

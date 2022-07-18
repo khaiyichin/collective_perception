@@ -34,8 +34,8 @@ MAX=(0.95)
 INC=(19)
 
 # Set fixed parameters
-sed -i "s/numExperiments:.*/numExperiments: 5/g" $PARAMFILE
-sed -i "s/numObs:.*/numObs: 2000/g" $PARAMFILE
+sed -i "s/numTrials:.*/numTrials: 5/g" $PARAMFILE
+sed -i "s/numSteps:.*/numSteps: 2000/g" $PARAMFILE
 
 # Run simulations
 {
@@ -61,9 +61,9 @@ sed -i "s/numObs:.*/numObs: 2000/g" $PARAMFILE
                 min=$(echo ${MIN[d]})
                 max=$(echo ${MAX[d]})
                 inc=$(echo ${INC[d]})
-                sed -i "/desFillRatios:/{n;N;N;d}" $PARAMFILE # remove the line and 2 lines after 'desFillRatios'
-                sed -i "s/desFillRatios:/desFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" $PARAMFILE
-                singularity run $SIFFILE
+                sed -i "/targFillRatios:/{n;N;N;d}" $PARAMFILE # remove the line and 2 lines after 'targFillRatios'
+                sed -i "s/targFillRatios:/targFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" $PARAMFILE
+                singularity exec $SIFFILE multi_agent_sim_static.py -p
             done
 
             # Copy and move the data

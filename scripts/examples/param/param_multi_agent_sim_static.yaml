@@ -9,11 +9,11 @@ sensorProb: # sensor probability range (inclusive) to simulate
   max: 0.975
   incSteps: 19 # set to -2 for uniform distribution with range [`min`, `max`)
                # set to -3 for normal distribution with (mean=`min`, variance=`max`)
-desFillRatios: # target fill ratio range (inclusive) to simulate
+targFillRatios: # target fill ratio range (inclusive) to simulate
   min: 0.05
   max: 0.95
   incSteps: 19
-numExperiments: 1 # number of experiments to run for each parameter
-numObs: 1000 # number of observations (timesteps)
+numTrials: 1 # number of trials to repeat for each parameter
+numSteps: 1000 # number of steps (each observation is made per step)
 writeAllData: False
 ...

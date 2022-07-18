@@ -119,9 +119,9 @@ if __name__ == "__main__":
     # Execute simulated experiments
     if args.p: # parallel simulation runs
 
-        if len(param_obj.dfr_range) == 1: # in the case when there's only one specific target fill ratio case
+        if len(param_obj.tfr_range) == 1: # in the case when there's only one specific target fill ratio case
 
-            tfr = param_obj.dfr_range[0]
+            tfr = param_obj.tfr_range[0]
 
             print("\nRunning cases with fill ratio = " + str(tfr))
 
@@ -130,7 +130,7 @@ if __name__ == "__main__":
             [data.insert_sim_obj(output[0], output[1], output[2], output[3]) for output in lst_of_outputs]
 
         else:
-            lst_of_lst_outputs = Parallel(n_jobs=-1, verbose=100)(delayed(run_sim_parallel_tfr)(param_obj, f) for f in param_obj.dfr_range)
+            lst_of_lst_outputs = Parallel(n_jobs=-1, verbose=100)(delayed(run_sim_parallel_tfr)(param_obj, f) for f in param_obj.tfr_range)
             outputs = [output_tup for target_fill_ratio_outputs_lst in lst_of_lst_outputs
                     for output_tup in target_fill_ratio_outputs_lst]
 
@@ -139,7 +139,7 @@ if __name__ == "__main__":
 
     else: # sequential simulation runs
         start = timeit.default_timer()
-        for f in param_obj.dfr_range: # iterate through each desired fill ratio
+        for f in param_obj.tfr_range: # iterate through each desired fill ratio
 
             print("\nRunning cases with fill ratio = " + str(f))
 
