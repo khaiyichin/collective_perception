@@ -4,9 +4,6 @@ import numpy as np
 from collective_perception_py import sim_modules as sm
 from collective_perception_py import viz_modules as vm
 
-"""
-"""
-
 # Default (arbitrary) values
 TFR_RANGE = []
 SP_RANGE = []
@@ -75,9 +72,6 @@ class MASParametrizer:
         )
         self.mas_tfr = mas_tfr
         self.mas_sp = mas_sp
-
-        # self.sp_range = [ int( str(UNIFORM_DIST_SP_ENUM) + lower_bound + upper_bound ) ] # [distribution id, lower bound incl., upper bound excl.]
-        # self.sp_range = [ int(str(NORMAL_DIST_SP_ENUM) + mean + var) ] # [distribution id, mean, variance]
 
 @pytest.fixture(scope="function")
 def mas(request):

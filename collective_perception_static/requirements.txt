@@ -9,6 +9,7 @@ Pillow==9.1.1
 protoletariat==0.9.4
 pyparsing==3.0.9
 pytest==7.1.2
+pytest-parallel==0.1.1
 python-dateutil==2.8.2
 PyYAML==6.0
 scipy==1.8.1

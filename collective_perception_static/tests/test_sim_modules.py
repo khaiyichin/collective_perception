@@ -10,11 +10,12 @@ sp_range_1 = np.linspace(0.6, 0.8, 3).tolist()
 num_steps_1 = 50000
 num_trials_1 = 10
 num_agents_1 = 15
-comms_graph_str_1 = "ring"
 comms_period_1 = 2
 tfr_10 = tfr_range_1[0]
 sp_10 = sp_range_1[0]
 
+"""Test simulator initialization
+"""
 @pytest.mark.parametrize(
     "mas",
     [ cftest.MASParametrizer(
@@ -23,7 +24,6 @@ sp_10 = sp_range_1[0]
         sparam_num_steps = num_steps_1,
         sparam_num_trials = num_trials_1,
         sparam_num_agents = num_agents_1,
-        sparam_comms_graph_str = comms_graph_str_1,
         sparam_comms_period = comms_period_1,
         sparam_comms_prob = cftest.COMMS_PROB,
         mas_tfr = tfr_10,
@@ -96,10 +96,9 @@ def test_mas_initialization(mas): # @todo: add more test cases (use different pa
         assert len(agt_tiles) == num_steps_1
 
         fill_ratio = sum(agt_tiles)/len(agt_tiles)
-        np.testing.assert_approx_equal(fill_ratio, tfr_10, 2)
+        np.testing.assert_almost_equal(fill_ratio, tfr_10, 2)
 
-"""
-Test full network generation
+"""Test full network generation
 """
 @pytest.mark.parametrize(
     "mas", [cftest.MASParametrizer(sparam_comms_graph_str="full")], indirect=True
@@ -112,8 +111,7 @@ def test_full_comms_network(mas):
     assert graph.num_edges() == n*(n-1)/2 # number of edges
     assert np.all(graph.get_total_degrees(graph.get_vertices()) == n-1) # number of neighbors
 
-"""
-Test ring network generation
+"""Test ring network generation
 """
 @pytest.mark.parametrize(
     "mas", [cftest.MASParametrizer(sparam_comms_graph_str="ring")], indirect=True
@@ -140,8 +138,7 @@ def test_ring_network(mas):
             assert neighbors[0] == v-1
             assert neighbors[1] == v+1
 
-"""
-Test line network generation
+"""Test line network generation
 """
 @pytest.mark.parametrize(
     "mas", [cftest.MASParametrizer(sparam_comms_graph_str="line")], indirect=True
@@ -173,49 +170,88 @@ def test_line_network(mas):
             assert neighbors[0] == v-1
             assert neighbors[1] == v+1
 
-# @TODO: don't have a good way to verify the scale-free network yet
-# """
-# Test scale-free network generation
-# """
-# @pytest.mark.parametrize(
-#     "mas", [cftest.MASParametrizer(
-#         sparam_comms_graph_str="scale-free",
-#         sparam_num_agents=100)], indirect=True
-# )
-# def test_sf_network(mas):
-#     n = mas.sim_data.num_agents
-#     graph = mas.sim_data.comms_network.graph
-#     degrees_lst = graph.get_total_degrees(graph.get_vertices())
-
-#     import graph_tool.draw as gt_draw
-
-#     gt_draw.graph_draw(graph)
-
-#     deg_set = sorted(set(degrees_lst)) # get unique degree values
-#     num_occur_lst = [ len([i for i in degrees_lst if i == deg]) for deg in deg_set ]
-#     for deg in deg_set:
-
-#         # Gather the number of occurrence for a particular degree
-#         num_occur = len([i for i in degrees_lst if i == deg])
-
-#         # Compute the rate of occurrence
-#         rate_occur = num_occur / n
-
-#         # Compute the theoretical probability (https://en.wikipedia.org/wiki/Barab%C3%A1si%E2%80%93Albert_model#Degree_distribution)
-#         prob = 1/(deg ** 3)
-
-#         # Compare rate with the theoretical probability --> this isn't the correct way to verify
-#         # np.testing.assert_approx_equal(rate_occur, prob, 3)
-
-#     pass
-
-
-# Check that the uniformly distributed sensor probability is 0.75
-
-# test agent class?
-
+"""Test sensor probability distribution correctness
 """
-Test local value computation
+u_dist_sp = sm.encode_sp_distribution(sm.UNIFORM_DIST_SP_ENUM, *sorted(np.random.random_sample(2)))[0]
+n_dist_sp = sm.encode_sp_distribution(sm.NORMAL_DIST_SP_ENUM, *sorted(np.random.random_sample(2)))[0]
+@pytest.mark.parametrize(
+    "mas",
+    [cftest.MASParametrizer(mas_sp=u_dist_sp, sparam_num_agents=10000, sparam_num_steps=1),
+     cftest.MASParametrizer(mas_sp=n_dist_sp, sparam_num_agents=10000, sparam_num_steps=1)],
+    indirect=True
+)
+def test_sensor_distribution(mas):
+
+    # Define the appropriate mean and standard deviation equations
+    if mas.stats.sp_distribution == "uniform":
+        exp_mean = lambda p1, p2: (p1 + p2) / 2
+        exp_var = lambda p1, p2: np.square(p2 - p1) / 12
+    elif mas.stats.sp_distribution == "normal":
+        exp_mean = lambda p1, p2: p1
+        exp_var = lambda p1, p2: p2
+    else:
+        raise ValueError("Invalid \"sp_distribution\" string!")
+
+    # Obtain parsed parameters from simulator
+    param_1, param_2 = mas.dist_params
+
+    # Collect the sensor probabilities of all agents
+    cn = mas.sim_data.comms_network
+
+    for _ in range(mas.sim_data.num_trials):
+
+        b_probs = [ cn.agents_vp[v].b_prob for v in cn.graph.vertices() ]
+        w_probs = [ cn.agents_vp[v].w_prob for v in cn.graph.vertices() ]
+
+        np.testing.assert_array_equal(b_probs, w_probs) # verify that they are the same
+        del w_probs # save some memory
+
+        # Check that the mean and standard deviation is correct
+        actual_mean = np.mean(b_probs)
+        expected_mean = exp_mean(param_1, param_2)
+
+        actual_var = np.var(b_probs)
+        expected_var = exp_var(param_1, param_2)
+
+        np.testing.assert_almost_equal(actual_mean, expected_mean, 1)
+        np.testing.assert_almost_equal(actual_var, expected_var, 1)
+
+        # Reset the agents (can only reset to num_trials-1, i.e., the last iteration will fail)
+        try:
+            mas.reset_agents()
+        except Exception as e:
+            pass
+
+"""Test sensor accuracy distribution encoding and decoding schemes
+"""
+@pytest.mark.parametrize(
+    "dist_id", [ sm.UNIFORM_DIST_SP_ENUM, sm.NORMAL_DIST_SP_ENUM ]
+)
+def test_dist_encoding_decoding(dist_id):
+
+    for _ in range(cftest.TEST_REPEATS):
+        # Create random draw parameters
+        drawing_lim = sorted( np.random.random_sample(size=2) )
+        drawing_range = drawing_lim[1] - drawing_lim[0]
+
+        # Draw random parameter values
+        params = sorted( drawing_range *  np.random.random_sample(2) + drawing_lim[0] )
+
+        # Check encoding scheme
+        actual_encoding = sm.encode_sp_distribution(dist_id, params[0], params[1])
+        expected_encoding = [ int(
+            "{0}{1:04d}{2:04d}".format(dist_id, int( round(params[0], 3) * 1e3), int( round(params[1], 3) * 1e3))
+        ) ]
+
+        assert actual_encoding == expected_encoding
+
+        # Check decoding scheme
+        actual_decoding = sm.decode_sp_distribution(*actual_encoding)
+        expected_decoding = ( dist_id, np.round(params[0], 3), np.round( params[1], 3) )
+
+        assert all( [a == e for a, e in zip(actual_decoding, expected_decoding)] )
+
+"""Test local value computation
 """
 @pytest.mark.parametrize("mas", [cftest.MASParametrizer(sparam_num_steps=20)], indirect=True)
 def test_local_vals(mas):
@@ -268,8 +304,7 @@ def test_local_vals(mas):
         np.testing.assert_allclose(local_est, mas.x_hat[trial_ind][agent_ind][step_ind+1]) # the first value is from the initial estimate, not from observations
         np.testing.assert_allclose(local_conf, mas.alpha[trial_ind][agent_ind][step_ind+1]) # the first value is from the initial estimate, not from observations
 
-"""
-Test social value computation
+"""Test social value computation
 """
 @pytest.mark.parametrize(
     "mas",
@@ -308,8 +343,7 @@ def test_social_vals(mas):
         np.testing.assert_allclose(mas.x_bar[trial_ind][agent_ind][step_ind], social_est)
         np.testing.assert_allclose(mas.rho[trial_ind][agent_ind][step_ind], social_conf)
 
-"""
-Test legacy social value computation
+"""Test legacy social value computation
 """
 @pytest.mark.parametrize(
     "mas",
@@ -348,8 +382,7 @@ def test_social_vals_legacy(mas):
         np.testing.assert_allclose(mas.x_bar[trial_ind][agent_ind][step_ind], social_est)
         np.testing.assert_allclose(mas.rho[trial_ind][agent_ind][step_ind], social_conf)
 
-"""
-Test informed value computation
+"""Test informed value computation
 """
 @pytest.mark.parametrize(
     "mas",
@@ -377,16 +410,17 @@ def test_informed_vals(mas):
         social_conf =  mas.rho[trial_ind][agent_ind][step_ind]
 
         # Compute informed values manually
-        informed_est = (local_conf * local_est + social_est) / (local_conf + social_conf)
-        informed_conf = np.mean([local_conf, social_conf])
+        if local_conf == 0 and social_conf == 0:
+            informed_est = local_est
+        else:
+            informed_est = (local_conf * local_est + social_est) / (local_conf + social_conf)
 
-        print("debug", step_ind, social_conf, local_conf)
+        informed_conf = np.mean([local_conf, social_conf])
 
         np.testing.assert_allclose(mas.x[trial_ind][agent_ind][step_ind], informed_est)
         np.testing.assert_allclose(mas.gamma[trial_ind][agent_ind][step_ind], informed_conf)
 
-"""
-Test legacy informed value computation
+"""Test legacy informed value computation
 """
 @pytest.mark.parametrize(
     "mas",
@@ -414,20 +448,20 @@ def test_informed_vals_legacy(mas):
         social_conf =  mas.rho[trial_ind][agent_ind][step_ind]
 
         # Compute informed values manually
-        informed_est = (local_conf * local_est + social_conf * social_est) / (local_conf + social_conf)
+        if local_conf == 0 and social_conf == 0:
+            informed_est = local_est
+        else:
+            informed_est = (local_conf * local_est + social_conf * social_est) / (local_conf + social_conf)
         informed_conf = local_conf + social_conf
 
         np.testing.assert_allclose(mas.x[trial_ind][agent_ind][step_ind], informed_est)
         np.testing.assert_allclose(mas.gamma[trial_ind][agent_ind][step_ind], informed_conf)
 
-# test that the uniform distribution is actually uniform
-
-"""
-Test agent sensor accuracy
+"""Test agent sensor accuracy
 """
 @pytest.mark.parametrize(
     "mas",
-    [cftest.MASParametrizer(sparam_num_trials=2, sparam_num_agents=3, sparam_comms_period=50)],
+    [cftest.MASParametrizer(sparam_num_trials=2, sparam_num_agents=3, sparam_comms_period=50, sparam_num_steps=int(1e5))],
     indirect=True
 )
 def test_agent_sensor_prob(mas):
@@ -452,11 +486,10 @@ def test_agent_sensor_prob(mas):
         correct_obs = sum([1 for t, o in zip(tiles, obs) if t == o])
         obs_rate = correct_obs/len(obs)
 
-        np.testing.assert_approx_equal(obs_rate, mas.sim_data.b_prob, 2)
-        np.testing.assert_approx_equal(obs_rate, mas.sim_data.w_prob, 2)
+        np.testing.assert_almost_equal(obs_rate, mas.sim_data.b_prob, 2)
+        np.testing.assert_almost_equal(obs_rate, mas.sim_data.w_prob, 2)
 
-"""
-Test agent reset function
+"""Test agent reset function
 """
 @pytest.mark.parametrize(
     "mas", [ cftest.MASParametrizer() ], indirect=True)
@@ -489,3 +522,37 @@ def test_reset_agents(mas):
         # Reset agent and verify
         agent_obj.reset()
         cftest.assert_initial_agent_values(agent_obj)
+
+# @TODO: don't have a good way to verify the scale-free network yet
+# """
+# Test scale-free network generation
+# """
+# @pytest.mark.parametrize(
+#     "mas", [cftest.MASParametrizer(
+#         sparam_comms_graph_str="scale-free",
+#         sparam_num_agents=100)], indirect=True
+# )
+# def test_sf_network(mas):
+#     n = mas.sim_data.num_agents
+#     graph = mas.sim_data.comms_network.graph
+#     degrees_lst = graph.get_total_degrees(graph.get_vertices())
+
+#     import graph_tool.draw as gt_draw
+
+#     gt_draw.graph_draw(graph)
+
+#     deg_set = sorted(set(degrees_lst)) # get unique degree values
+#     num_occur_lst = [ len([i for i in degrees_lst if i == deg]) for deg in deg_set ]
+#     for deg in deg_set:
+
+#         # Gather the number of occurrence for a particular degree
+#         num_occur = len([i for i in degrees_lst if i == deg])
+
+#         # Compute the rate of occurrence
+#         rate_occur = num_occur / n
+
+#         # Compute the theoretical probability (https://en.wikipedia.org/wiki/Barab%C3%A1si%E2%80%93Albert_model#Degree_distribution)
+#         prob = 1/(deg ** 3)
+
+#         # Compare rate with the theoretical probability --> this isn't the correct way to verify
+#         # np.testing.assert_approx_equal(rate_occur, prob, 3)

@@ -1,6 +1,6 @@
 import yaml
 import numpy as np
-import csv
+import scipy.stats as spy_stats
 from datetime import datetime
 import graph_tool as gt
 import graph_tool.generation as gt_gen
@@ -17,6 +17,26 @@ UNIFORM_DIST_SP_ENUM = -2
 NORMAL_DIST_SP_ENUM = -3
 
 warnings.filterwarnings("ignore", category=RuntimeWarning) # suppress warnings since division by zero occur frequently here
+
+def decode_sp_distribution(encoded_val):
+
+    assert encoded_val < 0.0
+
+    # Decode distribution parameters
+    dist_id = int( str(encoded_val)[:2] )
+    param_1 = round( float( str( encoded_val )[2:6] ) * 1e-3, 3 )
+    param_2 = round( float( str( encoded_val )[6:] ) * 1e-3, 3 )
+
+    return dist_id, param_1, param_2
+
+def encode_sp_distribution(dist_id, param_1, param_2):
+
+    # Encode distribution parameters into single int in a list
+    p1_enc = "{:04d}".format( int( round(param_1, 3) * 1e3 ) ) # 4 digits, scaled by 1e3
+    p2_enc = "{:04d}".format( int( round(param_2, 3) * 1e3 ) ) # 4 digits, scaled by 1e3
+    encoded = [ int( str(dist_id) + p1_enc + p2_enc ) ] # [ int(distribution id, parameter 1, parameter 2) ]
+
+    return encoded
 
 class Sim:
     """Top level simulation class.
@@ -35,6 +55,7 @@ class Sim:
             self.w_prob = sensor_prob # P(white|white)
             self.comms_network_str = None
             self.comms_period = comms_period
+            self.comms_network = None
 
             if sim_type == "multi":
                 self.tiles = np.zeros( (num_trials, num_agents, num_steps) )
@@ -169,15 +190,19 @@ class Sim:
             return 0.0 if all([i == 0 for i in weights]) else np.average(x_arr, weights=weights)
 
     def compute_fisher_bar(self, fisher_arr, legacy=False):
-        if legacy: return np.nan_to_num(np.reciprocal( np.mean( np.reciprocal( fisher_arr ) ) ), posinf=POSINF) # prevent infs
+        if legacy: return np.nan_to_num( spy_stats.hmean(fisher_arr), posinf=POSINF )
         else: return np.nan_to_num( np.mean(fisher_arr), posinf=POSINF )
 
     def compute_x(self, x_hat, alpha, x_bar, rho, legacy=False): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
+
+        # Check if the confidences are zero
+        if alpha == 0 and rho == 0: return x_hat # use the local estimate since that's the best possible guess at this time
+
         if legacy: return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
         else: return (alpha*x_hat + x_bar) / (alpha + rho)
 
     def compute_fisher(self, alpha, rho, legacy=False):
-        if legacy: return np.nan_to_num(np.reciprocal( 1 / (alpha + rho) ), posinf=POSINF) # alpha^-1 and rho^-1 are variances; prevent infs
+        if legacy: return alpha + rho # alpha^-1 and rho^-1 are variances, so the sum is the result of the harmonic mean
         else: return np.mean([alpha, rho])
 
 class MultiAgentSim(Sim):
@@ -197,14 +222,12 @@ class MultiAgentSim(Sim):
         if sensor_prob < 0: # not actually the sensor probability; actually encoded distribution
 
             # Decode distribution parameters
-            val = int( str(sensor_prob)[:2] )
-            param_1 = float( str( sensor_prob )[2:6] ) * 1e-3
-            param_2 = float( str( sensor_prob )[6:] ) * 1e-3
+            dist_id, param_1, param_2 = decode_sp_distribution(sensor_prob)
 
             # Store parameters
             self.generator = np.random.default_rng()
             self.dist_params = [param_1, param_2]
-            self.sim_data = self.SimData("multi", num_trials, num_agents, num_steps, val, comms_period)
+            self.sim_data = self.SimData("multi", num_trials, num_agents, num_steps, dist_id, comms_period)
         else:
             self.sim_data = self.SimData("multi", num_trials, num_agents, num_steps, sensor_prob, comms_period)
 
@@ -835,18 +858,8 @@ class SimParam:
         self.legacy = yaml_config["legacy"]
 
         # Check if distributed sensor probabilities is desired
-        if sp_inc == UNIFORM_DIST_SP_ENUM:
-            # Encode distribution parameters into single int in a list
-            lower_bound = "{:04d}".format( int( np.round( sp_min*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
-            upper_bound = "{:04d}".format( int( np.round( sp_max*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
-            self.sp_range = [ int( str(UNIFORM_DIST_SP_ENUM) + lower_bound + upper_bound ) ] # [distribution id, lower bound incl., upper bound excl.]
-
-        elif sp_inc == NORMAL_DIST_SP_ENUM:
-            # Encode distribution parameters into single int in a list
-            mean = "{:04d}".format( int( np.round( sp_min*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
-            var = "{:04d}".format( int( np.round( sp_max*1e3, 3 ) ) ) # 4 digits, scaled by 1e3
-            self.sp_range = [ int(str(NORMAL_DIST_SP_ENUM) + mean + var) ] # [distribution id, mean, variance]
-
+        if sp_inc < 0:
+            self.sp_range = encode_sp_distribution(sp_inc, sp_min, sp_max)
         else:
             self.sp_range = np.round(np.linspace(sp_min, sp_max, sp_inc), 3).tolist()
         self.tfr_range = np.round(np.linspace(tfr_min, tfr_max, tfr_inc), 3).tolist()
