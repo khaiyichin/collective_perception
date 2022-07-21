@@ -36,11 +36,7 @@ class Sim:
             self.comms_network_str = None
             self.comms_period = comms_period
 
-            if sim_type == "single":
-                self.tiles = np.zeros( (num_trials, num_steps) )
-                self.agent_obs = np.zeros( (num_trials, num_steps) )
-
-            elif sim_type == "multi":
+            if sim_type == "multi":
                 self.tiles = np.zeros( (num_trials, num_agents, num_steps) )
                 self.agent_obs = np.zeros( (num_trials, num_agents, num_steps) )
 
@@ -48,15 +44,29 @@ class Sim:
         """Class for storing statistics of simulation experiments.
         """
 
-        def __init__(self, sim_type, num_trials=0, num_steps=0, comms_period=1, num_agents=0):
+        def __init__(self, sim_type, num_trials=0, num_steps=0, comms_period=1, num_agents=0, legacy=False):
 
-            if sim_type == "single" and num_trials != 0 and num_steps != 0:
-                self.x_hat_sample_mean = np.zeros( (num_trials, num_steps + 1) )
-                self.alpha_sample_mean = np.zeros( (num_trials, num_steps + 1) )
-                self.x_hat_sample_std = np.zeros( (num_trials, num_steps + 1) )
-                self.alpha_sample_std = np.zeros( (num_trials, num_steps + 1) )
+            # Initialize data containers so that it can be also used to populate dynamic simulation data @TODO: not a good way to do this, please revise!
+            self.sp_distribution = None
+            self.sp_distributed_sample_mean = None
 
-            elif sim_type == "multi" and num_trials != 0 and num_steps != 0:
+            self.x_hat_sample_mean = None
+            self.alpha_sample_mean = None
+            self.x_hat_sample_std = None
+            self.alpha_sample_std = None
+
+            self.x_bar_sample_mean = None
+            self.rho_sample_mean = None
+            self.x_bar_sample_std = None
+            self.rho_sample_std = None
+
+            self.x_sample_mean = None
+            self.gamma_sample_mean = None
+            self.x_sample_std = None
+            self.gamma_sample_std = None
+            self.legacy = legacy
+
+            if sim_type == "multi" and num_trials != 0 and num_steps != 0:
                 self.sp_distribution = None
                 self.sp_distributed_sample_mean = np.zeros(num_trials)
 
@@ -79,25 +89,6 @@ class Sim:
                 self.gamma_sample_mean = np.zeros( (num_trials, num_steps//comms_period + 1) )
                 self.x_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
                 self.gamma_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
-
-            else: # for population with dynamic simulation data
-                self.sp_distribution = None
-                self.sp_distributed_sample_mean = None
-
-                self.x_hat_sample_mean = None
-                self.alpha_sample_mean = None
-                self.x_hat_sample_std = None
-                self.alpha_sample_std = None
-
-                self.x_bar_sample_mean = None
-                self.rho_sample_mean = None
-                self.x_bar_sample_std = None
-                self.rho_sample_std = None
-
-                self.x_sample_mean = None
-                self.gamma_sample_mean = None
-                self.x_sample_std = None
-                self.gamma_sample_std = None
 
     def __init__(self, num_trials, num_steps, des_fill_ratio, main_filename_suffix):
         self.num_trials = num_trials
@@ -149,163 +140,45 @@ class Sim:
         else:
             return (h/t + w - 1.0) / (b + w - 1)
 
-    def compute_fisher_hat_inv(self, h, t, b, w):
-        """Compute the inverse Fisher information (variance) for one agent.
-        """
-
-        if (b == 1.0) and (w == 1.0): output = h * (t-h) / np.power(t, 3) # perfect sensors
-        else: # noisy sensors
-            if h <= (1.0 - w) * t:
-                output = np.square(w) * np.square(w-1.0) / ( np.square(b+w-1.0) * (t*np.square(w) - 2*(t-h)*w + (t-h)) )
-            elif h >= b*t:
-                output = np.square(b) * np.square(b-1.0) / ( np.square(b+w-1.0) * (t*np.square(b) - 2*h*b + h) )
-            else:
-                output = h * (t-h) / ( np.power(t, 3) * np.square(b+w-1.0) )
-
-        return np.nan_to_num(output, posinf=POSINF) # prevent nans
-
     def compute_fisher_hat(self, h, t, b, w):
         """Compute the Fisher information for one agent.
         """
-        return np.nan_to_num( np.reciprocal( self.compute_fisher_hat_inv(h, t, b, w) ), posinf=POSINF ) # prevent infs
 
-    def compute_x_bar(self, x_arr): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same social function)
-        return np.mean(x_arr)
+        if (b == 1.0) and (w == 1.0): np.power(t, 3) / (h * (t - h)) # perfect sensor
+        else: # imperfect sensor
+            if h <= (1.0 - w) * t:
+                num = np.square(b + w - 1.0) * (t * np.square(w) - 2 * (t - h) * w + (t - h))
+                denom = np.square(w) * np.square(w - 1.0)
+                output = num / denom
+            elif h >= b*t:
+                num = np.square(b + w - 1.0) * (t * np.square(b) - 2 * h * b + h)
+                denom = np.square(b) * np.square(b - 1.0)
+                output = num / denom
+            else:
+                num = np.power(t, 3) * np.square(b + w - 1.0)
+                denom = h * (t - h)
+                output = num / denom
 
-    def compute_fisher_bar(self, fisher_arr):
-        return np.nan_to_num(np.reciprocal( np.mean( np.reciprocal( fisher_arr ) ) ), posinf=POSINF) # prevent infs
+        return np.nan_to_num(output, posinf=POSINF)
 
-    def compute_x(self, x_hat, alpha, x_bar, rho): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
-        return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
+    def compute_x_bar(self, x_arr, weights=None, legacy=False): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same social function)
 
-    def compute_fisher(self, alpha, rho):
-        return np.nan_to_num(np.reciprocal( 1 / (alpha + rho) ), posinf=POSINF) # alpha^-1 and rho^-1 are variances; prevent infs
+        if legacy:
+            return np.mean(x_arr)
+        else:
+            return 0.0 if all([i == 0 for i in weights]) else np.average(x_arr, weights=weights)
 
-    def _write_data_to_csv(self, f_hat_data, fisher_inv_data, suffix=""):
+    def compute_fisher_bar(self, fisher_arr, legacy=False):
+        if legacy: return np.nan_to_num(np.reciprocal( np.mean( np.reciprocal( fisher_arr ) ) ), posinf=POSINF) # prevent infs
+        else: return np.nan_to_num( np.mean(fisher_arr), posinf=POSINF )
 
-        f_hat_filename = "f_hat" + self.main_filename_suffix + suffix + ".csv"
-        fisher_inv_filename = "fisher_inv" + self.main_filename_suffix + suffix + ".csv"
-        tiles_filename =  "tiles" + self.main_filename_suffix + suffix + ".csv"
+    def compute_x(self, x_hat, alpha, x_bar, rho, legacy=False): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
+        if legacy: return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
+        else: return (alpha*x_hat + x_bar) / (alpha + rho)
 
-        with open(f_hat_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(f_hat_data)
-
-        with open(fisher_inv_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(fisher_inv_data)
-
-        with open(tiles_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(self.tiles_record)
-
-class SingleAgentSim(Sim):
-
-    def __init__(self, num_trials, num_steps, des_fill_ratio, b_prob, w_prob, main_f_suffix):
-
-        super().__init__(num_trials, num_steps, des_fill_ratio, main_f_suffix)
-
-        self.b_prob = b_prob # P(black|black)
-        self.w_prob = w_prob # P(white|white)
-        self.agent_obs = np.zeros( (num_trials, num_steps) )
-        self.agent_avg_black_obs = np.zeros( (num_trials, num_steps) )
-
-        # Define data members
-        self.f_hat = np.zeros( (num_trials, num_steps) )
-        self.fisher_inv = np.zeros( (num_trials, num_steps) )
-        self.f_hat_sample_mean = np.zeros( num_steps )
-        self.fisher_inv_sample_mean = np.zeros( num_steps )
-        self.f_hat_sample_std = np.zeros( num_steps )
-        self.fisher_inv_sample_std = np.zeros( num_steps )
-        self.f_hat_sample_min = np.zeros( num_steps )
-        self.fisher_inv_sample_min = np.zeros( num_steps )
-        self.f_hat_sample_max = np.zeros( num_steps )
-        self.fisher_inv_sample_max = np.zeros( num_steps )
-
-    def run(self, data_flag = False):
-        self.run_sim()
-
-        self.compute_sample_mean()
-
-        self.compute_sample_std()
-
-        self.compute_sample_min()
-
-        self.compute_sample_max()
-
-        if data_flag: self.write_data_to_csv()
-
-    def compute_sample_mean(self):
-
-        self.f_hat_sample_mean = np.mean(self.f_hat, axis=0)
-        self.fisher_inv_sample_mean = np.mean(self.fisher_inv, axis=0)
-
-    def compute_sample_std(self):
-
-        # TODO: should i be using the biased or unbiased variance here? sticking with the unbiased for now
-        self.f_hat_sample_std = np.std(self.f_hat, axis=0, ddof=1)
-        self.fisher_inv_sample_std = np.std(self.fisher_inv, axis=0, ddof=1)
-
-    def compute_sample_min(self):
-
-        self.f_hat_sample_min = np.amin(self.f_hat, axis=0)
-        self.fisher_inv_sample_min = np.amin(self.fisher_inv, axis=0)
-
-    def compute_sample_max(self):
-
-        self.f_hat_sample_max = np.amax(self.f_hat, axis=0)
-        self.fisher_inv_sample_max = np.amax(self.fisher_inv, axis=0)
-
-    def run_sim(self):
-
-        # Compute the denominator term for the estimated fill ratio calculation
-        denom = self.b_prob + self.w_prob - 1.0
-
-        for exp_ind in range(self.num_trials):
-            prev_obs = 0
-            curr_obs = 0
-
-            tiles = self.generate_tiles() # generate a new set of tiles for the current agent/experiment
-
-            for tile_ind, tile_color in enumerate(tiles):
-
-                if tile_color == 1:
-                    curr_obs = self.observe_color(tile_color, self.b_prob)
-                else:
-                    curr_obs = self.observe_color(tile_color, self.w_prob)
-
-                # Store observations
-                self.agent_obs[exp_ind][tile_ind] = curr_obs
-                self.agent_avg_black_obs[exp_ind][tile_ind] = (prev_obs + curr_obs) / (tile_ind + 1) # tile number in the denom
-                prev_obs += curr_obs
-
-                # Compute estimated fill ratio
-                if self.agent_avg_black_obs[exp_ind][tile_ind] <= 1 - self.w_prob:
-                    self.f_hat[exp_ind][tile_ind] = 0.0
-                elif self.agent_avg_black_obs[exp_ind][tile_ind] >= self.b_prob:
-                    self.f_hat[exp_ind][tile_ind] = 1.0
-                else:
-                    self.f_hat[exp_ind][tile_ind] = (self.agent_avg_black_obs[exp_ind][tile_ind] + self.w_prob - 1.0) / denom
-
-                # Compute the inverse Fisher information (variance)
-                h = np.sum(self.agent_obs[exp_ind][0:tile_ind+1])
-                self.fisher_inv[exp_ind][tile_ind] = self.compute_fisher_hat_inv(h, tile_ind + 1, self.b_prob, self.w_prob)
-
-            # Store the tile config
-            self.tiles_record[exp_ind] = tiles
-
-            # Compute the average tile ratio up to this simulation experiment
-            self.avg_fill_ratio =  (exp_ind)/(exp_ind+1) * self.avg_fill_ratio + 1/(exp_ind+1) * sum(tiles)/self.num_steps
-
-    def write_data_to_csv(self):
-        """Write simulation data to CSV files.
-        """
-
-        prob_suffix = "_b" + str( int(self.b_prob*1e2) ) + "w" + str( int(self.w_prob*1e2) )
-        f_suffix = "_df" + str( int(self.des_fill_ratio*1e2) ) + "af" + str( int(self.avg_fill_ratio*1e2) )
-        suffix = prob_suffix + f_suffix
-
-        self._write_data_to_csv( self.f_hat, self.fisher_inv, suffix )
+    def compute_fisher(self, alpha, rho, legacy=False):
+        if legacy: return np.nan_to_num(np.reciprocal( 1 / (alpha + rho) ), posinf=POSINF) # alpha^-1 and rho^-1 are variances; prevent infs
+        else: return np.mean([alpha, rho])
 
 class MultiAgentSim(Sim):
 
@@ -315,11 +188,12 @@ class MultiAgentSim(Sim):
         num_trials = sim_param_obj.num_trials
         num_steps = sim_param_obj.num_steps
         comms_period = sim_param_obj.comms_period
+        legacy = sim_param_obj.legacy
 
         super().__init__(num_trials, num_steps, des_fill_ratio, sim_param_obj.filename_suffix_1)
 
         # Initialize data containers (to be serialized)
-        self.stats = self.SimStats("multi", num_trials, num_steps, comms_period, num_agents)
+        self.stats = self.SimStats("multi", num_trials, num_steps, comms_period, num_agents, legacy)
         if sensor_prob < 0: # not actually the sensor probability; actually encoded distribution
 
             # Decode distribution parameters
@@ -344,7 +218,7 @@ class MultiAgentSim(Sim):
 
         # Setup up communication graph
         self.setup_comms_graph(sim_param_obj.comms_graph_str, sim_param_obj.comms_prob)
-        self.create_agents()
+        self.create_agents(legacy)
 
     def setup_comms_graph(self, graph_type, comms_prob):
 
@@ -394,7 +268,7 @@ class MultiAgentSim(Sim):
         """
         return CommsNetwork(gt_gen.price_network(self.sim_data.num_agents, directed=False))
 
-    def create_agents(self):
+    def create_agents(self, legacy=False):
 
         # Create agent objects
         agents_vprop = self.sim_data.comms_network.graph.new_vertex_property("object") # need to populate agents into the vertices
@@ -425,7 +299,8 @@ class MultiAgentSim(Sim):
             agents_vprop[vertex] = Agent(b_sensor_prob, w_sensor_prob,
                                         (self.compute_x_hat, self.compute_fisher_hat),
                                         (self.compute_x_bar, self.compute_fisher_bar),
-                                        (self.compute_x, self.compute_fisher))
+                                        (self.compute_x, self.compute_fisher),
+                                        legacy)
 
         # @todo hacky solution to replace/update mean sensor probability
         if self.stats.sp_distribution:
@@ -665,7 +540,7 @@ class CommsNetwork:
 
 class Agent:
 
-    def __init__(self, p_b_b, p_w_w, local_functions, social_functions, informed_functions):
+    def __init__(self, p_b_b, p_w_w, local_functions, social_functions, informed_functions, legacy=False):
 
         if isinstance(p_b_b, list):
             self.prob_counter = 0
@@ -685,8 +560,8 @@ class Agent:
         self.comms_round_collected_conf = []
 
         self.local_solver = self.LocalSolver(*local_functions)
-        self.social_solver = self.SocialSolver(*social_functions)
-        self.informed_solver = self.InformedSolver(*informed_functions)
+        self.social_solver = self.SocialSolver(*social_functions, legacy=legacy)
+        self.informed_solver = self.InformedSolver(*informed_functions, legacy=legacy)
 
     def reset(self):
 
@@ -808,12 +683,14 @@ class Agent:
 
     class SocialSolver:
 
-        def __init__(self, est_func, conf_func):
+        def __init__(self, est_func, conf_func, legacy=False):
             self.x = 0.0
             self.conf = 0.0
 
             self.est_func = est_func
             self.conf_func = conf_func
+
+            self.legacy = legacy
 
         def reset(self):
             self.x = 0.0
@@ -824,19 +701,21 @@ class Agent:
             """
 
             # Compute the social estimate
-            self.x = self.est_func(x_arr)
+            self.x = self.est_func(x_arr, conf_arr, self.legacy)
 
             # Compute the social confidence
-            self.conf = self.conf_func(conf_arr)
+            self.conf = self.conf_func(conf_arr, self.legacy)
 
     class InformedSolver:
 
-        def __init__(self, primal_est_func, primal_conf_func):
+        def __init__(self, primal_est_func, primal_conf_func, legacy=False):
             self.x = 0.0
             self.conf = 0.0
 
             self.primal_est_func = primal_est_func
             self.primal_conf_func = primal_conf_func
+
+            self.legacy = legacy
 
         def reset(self):
             self.x = 0.0
@@ -847,8 +726,8 @@ class Agent:
             """
 
             # Compute the informed estimate
-            self.x = self.primal_est_func(local_est, local_conf, social_est, social_conf)
-            self.conf = self.primal_conf_func(local_conf, social_conf)
+            self.x = self.primal_est_func(local_est, local_conf, social_est, social_conf, self.legacy)
+            self.conf = self.primal_conf_func(local_conf, social_conf, self.legacy)
 
 class ExperimentData:
     """Class to store simulated experiment data.
@@ -940,138 +819,6 @@ class ExperimentData:
 
         return obj
 
-class HeatmapData:
-    """Class to store and process heatmap data
-    """
-
-    def __init__(self, sim_param_obj):
-
-        self.num_trials = sim_param_obj.num_trials
-        self.num_steps = sim_param_obj.num_steps
-        self.sensor_prob_range = sim_param_obj.sp_range
-        self.fill_ratio_range = sim_param_obj.tfr_range
-        self.main_filename_suffix = sim_param_obj.full_suffix
-
-        self.f_hat_data = {"mean": [], "min": [], "max": []}
-        self.fisher_inv_data = {"mean": [], "min": [], "max": []}
-        self.avg_f_data = []
-
-    def compile_data(self, heatmap_row_obj):
-        """Compile and organize heatmap data.
-        """
-
-        self.f_hat_data["mean"].append(heatmap_row_obj.f_hat_mean)
-        self.f_hat_data["min"].append(heatmap_row_obj.f_hat_min)
-        self.f_hat_data["max"].append(heatmap_row_obj.f_hat_max)
-        self.fisher_inv_data["mean"].append(heatmap_row_obj.fisher_inv_mean)
-        self.fisher_inv_data["min"].append(heatmap_row_obj.fisher_inv_min)
-        self.fisher_inv_data["max"].append(heatmap_row_obj.fisher_inv_max)
-
-        self.avg_f_data.append(heatmap_row_obj.avg_f)
-
-    def write_data_to_csv(self):
-        """Write completed heatmap data to CSV files.
-        """
-
-        # Write heatmap data
-        f_hat_mean_filename = "f_hat_heatmap_mean" + self.main_filename_suffix + ".csv"
-        f_hat_min_filename = "f_hat_heatmap_min" + self.main_filename_suffix + ".csv"
-        f_hat_max_filename = "f_hat_heatmap_max" + self.main_filename_suffix + ".csv"
-        fisher_inv_mean_filename = "fisher_inv_heatmap_mean" + self.main_filename_suffix + ".csv"
-        fisher_inv_min_filename = "fisher_inv_heatmap_min" + self.main_filename_suffix + ".csv"
-        fisher_inv_max_filename = "fisher_inv_heatmap_max" + self.main_filename_suffix + ".csv"
-        des_f_avg_f_filename = "des_f_avg_f" + self.main_filename_suffix + ".csv"
-
-        with open(f_hat_mean_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(self.f_hat_data["mean"])
-
-        with open(f_hat_min_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(self.f_hat_data["min"])
-
-        with open(f_hat_max_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(self.f_hat_data["max"])
-
-        with open(fisher_inv_mean_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(self.fisher_inv_data["mean"])
-
-        with open(fisher_inv_min_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(self.fisher_inv_data["min"])
-
-        with open(fisher_inv_max_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows(self.fisher_inv_data["max"])
-
-        with open(des_f_avg_f_filename, "w", encoding="UTF8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerows( np.array( (self.fill_ratio_range, self.avg_f_data) ).T )
-
-class HeatmapRow:
-    """Class to store one row of heatmap data
-    """
-
-    def __init__(self):
-        self.avg_f = 0.0
-
-        self.f_hat_mean = []
-        self.f_hat_min = []
-        self.f_hat_max = []
-
-        self.fisher_inv_mean = []
-        self.fisher_inv_min = []
-        self.fisher_inv_max = []
-
-    # TODO: update variable names to use alpha instead of fisher_inv
-    def populate(self, single_agent_sim_obj: SingleAgentSim):
-        """Populate data given SingleAgentSim object.
-        """
-
-        self.f_hat_mean.append( single_agent_sim_obj.f_hat_sample_mean[-1] )
-        self.f_hat_min.append( single_agent_sim_obj.f_hat_sample_min[-1] )
-        self.f_hat_max.append( single_agent_sim_obj.f_hat_sample_max[-1] )
-
-        self.fisher_inv_mean.append( single_agent_sim_obj.fisher_inv_sample_mean[-1] )
-        self.fisher_inv_min.append( single_agent_sim_obj.fisher_inv_sample_min[-1] )
-        self.fisher_inv_max.append( single_agent_sim_obj.fisher_inv_sample_max[-1] )
-
-        self.avg_f = single_agent_sim_obj.avg_fill_ratio
-
-    def populate(self, multi_agent_sim_obj: MultiAgentSim):
-
-        # Collect local analytics
-        self.x_hat_mean.append( multi_agent_sim_obj.x_hat_sample_mean[-1] )
-        self.x_hat_min.append( multi_agent_sim_obj.x_hat_sample_min[-1] )
-        self.x_hat_max.append( multi_agent_sim_obj.x_hat_sample_max[-1] )
-
-        self.alpha_mean.append( multi_agent_sim_obj.alpha_sample_mean[-1] )
-        self.alpha_min.append( multi_agent_sim_obj.alpha_sample_min[-1] )
-        self.alpha_max.append( multi_agent_sim_obj.alpha_sample_max[-1] )
-
-        # Collect social analytics
-        self.x_bar_mean.append( multi_agent_sim_obj.x_bar_sample_mean[-1] )
-        self.x_bar_min.append( multi_agent_sim_obj.x_bar_sample_min[-1] )
-        self.x_bar_max.append( multi_agent_sim_obj.x_bar_sample_max[-1] )
-
-        self.rho_mean.append( multi_agent_sim_obj.rho_sample_mean[-1] )
-        self.rho_min.append( multi_agent_sim_obj.rho_sample_min[-1] )
-        self.rho_max.append( multi_agent_sim_obj.rho_sample_max[-1] )
-
-        # Collect informed analytics
-        self.x_mean.append( multi_agent_sim_obj.x_sample_mean[-1] )
-        self.x_min.append( multi_agent_sim_obj.x_sample_min[-1] )
-        self.x_max.append( multi_agent_sim_obj.x_sample_max[-1] )
-
-        self.gamma_mean.append( multi_agent_sim_obj.gamma_sample_mean[-1] )
-        self.gamma_min.append( multi_agent_sim_obj.gamma_sample_min[-1] )
-        self.gamma_max.append( multi_agent_sim_obj.gamma_sample_max[-1] )
-
-        self.avg_f = multi_agent_sim_obj.avg_fill_ratio
-        pass
-
 class SimParam:
 
     def __init__(self, yaml_config):
@@ -1084,6 +831,8 @@ class SimParam:
         sp_min = float(yaml_config["sensorProb"]["min"])
         sp_max = float(yaml_config["sensorProb"]["max"])
         sp_inc = int(yaml_config["sensorProb"]["incSteps"])
+
+        self.legacy = yaml_config["legacy"]
 
         # Check if distributed sensor probabilities is desired
         if sp_inc == UNIFORM_DIST_SP_ENUM:

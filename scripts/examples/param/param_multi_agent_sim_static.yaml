@@ -15,5 +15,6 @@ targFillRatios: # target fill ratio range (inclusive) to simulate
   incSteps: 19
 numTrials: 1 # number of trials to repeat for each parameter
 numSteps: 1000 # number of steps (each observation is made per step)
+legacy: False # flag to use legacy equations (see README)
 writeAllData: False
 ...
