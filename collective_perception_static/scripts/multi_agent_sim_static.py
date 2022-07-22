@@ -100,8 +100,8 @@ def run_sim_parallel_sp(param_obj, target_fill_ratio, sensor_prob):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Visualize multi-agent simulation data")
-    parser.add_argument("-p", action="store_true", help="flag to use cores to run simulations in parallel.")
+    parser = argparse.ArgumentParser(description="Execute multi-agent simulation with static topologies.")
+    parser.add_argument("-p", action="store_true", help="flag to use cores to run simulations in parallel")
     args = parser.parse_args()
 
     # Obtain timestamp

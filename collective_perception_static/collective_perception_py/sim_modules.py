@@ -111,10 +111,10 @@ class Sim:
                 self.x_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
                 self.gamma_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
 
-    def __init__(self, num_trials, num_steps, des_fill_ratio, main_filename_suffix):
+    def __init__(self, num_trials, num_steps, targ_fill_ratio, main_filename_suffix):
         self.num_trials = num_trials
         self.num_steps = num_steps
-        self.des_fill_ratio = des_fill_ratio
+        self.targ_fill_ratio = targ_fill_ratio
         self.avg_fill_ratio = 0.0
         self.tiles_record = np.empty( (self.num_trials, self.num_steps) )
         self.main_filename_suffix = main_filename_suffix
@@ -132,10 +132,10 @@ class Sim:
 
         # Draw bernoulli samples for tiles based on desired fill ratio
         if num_agents > 1:
-            tiles = np.random.binomial(1, self.des_fill_ratio * np.ones((num_agents, self.num_steps)))
+            tiles = np.random.binomial(1, self.targ_fill_ratio * np.ones((num_agents, self.num_steps)))
 
         else:
-            tiles = np.random.binomial(1, self.des_fill_ratio * np.ones(self.num_steps) )
+            tiles = np.random.binomial(1, self.targ_fill_ratio * np.ones(self.num_steps) )
 
             assert(len(tiles) == self.num_steps)
 
@@ -207,7 +207,7 @@ class Sim:
 
 class MultiAgentSim(Sim):
 
-    def __init__(self, sim_param_obj, des_fill_ratio, sensor_prob):
+    def __init__(self, sim_param_obj, targ_fill_ratio, sensor_prob):
 
         num_agents = sim_param_obj.num_agents
         num_trials = sim_param_obj.num_trials
@@ -215,7 +215,7 @@ class MultiAgentSim(Sim):
         comms_period = sim_param_obj.comms_period
         legacy = sim_param_obj.legacy
 
-        super().__init__(num_trials, num_steps, des_fill_ratio, sim_param_obj.filename_suffix_1)
+        super().__init__(num_trials, num_steps, targ_fill_ratio, sim_param_obj.filename_suffix_1)
 
         # Initialize data containers (to be serialized)
         self.stats = self.SimStats("multi", num_trials, num_steps, comms_period, num_agents, legacy)
@@ -772,36 +772,36 @@ class ExperimentData:
         self.stats_obj_dict = {i: {j: None for j in self.sp_range} for i in self.tfr_range}
         self.sim_data_obj_dict = {i: {j: None for j in self.sp_range} for i in self.tfr_range}
 
-    def insert_sim_obj(self, des_fill_ratio, sensor_prob, stats_obj: Sim.SimStats, sim_data_obj: Sim.SimData):
+    def insert_sim_obj(self, targ_fill_ratio, sensor_prob, stats_obj: Sim.SimStats, sim_data_obj: Sim.SimData):
 
-        self.stats_obj_dict[des_fill_ratio][sensor_prob] = stats_obj
-        self.sim_data_obj_dict[des_fill_ratio][sensor_prob] = sim_data_obj
+        self.stats_obj_dict[targ_fill_ratio][sensor_prob] = stats_obj
+        self.sim_data_obj_dict[targ_fill_ratio][sensor_prob] = sim_data_obj
 
-    def get_stats_obj(self, des_fill_ratio, sensor_prob) -> Sim.SimStats:
+    def get_stats_obj(self, targ_fill_ratio, sensor_prob) -> Sim.SimStats:
         """Get the statistics based on the target fill ratio and sensor probability.
 
         Args:
-            des_fill_ratio: Target fill ratio.
+            targ_fill_ratio: Target fill ratio.
             sensor_prob: Sensor probability.
 
         Returns:
             A Sim.SimStats object containing the statistics for the simulation based on the target fill ratio and sensor probability.
         """
 
-        return self.stats_obj_dict[des_fill_ratio][sensor_prob]
+        return self.stats_obj_dict[targ_fill_ratio][sensor_prob]
 
-    def get_sim_data_obj(self, des_fill_ratio, sensor_prob) -> Sim.SimData:
+    def get_sim_data_obj(self, targ_fill_ratio, sensor_prob) -> Sim.SimData:
         """Get the simulation data based on the target fill ratio and sensor probability.
 
         Args:
-            des_fill_ratio: Target fill ratio.
+            targ_fill_ratio: Target fill ratio.
             sensor_prob: Sensor probability.
 
         Returns:
             A Sim.SimData object containing the data for the simulation based on the target fill ratio and sensor probability.
         """
 
-        return self.sim_data_obj_dict[des_fill_ratio][sensor_prob]
+        return self.sim_data_obj_dict[targ_fill_ratio][sensor_prob]
 
     # TODO: protobuf maybe? since the argos implementation will need that?
     def save(self, curr_time=None, filepath=None):
@@ -855,8 +855,6 @@ class SimParam:
         sp_max = float(yaml_config["sensorProb"]["max"])
         sp_inc = int(yaml_config["sensorProb"]["incSteps"])
 
-        self.legacy = yaml_config["legacy"]
-
         # Check if distributed sensor probabilities is desired
         if sp_inc < 0:
             self.sp_range = encode_sp_distribution(sp_inc, sp_min, sp_max)
@@ -865,7 +863,7 @@ class SimParam:
         self.tfr_range = np.round(np.linspace(tfr_min, tfr_max, tfr_inc), 3).tolist()
         self.num_steps = int(yaml_config["numSteps"])
         self.num_trials = int(yaml_config["numTrials"])
-        self.write_all = yaml_config["writeAllData"]
+        self.legacy = yaml_config["legacy"]
 
         # Multi-agent simulation parameters
         try:
@@ -895,13 +893,13 @@ class SimParam:
 
         # Define filename descriptors
         min_sensor_prob, max_sensor_prob = int(self.sp_range[0]*1e2), int(self.sp_range[-1]*1e2)
-        min_des_fill_ratio, max_des_fill_ratio = int(self.tfr_range[0]*1e2), int(self.tfr_range[-1]*1e2)
+        min_targ_fill_ratio, max_targ_fill_ratio = int(self.tfr_range[0]*1e2), int(self.tfr_range[-1]*1e2)
         p_inc, f_inc = int(sensor_prob_inc*1e2), int(fill_ratio_inc*1e2)
 
-        self.filename_suffix_1 = "_e" +str(self.num_trials) + "_o" + str(self.num_steps) # describing number of experiments and observations
+        self.filename_suffix_1 = "_e" +str(self.num_trials) + "_o" + str(self.num_steps) # describing number of trials and observations
 
         prob_suffix = "_p" + str(min_sensor_prob) + "-" + str(p_inc) + "-" + str(max_sensor_prob)
-        f_suffix = "_f" + str(min_des_fill_ratio) + "-" + str(f_inc) + "-" + str(max_des_fill_ratio)
+        f_suffix = "_f" + str(min_targ_fill_ratio) + "-" + str(f_inc) + "-" + str(max_targ_fill_ratio)
         self.filename_suffix_2 = prob_suffix + f_suffix # describing the probabilites and fill ratios
 
         self.full_suffix = self.filename_suffix_1 + self.filename_suffix_2

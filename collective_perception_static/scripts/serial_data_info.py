@@ -24,8 +24,8 @@ if __name__ == "__main__":
     
     print("\tType:\t\t\t\t\t{0}".format(data_type))
     print("\tNumber of agents:\t\t\t{0}".format(data.num_agents))
-    print("\tNumber of experiments:\t\t\t{0}".format(data.num_exp))
-    print("\tNumber of observations:\t\t\t{0}".format(data.num_steps))
+    print("\tNumber of trials:\t\t\t{0}".format(data.num_trials))
+    print("\tNumber of steps:\t\t\t{0}".format(data.num_steps))
     print("\tSimulated target fill ratios:\t\t{0}".format(data.tfr_range))
     print("\tSimulated sensor probabilities:\t\t{0}".format(data.sp_range))
     print("\tCommunication properties:")

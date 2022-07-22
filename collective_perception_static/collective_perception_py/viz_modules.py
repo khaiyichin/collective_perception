@@ -37,7 +37,7 @@ class VisualizationData:
 
     This class is intended to store simulations with the same:
         - communication network type,
-        - number of experiments,
+        - number of trials,
         - number of agents,
         - communication period, and
         - communication probability
@@ -294,7 +294,7 @@ class VisualizationData:
 
             for sp_key, stats_obj in sp_dict.items():
 
-                # Compute mean across all experiments
+                # Compute mean across all trials
                 x_hat_mean = np.mean(stats_obj.x_hat_sample_mean, axis=0)
                 x_bar_mean = np.mean(stats_obj.x_bar_sample_mean, axis=0)
                 x_mean = np.mean(stats_obj.x_sample_mean, axis=0)
@@ -303,7 +303,7 @@ class VisualizationData:
                 rho_mean = np.mean(stats_obj.rho_sample_mean, axis=0)
                 gamma_mean = np.mean(stats_obj.gamma_sample_mean, axis=0)
 
-                # Compute pooled variance across all experiments
+                # Compute pooled variance across all trials
                 x_hat_std = np.sqrt( np.mean( np.square( stats_obj.x_hat_sample_std ), axis=0) )
                 x_bar_std = np.sqrt( np.mean( np.square( stats_obj.x_bar_sample_std ), axis=0) )
                 x_std = np.sqrt( np.mean( np.square( stats_obj.x_sample_std ), axis=0) )
@@ -611,7 +611,7 @@ class VisualizationDataGroupStatic(VisualizationDataGroupBase):
 
     This class is intended to store VisualizationData objects with the same:
         - communication network type, and
-        - number of experiments,
+        - number of trials,
     and with varying:
         - communication period,
         - communication probability,
@@ -685,7 +685,7 @@ class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
     are stored in this class.
 
     This class is intended to store VisualizationData objects with the same:
-        - number of experiments,
+        - number of trials,
         - number of agents,
     and with varying:
         - robot speed, and
@@ -1251,7 +1251,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     abscissa_values_x_bar = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
     abscissa_values_x = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
 
-    # Plot for all experiments
+    # Plot for all trials
     if not agg_data:
 
         # Compute the convergence timestamps
