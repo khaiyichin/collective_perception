@@ -1,161 +1,133 @@
-# Collective Consensus Project
+# Collective Perception with Imperfect Sensors
+## Introduction
+This repository provides the code to simulate collective perception experiments shown in [Collective Perception with Imperfect Sensors (work-in-progress)]().
 
-**README still a work in progress**
+Two simulators are provided here:
+1. Python-based static topology simulator `collective_perception_static`, and
+2. ARGoS-based dynamic topology simulator `collection_perception_dynamic`.
 
-## Dependencies
-- Protobuf (highly recommended to install this from source, instead from using the package manager)
+### Static topology simulation
+The robots in the static topology simulator do not move in the normal sense and have fixed communication channels with its neighbors (the communication network is specified by the user). In each simulated experiment, a fixed number of robots would traverse their own black and white tile-track and communicate periodically with their neighbors. The figure below shows what that looks like for a ring topology.
 
-## Scripts
-- `slurm`: scripts to run jobs using the SLURM batch manager on a HPC cluster.
-  <!-- - how to use the slurm scripts?
-    - what arguments are required?
-    - where do you run them from? -->
-- `bash`: scripts to execute multi-parameter simulations.
-  <!-- - Describe bash scripts:
-    - how can they be used? -->
-- `examples`: example scripts.
-  <!-- - how to use the .argos xml script?
-    - usage of loop functions? -->
-- `python`: (will be moved to standalone folder for package management) static simulator
-  <!-- - Describe modules:
-    - how to use the classes, what do the classes do and where do they fit?
-  - Describe python scripts:
-    - how can they be used?
-    - what arguments are needed? -->
+<img src="static_sim_graphic.png" alt="Static simulated experiment visualized" width="450"/>
 
-## Apptainer definition files
-<!-- - what is the def file for?
-  - what steps to build sif file?
-  - how does it work with the bash scripts to run hpc simulation? -->
+### Dynamic topology simulation
+The robots in the dynamic topology simulator move around a square arena of black and white tiles. In each simulated experiment, a fixed number of robots would randomly move around the arena and communicate with neighbors within their proximity.
 
-## MATLAB Scripts
-The MATLAB scripts are mostly for quick prototyping and data processing/visualization.
+<img src="dynamic_sim_graphic.png" alt="Dynamic simulated experiment visualized" width="400"/>
 
-### `plot_heat_surf.m`
-Used for plotting heatmap data from the following files (obtained from running `single_agent_sim.py`):
-- `fisher_inv_heatmap_*.csv`,
-- `f_hat_heatmap_*.csv`,
-- `des_f_avg_f_*.csv`.
-The script outputs heatmap and 3-D surface plots for `f_hat` and `fisher_inv`.
+## Requirements
+### Local build
+- Python 3.8+ and `pip`
+- CMake 3.15+
+- [ARGoS](https://github.com/ilpincy/argos3.git) - *version used: [da33b87](https://github.com/ilpincy/argos3/tree/da33b8786293dad40307e4182bb791add1e89172)*
+- [Buzz](https://github.com/NESTLab/Buzz) - *version used: [6a9a51f](https://github.com/NESTLab/Buzz/tree/6a9a51f9b658b76fc995152546d4b625e74abb6d)*
+- [Protobuf v21.1+ (`proto3`)](https://github.com/protocolbuffers/protobuf.git) - *source build recommended, although the `apt` package version may work as well*
+- [GraphTool v2.45+](https://graph-tool.skewed.de/)
 
-To run the script, create/modify a `param_plot_heat_surf.m` file to set the desired parameters in the same folder, then run the `plot_heat_surf.m` script in MATLAB.
+### Container
+- [Apptainer v1.0.2+](https://github.com/apptainer/apptainer)
 
-The parameter file should look like the following:
-```matlab
-%% param_plot_heat_surf.m
+## Installation
+### Local build
+The following instructions were tested on Ubuntu 20.04 LTS Focal Fossa. It's likely they would work on MacOS and Windows with some modification.
+1. Ensure that all requirements are satisfied.
+2. Clone the repository and go to the root directory.
+    ```
+    $ git clone https://github.com/khaiyichin/collective_perception.git
+    $ cd collective_perception/
+    ```
+3. Run the `install` script (it builds `collective_perception_dynamic` and `collective_perception_static` under the hood).
+    ```
+    $ ./install.sh
+    ```
 
-fisher_inv_filepath = <STRING>;       % path to Fisher inverse heatmap data file
-f_hat_filepath = <STRING>;            % path to f_hat heatmap data file
-sim_fill_ratios_filepath = <STRING>;  % path to fill ratio file
+### Container
+The reason for using `apptainer` is the benefit of rootless execution (which is a problem for Docker containers), which permits usage of the simulators on HPC clusters. Another reason is due to the usage of GraphTool for the static simulator &mdash; installed using the `apt` package manager &mdash; which requires `sudo` privileges.
 
-xrange = <FLOAT ARRAY>;               % range of sensor probabilities
-yrange = <FLOAT ARRAY>;               % range of fill ratios
-sim_cycles = <INT>;                   % number of agents to simulate (or simulation cycles for one agent)
-num_obs = <INT>;                      % total number of observations
+To create simulator containers, only `apptainer` is required; the other requirements will be installed as the containers are built. The containers are built in stages so that you can modify the `collective_perception*` source code anytime and only build the last level without having to start from the top.
+
+1. Create a `containers` directory in the `apptainer` directory.
+    ```
+    $ cd apptainer && mkdir containers
+    ```
+2. Build the first container, which provides the ARGoS and Buzz base.
+    ```
+    $ sudo apptainer build argos_buzz_no_qt_base.sif ../def/argos_buzz_no_qt_base.def
+    ```
+    When the build finishes you should see the `argos_buzz_no_qt_base.sif` container.
+3. Build the second container on top of the previous container (specified in the definition file), which provides the Protobuf layer.
+    ```
+    $ sudo apptainer build protobuf_no_qt_layer.sif ../def/protobuf_no_qt_layer.def
+    ```
+    When the build finishes you should see the `protobuf_no_qt_layer.sif` container.
+4. Build the final layer.
+    ```
+    $ sudo apptainer build multi_agent_sim_full_no_qt.sif ../def/multi_agent_sim_full_no_qt.sif
+    ```
+    When the build finishes you should see the multi_agent_sim_full_no_qt.sif container.
+
+## Execution
+The instructions here describe scripts that provide a **single simulation execution**. In a single simulation execution, there can be multiple experiments, each of which may have repeated trials.
+```mermaid
+graph TD;
+    s[Single simulation execution]-->e1[Experiment 1];
+    s-->e2[Experiment 2];
+    s-->en[Experiment n];
+    e1-->t11[Trial 1];
+    e1-->t12[Trial 2];
+    e1-->t1m[Trial m];
+    e2-->t21[Trial 1];
+    e2-->t22[Trial 2];
+    e2-->t2m[Trial m];
+    en-->tn1[Trial 1];
+    en-->tn2[Trial 2];
+    en-->tnm[Trial m];
+```
+In general, simulation executions are controlled by two groups of parameters: an outer group and an inner group. The *outer parameter group is fixed for a single simulation execution*, i.e., the parameter values stay the same for all experiment and trials. The *inner parameter group is fixed only within an experiment*, i.e., the parameter values stay the same between the repeated trials of a single experiment, but vary across experiments.
+
+The inner parameter group has two parameters: *target fill ratios* and *sensor probabilities*, and is the same for both simulation types. That is, a pair of target fill ratio and sensor probability values are used in one experiment. When the experiment (including the repeated trials) completes, a different pair of target fill ratio and sensor probability values is used in the next experiment.
+
+The outer parameter group differs between the static and dynamic simulation types. For the static topology simulator, the parameters are *communication period* and *number of agents*; for the dynamic topology simulator, the parameters are *robot speed* and *swarm density*.
+
+The following instructions apply directly for the local build; for the container simulator simply prepend `apptainer exec multi_agent_sim_full_no_qt.sif` to the commands ([see the Apptainer documentation for more info](https://apptainer.org/docs/)).
+
+### Static topology simulation
+1. Set up the desired experimental parameters according as shown [here](docs/parameter_file_setup.md).
+2. Activate the Python virtual environment (created in the `collective_perception_static` directory).
+    ```
+    $ cd collective_perception_static/
+    $ source .venv/bin/activate
+    ```
+    *When running the container simulator, you can skip this step; there's no need to activate any virtual environment since the Python modules are installed directly to the container.*
+3. Run the simulation (ensure that the parameter file is in the current directory).
+    ```
+    $ multi_agent_sim_static.py
+    ```
+    Script help:
+    ```
+    usage: multi_agent_sim_static.py [-h] [-p]
+
+    Execute multi-agent simulation with static topologies.
+
+    optional arguments:
+      -h, --help  show this help message and exit
+      -p          flag to use cores to run simulations in parallel
+    ```
+  4. When the execution completes, it will output pickled data in newly created directory `data`. (Dev note: pickles may be updated to protobufs; output directory structure may be modified.)
+
+### Dynamic topology simulation
+1. Set up the desired experimental parameters according as shown [here](docs/parameter_file_setup.md).
+2. TODO
+
+## Testing
+Unit tests have been provided to aid any updates to the source code. Besides identifying the kinds of testing imposed on the source code, looking into the test files can help you understand how the algorithm works.
+
+For the static simulator, simply do the following to run tests.
+```
+$ cd collective_perception_static
+$ source .venv/bin/activate
+$ pytest --workers=<N> # run the test in parallel using N cores; remove the "--workers" flag if sequential testing is desired
 ```
 
-### `plot_mean_rel_err.m`
-Used for plotting the averaged `f_hat` errors for multiple simulations. *Currently only for `c200_o100`, `c200_o250`, `c200_o500`, and `c200_o1000` files.*
-
-To run the script, create/modify a `param_plot_mean_rel_err.m` file to set the desired parameters in the same folder, then run the `plot_heat_surf.m` script in MATLAB.
-
-The parameter file should look like the following:
-```matlab
-%% param_plot_mean_rel_err.m
-
-c200_o100_filepaths = {
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    ...
-};
-
-c200_o250_filepaths = {
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    ...
-};
-
-c200_o500_filepaths = {
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    ...
-};
-
-c200_o1000_filepaths = {
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    [ <STRING> ; <STRING> ];  % path to heatmap data file ; path to fill ratio file
-    ...
-};
-
-xrange = <FLOAT ARRAY>;       % range of sensor probabilities
-yrange = <FLOAT ARRAY>;       % range of fill ratios
-sim_cycles = <INT>;           % number of agents to simulate (or simulation cycles for one agent)
-num_obs = <INT>;              % total number of observations
-```
-
-
-### `simple_single_agent_no_motion.m`
-Used for running a quick simulation/prototyping; simulates a single agent (with no communication) for **one desired fill ratio and one sensor probability**.
-
-To run the script, create/modify a `param_simple_single_agent_no_motion.m` file to set the desired parameters in the same folder, then run the `simple_single_agent_no_motion.m` script in MATLAB.
-
-The parameter file should look like the following:
-```matlab
-%% param_simple_single_agent_no_motion.m
-
-N = <INT>;                      % total number of observations
-b = <FLOAT>;                    % sensor probability to black tile
-w = b;                          % sensor probability to white tile
-sim_cycles = <INT>;             % number of agents to simulate (or simulation cycles for one agent)
-desired_fill_ratio = <FLOAT>;   % fill ratio, f (can be set to rand(1))
-```
-
-## Python Scripts
-The Python scripts are used for major simulation runs (simulations that can generate heatmap data).
-
-### `single_agent_sim.py`
-Used for running multiple simulations; simulates a single agent (with no communication) across **multiple sensor probabilities and desired fill ratios**.
-
-To run the script, create/modify a `param_single_agent_sim.yaml` file to set the desired simulation parameters in the same folder, then run
-```
-$ python3 single_agent_sim.py
-```
-which would produce heatmap CSV files that can be used for further analysis:
-- `fisher_inv_heatmap_*.csv`: `fisher_inv` heatmap data file,
-- `f_hat_heatmap_*.csv`: `f_hat` heatmap data file,
-- `des_f_avg_f_*.csv`: desired and actual (average) fill ratio file.
-
-The parameter file should look like the following:
-```yaml
-# param_single_agent_sim.yaml
-
---- # document start marker
-sensorProb:
-  min: <FLOAT> # min sensor probability
-  max: <FLOAT> # max sensor probability
-  incSteps: <INT> # number of steps from min to max inclusive
-desFillRatios:
-  min: <FLOAT> # min desired fill ratio
-  max: <FLOAT> # max desired fill ratio
-  incSteps: <INT> # number of steps from min to max inclusive
-numExperiments: <INT> # number of experiments to run
-numObs: <INT> # number of observations per experiment/agent
-writeAllData: <BOOL> # whether to write data from every single experiment
-... # document end marker
-```
-
-If `writeAllData` is set to `True`, then the additional output files look someting like the following:
-- `tiles_c200_o100_b57w57_df85af85.csv`, entire history of tile configurations for the current experiment,
-- `fisher_inv_c200_o100_b57w57_df85af85.csv`, entire history of `fisher_inv` for the current experiment,
-- `f_hat_c200_o100_b57w57_df85af85.csv`, entire history of `f_hat` for the current experiment
-
-where the current experiment parameters are described by the flags and their values (separated by underscores) in the filenames:
-- `c` = total number of experiments `<numExperiments>`,
-- `o` = total number of observations `<numObs>`,
-- `b` = `w` = current sensor probability simulated * 100 (rounded to closest 1),
-- `df` = current desired fill ratio simulated * 100 (rounded to closest 1),
-- `af` = current actual (averaged) fill ratio simulated * 100 (rounded to closest 1).
+For the dynamic simulator, TODO.
