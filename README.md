@@ -7,14 +7,14 @@ Two simulators are provided here:
 2. ARGoS-based dynamic topology simulator `collection_perception_dynamic`.
 
 ### Static topology simulation
-The robots in the static topology simulator do not move in the normal sense and have fixed communication channels with its neighbors (the communication network is specified by the user). In each simulated experiment, a fixed number of robots would traverse their own black and white tile-track and communicate periodically with their neighbors. The figure below shows what that looks like for a ring topology.
+The robots in the static topology simulator do not move in the normal sense and have fixed communication channels with its neighbors (the communication network is specified by the user). In each simulated experiment, a fixed number of robots would traverse their own black and white tile-track and communicate periodically with their neighbors. The figure below illustrates what it would look like for 4 robots in a ring topology.
 
 <img src="static_sim_graphic.png" alt="Static simulated experiment visualized" width="450"/>
 
 ### Dynamic topology simulation
-The robots in the dynamic topology simulator move around a square arena of black and white tiles. In each simulated experiment, a fixed number of robots would randomly move around the arena and communicate with neighbors within their proximity.
+The robots in the dynamic topology simulator move around a square arena of black and white tiles. In each simulated experiment, a fixed number of robots would randomly move around the arena and communicate with neighbors within their proximity. The figure below is a screenshot of the simulation for 25 robots.
 
-<img src="dynamic_sim_graphic.png" alt="Dynamic simulated experiment visualized" width="400"/>
+<img src="dynamic_sim_graphic.png" alt="Dynamic simulated experiment visualized" width="450"/>
 
 ## Requirements
 ### Local build
