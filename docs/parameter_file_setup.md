@@ -94,7 +94,7 @@ For the location of the `collective_perception_loop_functions` library, specify 
 Note: it is advised that the extensions `.pbs` and `.pbad` be used for the `stats` and `agent_data` files respectively.
 
 ### Arena size and swarm density
-The arena size can be modified here as explained in the official ARGoS documentation. The effect it has on the generated tile size is described by `arena_size_*/arena_tile_count_*`.
+The arena size can be modified as explained in the official ARGoS documentation. The effect it has on the generated tile size is described by the equation `arena_size_*/arena_tile_count_*` for both the x and y directions.
 
 The swarm density is modified indirectly through the positions of the 4 walls that constrain the robots' movable space. Use the `compute_wall_positions.cpp` script to obtain the appropriate values based on the desired swarm density.
 ```xml
@@ -145,7 +145,5 @@ Within the `distribute` node, the following code snippet should be inserted.
     </distribute>
     ...
 ```
-
-
 
 NEED TO COMPUTE BOX POSITIONS TO GET THE CORRECT DENSITY: SHOW FORMULA (maybe have a script to auto computev positions?)

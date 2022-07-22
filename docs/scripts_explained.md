@@ -1,8 +1,8 @@
 # Utility scripts
-In addition to the scripts that execute simulate experiments, scripts to process, analyze, and visualize data are provided; this page describes all of them.
+In addition to the scripts that execute simulated experiments, scripts to process, analyze, and visualize data are provided; this page describes all of them.
 
 ## Python Scripts (built in `collective_perception_static`)
-The Python scripts are used for data processing, and data analysis.
+The Python scripts are used for data processing, analysis, and visualization.
 
   <!-- - Describe modules:
     - how to use the classes, what do the classes do and where do they fit?
@@ -10,49 +10,15 @@ The Python scripts are used for data processing, and data analysis.
     - how can they be used?
     - what arguments are needed? -->
 
+### `convert_exp_data_to_viz_data_group.py`
 
-### `single_agent_sim.py`
-Used for running multiple simulations; simulates a single agent (with no communication) across **multiple sensor probabilities and desired fill ratios**.
+### `convert_sim_stats_set_to_viz_data_group.py`
 
-To run the script, create/modify a `param_single_agent_sim.yaml` file to set the desired simulation parameters in the same folder, then run
-```
-$ python3 single_agent_sim.py
-```
-which would produce heatmap CSV files that can be used for further analysis:
-- `fisher_inv_heatmap_*.csv`: `fisher_inv` heatmap data file,
-- `f_hat_heatmap_*.csv`: `f_hat` heatmap data file,
-- `des_f_avg_f_*.csv`: desired and actual (average) fill ratio file.
+### `serial_data_info.py`
 
-The parameter file should look like the following:
-```yaml
-# param_single_agent_sim.yaml
+### `visualize_multi_agent_data_static.py`
 
---- # document start marker
-sensorProb:
-  min: <FLOAT> # min sensor probability
-  max: <FLOAT> # max sensor probability
-  incSteps: <INT> # number of steps from min to max inclusive
-desFillRatios:
-  min: <FLOAT> # min desired fill ratio
-  max: <FLOAT> # max desired fill ratio
-  incSteps: <INT> # number of steps from min to max inclusive
-numExperiments: <INT> # number of experiments to run
-numObs: <INT> # number of observations per experiment/agent
-writeAllData: <BOOL> # whether to write data from every single experiment
-... # document end marker
-```
-
-If `writeAllData` is set to `True`, then the additional output files look someting like the following:
-- `tiles_c200_o100_b57w57_df85af85.csv`, entire history of tile configurations for the current experiment,
-- `fisher_inv_c200_o100_b57w57_df85af85.csv`, entire history of `fisher_inv` for the current experiment,
-- `f_hat_c200_o100_b57w57_df85af85.csv`, entire history of `f_hat` for the current experiment
-
-where the current experiment parameters are described by the flags and their values (separated by underscores) in the filenames:
-- `c` = total number of experiments `<numExperiments>`,
-- `o` = total number of observations `<numObs>`,
-- `b` = `w` = current sensor probability simulated * 100 (rounded to closest 1),
-- `df` = current desired fill ratio simulated * 100 (rounded to closest 1),
-- `af` = current actual (averaged) fill ratio simulated * 100 (rounded to closest 1).
+### `visualize_multi_agent_data_dynamic.py`
 
 ## C++ scripts (built in `collective_perception_dynamic`)
 
