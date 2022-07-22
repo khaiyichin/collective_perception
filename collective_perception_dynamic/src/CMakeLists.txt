@@ -64,3 +64,5 @@ target_include_directories(protobuf_info
     PRIVATE
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
 )
+
+add_executable(compute_wall_positions compute_wall_positions.cpp)
