@@ -23,7 +23,48 @@ The Python scripts are used for data processing, analysis, and visualization.
 ## C++ scripts (built in `collective_perception_dynamic`)
 
 ### `compute_wall_positions.cpp`
+To test a specific swarm density using the dynamic topology simulator, you need to specify the appropriate wall position to constrain the robots' walkable area, as the following equation describes:
+
 $$ D = \frac{\text{communication area}}{\text{walkable area}} = \frac{N \pi r^2}{L^2} $$
+
+Simply run the `compute_wall_positions.cpp` script and answer the prompts accordingly:
+
+```
+$ compute_wall_positions
+
+Please specify the desired number of robots: 25
+Please specify the desired swarm density: 10
+Please specify the radius of the communication range of the robot in m: 0.7
+Please specify the desired wall thickness in m (optional): 0.1
+Please specify the desired wall height in m (optional): 0.5
+```
+Upon completion the script will generate an XML output that you can copy and paste in your `.argos` configuration file.
+```
+Configuration for the .argos file (copy and paste this under the <arena> node):
+
+	<box id="wall_north" size="3.000000, 0.100000, 0.500000" movable="false">
+	    <body position="0.000000, 1.030873, 0.000000" orientation="0, 0, 0" />
+	</box>
+	<box id="wall_south" size="3.000000, 0.100000, 0.500000" movable="false">
+	    <body position="0.000000, -1.030873, 0.000000" orientation="0, 0, 0" />
+	</box>
+	<box id="wall_east" size="0.100000, 3.000000, 0.500000" movable="false">
+	    <body position="1.030873, 0.000000, 0.000000" orientation="0, 0, 0" />
+	</box>
+	<box id="wall_west" size="0.100000, 3.000000, 0.500000" movable="false">
+	    <body position="-1.030873, 0.000000, 0.000000" orientation="0, 0, 0" />
+	</box>
+
+	<distribute>
+	    <position method="uniform" min="-1.030873, -1.030873, 0" max="1.030873, 1.030873, 0" />
+	    <orientation method="uniform" min="0, 0, 0" max="0, 0, 0" />
+	    <entity quantity="25" max_trials="100" base_num="0">
+	        <kheperaiv id="kiv" rab_data_size="50" rab_range="0.700000">
+	            <controller config="bck" />
+	        </kheperaiv>
+	    </entity>
+	</distribute>
+```
 
 ## Bash
 - `bash`: scripts to execute multi-parameter simulations.
