@@ -24,7 +24,7 @@ void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
     BuzzPut(t_vm, "spd", spd);
 
     // Initialize RobotIDBrainMap
-    (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, prob, prob);
+    (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, prob, prob, legacy);
     auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
 
     // Open the local_vals table
@@ -47,7 +47,7 @@ void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 
     // Store the local values
     ///< @todo: this should probably be done without the body; the brain only cares about the observations and neighbor values, not self
-    robot_brain.StoreLocalValuePair(v);
+    // robot_brain.StoreLocalValuePair(v); ///< @todo: debug! shouldn't need this
 }
 
 float InitializeRobot::GenerateRandomSensorProbability()
@@ -378,6 +378,9 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(robot_id_node, "prefix", id_prefix_);
         GetNodeAttribute(robot_id_node, "base_num", id_base_num_);
 
+        // Grab legacy flag
+        GetNodeAttribute(GetNode(col_per_root_node, "legacy"), "bool", legacy_);
+
         // Grab probotuf file save path
         TConfigurationNode &path_node = GetNode(col_per_root_node, "path");
         GetNodeAttribute(path_node, "folder", output_folder_);
@@ -399,6 +402,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
             LOG << "[INFO] Specifying output folder " << output_folder_ << std::endl;
             LOG << "[INFO] Specifying output statistics filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << sim_stats_set_.proto_filepath_ << "\"" << std::endl;
             LOG << "[INFO] Specifying output agent data filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << sim_agent_data_set_.proto_filepath_ << "\"" << std::endl;
+            LOG << "[INFO] " << ((legacy_) ? "Using" : "Not using") << " legacy equations. " << std::endl;
 
             LOG << "[INFO] Computed swarm density = " << simulation_parameters_.density_ << std::endl;
             LOG << "[INFO] Generated tile size = " << arena_tile_size_ << " m" << std::endl;
@@ -462,7 +466,7 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
     // Setup functors
     std::vector<AgentData> *curr_agent_data_vec_ptr = &curr_agent_data_packet_.repeated_agent_data_vec[trial_counter_];
 
-    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, simulation_parameters_.speed_);
+    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, simulation_parameters_.speed_, legacy_);
     process_thought_functor_ = ProcessRobotThought(id_brain_map_ptr_,
                                                    curr_agent_data_vec_ptr,
                                                    id_prefix_,

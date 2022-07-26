@@ -1,37 +1,41 @@
-# Find dependencies
-find_package(ARGoS REQUIRED)
-find_package(Buzz REQUIRED)
-
-include_directories(${CMAKE_SOURCE_DIR} ${ARGOS_INCLUDE_DIRS})
-link_directories(${ARGOS_LIBRARY_DIR}) # include the */lib/argos3 directory to find the ARGoS libraries
-link_libraries(${ARGOS_LDFLAGS})
-
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${Buzz_DIR}")
-include_directories(${BUZZ_C_INCLUDE_DIR})
-
-# Set install rule
-
-# Build libraries
+# Build library of data structures
 add_library(collective_perception_data_structures
-simulation_stats_set.cpp
-simulation_agent_data_set.cpp
+    SHARED
+    simulation_stats_set.cpp
+    simulation_agent_data_set.cpp
 )
 target_link_libraries(collective_perception_data_structures
-PRIVATE
-${PROTO_LIB}
+    PRIVATE
+    ${PROTO_LIB}
 )
 target_include_directories(collective_perception_data_structures
-PRIVATE
-$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
+    PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
 )
 
+# Build dedicated test interface library @todo: hack to circumvent test issues
+add_library(collective_perception_test_interface
+    SHARED
+    arena.cpp
+    brain.cpp
+)
+target_link_libraries(collective_perception_test_interface
+    PRIVATE
+)
+target_include_directories(collective_perception_test_interface
+    PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
+)
+
+# Build ARGoS loop function library
 add_library(collective_perception_loop_functions
-    MODULE
+    SHARED
     collective_perception_loop_functions.cpp
     arena.cpp
     brain.cpp
 )
 target_link_libraries(collective_perception_loop_functions
+    PUBLIC
     ${BUZZ_LIBRARY}
     ${PROTO_LIB}
     collective_perception_data_structures

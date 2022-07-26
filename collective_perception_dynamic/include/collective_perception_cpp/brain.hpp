@@ -84,14 +84,15 @@ public:
          * @brief Solve for social values
          *
          * @param neighbor_vals Vector of neighbor values
+         * @param legacy_mode Flag to indicate if using legacy equations
          */
-        void SocialSolve(const std::vector<ValuePair> &neighbor_vals);
+        void SocialSolve(const std::vector<ValuePair> &neighbor_vals, const bool &legacy_mode);
 
         /**
          * @brief Solve for informed values
          *
          */
-        void InformedSolve();
+        void InformedSolve(const bool &legacy);
 
         ValuePair local_vals; ///< Local values
 
@@ -113,7 +114,8 @@ public:
      * @param b_prob Sensor accuracy for black tiles
      * @param w_prob Sensor accuracy for white tiles
      */
-    Brain(const std::string &id, const float &b_prob, const float &w_prob) : id_(id), b_prob_(b_prob), w_prob_(w_prob){};
+    Brain(const std::string &id, const float &b_prob, const float &w_prob, const bool &legacy = false)
+        : id_(id), b_prob_(b_prob), w_prob_(w_prob), legacy_(legacy){};
 
     /**
      * @brief Get the local ValuePair object
@@ -147,6 +149,8 @@ public:
 
     inline float GetWProb() { return w_prob_; }
 
+    inline bool GetSolverMode() { return legacy_; }
+
     /**
      * @brief Solve values
      *
@@ -166,13 +170,6 @@ public:
     }
 
     /**
-     * @brief Store the local values
-     *
-     * @param value_pair Local ValuePair object
-     */
-    void StoreLocalValuePair(const ValuePair &value_pair) { solver_.local_vals = value_pair; }
-
-    /**
      * @brief Store the neighbors' values
      *
      * @param value_pair_vec Vector of neighbor's ValuePair objects
@@ -180,6 +177,8 @@ public:
     void StoreNeighborValuePairs(const std::vector<ValuePair> &value_pair_vec) { neighbors_value_pairs_ = value_pair_vec; }
 
 private:
+    bool legacy_; ///< legacy solver mode @todo may be removed in the future
+
     std::string id_; ///< Robot ID
 
     int total_black_obs_; ///< Total number of black tiles observed

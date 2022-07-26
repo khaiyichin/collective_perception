@@ -1,0 +1,3 @@
+[submodule "collective_perception_dynamic/extern/Catch2"]
+	path = collective_perception_dynamic/extern/Catch2
+	url = https://github.com/catchorg/Catch2.git
