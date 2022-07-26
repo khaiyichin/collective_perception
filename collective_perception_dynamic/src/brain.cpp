@@ -1,5 +1,4 @@
 #include "brain.hpp"
-#include <iostream>
 
 void Brain::Solver::LocalSolve(const int &total_b_obs, const int &total_obs, const float &b, const float &w)
 {
@@ -37,36 +36,84 @@ void Brain::Solver::LocalSolve(const int &total_b_obs, const int &total_obs, con
     }
 }
 
-void Brain::Solver::SocialSolve(const std::vector<ValuePair> &neighbor_vals)
+void Brain::Solver::SocialSolve(const std::vector<ValuePair> &neighbor_vals, const bool &legacy)
 {
-    // Accumulate all the values in a sum (the confidence is the inverse of variance)
-    auto lambda = [](const ValuePair &a, const ValuePair &b)
+    Brain::ValuePair sum;
+
+    // Check whether to compute using legacy equations
+    if (legacy)
     {
-        if (a == Brain::ValuePair(0.0, 0.0))
+        // Accumulate all the values in a sum (the confidence is the inverse of variance)
+        auto lambda = [](const ValuePair &a, const ValuePair &b) -> Brain::ValuePair
         {
-            return b;
-        }
-        else if (b == Brain::ValuePair(0.0, 0.0))
+            if (a.confidence == 0.0 && b.confidence == 0.0)
+            {
+                return Brain::ValuePair(0.0, 0.0);
+            }
+            else if (a.confidence == 0.0)
+            {
+                return b;
+            }
+            else if (b.confidence == 0.0)
+            {
+                return a;
+            }
+            else
+            {
+                return Brain::ValuePair(a.x + b.x, (a.confidence * b.confidence) / (a.confidence + b.confidence));
+            }
+        };
+
+        sum = std::reduce(neighbor_vals.begin(), neighbor_vals.end(), Brain::ValuePair(), lambda);
+
+        // Assign the averages as social values
+        social_vals.x = sum.x / neighbor_vals.size();
+        social_vals.confidence = sum.confidence * neighbor_vals.size();
+    }
+    else
+    {
+        auto lambda = [](const ValuePair &left, const ValuePair &right) -> Brain::ValuePair
         {
-            return a;
+            return Brain::ValuePair(left.x + right.x * right.confidence, left.confidence + right.confidence);
+        };
+
+        sum = std::accumulate(neighbor_vals.begin(), neighbor_vals.end(), Brain::ValuePair(0.0, 0.0), lambda);
+
+        // Assign the averages as social values
+        social_vals.x = (sum.confidence == 0.0) ? 0.0 : sum.x / sum.confidence;
+        social_vals.confidence = sum.confidence;
+    }
+}
+
+void Brain::Solver::InformedSolve(const bool &legacy)
+{
+    // Check whether to use legacy equations
+    if (legacy)
+    {
+        if (local_vals.confidence == 0.0 && social_vals.confidence == 0.0) // both confidence
+        {
+            informed_vals.x = local_vals.x;
         }
         else
         {
-            return Brain::ValuePair(a.x + b.x, (a.confidence * b.confidence) / (a.confidence + b.confidence));
+            informed_vals.x = (local_vals.confidence * local_vals.x + social_vals.confidence * social_vals.x) / (local_vals.confidence + social_vals.confidence);
         }
-    };
 
-    Brain::ValuePair sum = std::reduce(neighbor_vals.begin(), neighbor_vals.end(), Brain::ValuePair(), lambda);
+        informed_vals.confidence = local_vals.confidence + social_vals.confidence;
+    }
+    else
+    {
+        if (local_vals.confidence == 0.0 && social_vals.confidence == 0.0)
+        {
+            informed_vals.x = local_vals.x;
+        }
+        else
+        {
+            informed_vals.x = (local_vals.confidence * local_vals.x + social_vals.confidence * social_vals.x) / (local_vals.confidence + social_vals.confidence);
+        }
 
-    // Assign the averages as social values
-    social_vals.x = sum.x / neighbor_vals.size();
-    social_vals.confidence = sum.confidence * neighbor_vals.size();
-}
-
-void Brain::Solver::InformedSolve()
-{
-    informed_vals.x = (local_vals.confidence * local_vals.x + social_vals.confidence * social_vals.x) / (local_vals.confidence + social_vals.confidence);
-    informed_vals.confidence = local_vals.confidence + social_vals.confidence;
+        informed_vals.confidence = (local_vals.confidence + social_vals.confidence) / 2.0;
+    }
 }
 
 void Brain::Solve()
@@ -77,9 +124,9 @@ void Brain::Solve()
     // Compute social values only if neighbor values are available
     if (neighbors_value_pairs_.size() != 0)
     {
-        solver_.SocialSolve(neighbors_value_pairs_);
+        solver_.SocialSolve(neighbors_value_pairs_, legacy_);
     }
 
     // Solve informed values (since local values are always available, even if social values aren't)
-    solver_.InformedSolve();
+    solver_.InformedSolve(legacy_);
 }

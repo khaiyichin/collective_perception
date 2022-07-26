@@ -190,7 +190,7 @@ class Sim:
             return 0.0 if all([i == 0 for i in weights]) else np.average(x_arr, weights=weights)
 
     def compute_fisher_bar(self, fisher_arr, legacy=False):
-        if legacy: return np.nan_to_num( spy_stats.hmean(fisher_arr), posinf=POSINF )
+        if legacy: return 0.0 if all([i == 0 for i in fisher_arr]) else np.nan_to_num( spy_stats.hmean(fisher_arr), posinf=POSINF )
         else: return np.nan_to_num( np.mean(fisher_arr), posinf=POSINF )
 
     def compute_x(self, x_hat, alpha, x_bar, rho, legacy=False): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
