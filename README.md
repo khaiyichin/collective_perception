@@ -100,7 +100,7 @@ The following instructions apply directly for the local build; for the container
     $ source .venv/bin/activate
     ```
     *When running the container simulator, you can skip this step; there's no need to activate any virtual environment since the Python modules are installed directly to the container.*
-3. Run the simulation (ensure that the parameter file is in the current directory).
+3. Run the simulation (ensure that the parameter file is present in the execution directory).
     ```
     $ multi_agent_sim_static.py
     ```
@@ -114,20 +114,46 @@ The following instructions apply directly for the local build; for the container
       -h, --help  show this help message and exit
       -p          flag to use cores to run simulations in parallel
     ```
-  4. When the execution completes, it will output pickled data in newly created directory `data`. (Dev note: pickles may be updated to protobufs; output directory structure may be modified.)
+4. When the execution completes, it will output pickled data in newly created directory `data`. (Dev note: pickles may be updated to protobufs; output directory structure may be modified.)
 
 ### Dynamic topology simulation
 1. Set up the desired experimental parameters according as shown [here](docs/parameter_file_setup.md).
-2. TODO
+2. Run the simulation (ensure that the parameter file is present in the execution directory).
+    ```
+    $ run_dynamic_simulations -c param_multi_agent_sim_dynamic.argos
+    ```
+3. When the execution completes, it will output protobuf files in a local directory specified in your configuration file.
 
 ## Testing
 Unit tests have been provided to aid any updates to the source code. Besides identifying the kinds of testing imposed on the source code, looking into the test files can help you understand how the algorithm works.
 
-For the static simulator, simply do the following to run tests.
+For the static simulator, simply do the following to run tests after the virtual environment has been setup.
 ```
 $ cd collective_perception_static
 $ source .venv/bin/activate
 $ pytest --workers=<N> # run the test in parallel using N cores; remove the "--workers" flag if sequential testing is desired
 ```
 
-For the dynamic simulator, TODO.
+For the dynamic simulator, you will need to clone this repository including its submodules, notably the [Catch2](https://github.com/catchorg/Catch2/) repository in `collective_perception_dynamic/extern/`.
+```
+$ git clone --recurse-submodules https://github.com/khaiyichin/collective_perception.git
+```
+Build the dynamic simulator project in `Debug` mode.
+```
+$ cd collective_perception_dynamic
+$ mkdir build && cd build
+$ cmake -DCMAKE_BUILD_TYPE=Debug ..
+...
+$ make -j$(nproc)
+```
+Then you can run the tests by either doing `make test` or executing them with the command line.
+```
+# Run without any flags, see the Catch2 documentation for more info
+$ tests/tests
+
+# Run with gdb
+$ gdb tests/tests # or gdb --args tests/tests <ARGS> if you have arguments, e.g., Catch2 flags
+
+# Run with valgrind
+$ valgrind tests/tests <ARGS-IF-ANY>
+```

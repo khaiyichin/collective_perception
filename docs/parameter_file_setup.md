@@ -25,10 +25,8 @@ legacy: <BOOL>        # flag to use legacy equations
 ```
 Save the file with the name `param_multi_agent_sim_static.yaml` at the directory where you will be executing the simulation.
 
-TODO: DESCRIBE LEGACY 
-
 ## Dynamic topology simulation
-The parameter file used for the dynamic simulation is the same as the configuration file used by ARGoS, which is described in their [official documentation](https://www.argos-sim.info/user_manual.php). Here, only parameters specifically related to the simulated experiments will be discussed.
+The parameter file used for the dynamic simulation is the same as the configuration file used by ARGoS, which is described in their [official documentation](https://www.argos-sim.info/user_manual.php). Here, only parameters specifically related to the simulated experiments will be discussed. You can find the template from `examples/param/param_multi_agent_sim_dynamic.argos`.
 
 ### Number of steps
 An ARGoS "experiment" that is repeated `m` times means that it has `m` trials. Thus `length * ticks_per_second` of an `experiment` becomes the number of steps for a single trial.
@@ -87,6 +85,9 @@ For the location of the `collective_perception_loop_functions` library, specify 
         <!-- Verbosity level -->
         <verbosity level="reduced" />
 
+        <!-- Legacy equations -->
+        <legacy bool="false" />
+
     </collective_perception>
 
 </loop_functions>
@@ -96,7 +97,7 @@ Note: it is advised that the extensions `.pbs` and `.pbad` be used for the `stat
 ### Arena size and swarm density
 The arena size can be modified as explained in the official ARGoS documentation. The effect it has on the generated tile size is described by the equation `arena_size_*/arena_tile_count_*` for both the x and y directions.
 
-The swarm density is modified indirectly through the positions of the 4 walls that constrain the robots' movable space. Use the `compute_wall_positions.cpp` script to obtain the appropriate values based on the desired swarm density.
+The swarm density is modified indirectly through the positions of the 4 walls that constrain the robots' movable space. Use the `compute_wall_positions` script (see [here](scripts_explained.md)) to obtain the appropriate values based on the desired swarm density.
 ```xml
 <arena size="10, 10, 1" center="0,0,0.5">
 
@@ -118,16 +119,6 @@ The swarm density is modified indirectly through the positions of the 4 walls th
     </box>
 
     <distribute>
-        ... <!-- distribution of robot placement, see the following snippet -->
-    </distribute>
-
-</arena>
-```
-
-Within the `distribute` node, the following code snippet should be inserted. 
-```xml
-    ...
-    <distribute>
 
         <!-- Robot placement distribution -->
         <position method="uniform"
@@ -143,7 +134,24 @@ Within the `distribute` node, the following code snippet should be inserted.
         </entity>
 
     </distribute>
-    ...
+
+</arena>
 ```
 
-NEED TO COMPUTE BOX POSITIONS TO GET THE CORRECT DENSITY: SHOW FORMULA (maybe have a script to auto computev positions?)
+## Additional notes
+The `legacy` parameter allows you to switch between using legacy or updated social equations.
+
+With the $i$-th agent having $\mathcal{N}_i$ neighbors at timestep $k$, the *legacy* social estimate $\bar{x}$ and confidence $\beta$ are defined as
+$$
+\bar{x}^k_i = \frac{1}{\|\mathcal{N}_i\|} \sum_{j\in\mathcal{N}_i} \hat{x}^k_j\,,
+\\
+\beta^k_i = \bigg[ \frac{1}{\|\mathcal{N}_i\|} \sum \frac{1}{\alpha^k_j} \bigg]^{-1}\,,
+$$
+where $\hat{x}$ is the local estimate and $\alpha$ is the local confidence.
+
+On the other hand, the *updated* social estimate and confidence are defined as
+$$
+\bar{x}^k_i = \frac{1}{\sum_{j\in\mathcal{N}_i} \alpha^k_j} \sum_{j\in\mathcal{N}_i} \alpha^k_j \hat{x}^k_j\,,
+\\
+\beta^k_i = \sum_{j\in\mathcal{N}_i} \alpha^k_j\,.
+$$
