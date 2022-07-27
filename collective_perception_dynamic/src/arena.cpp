@@ -1,13 +1,13 @@
 #include "arena.hpp"
 
-Arena::Arena(const std::pair<uint32_t, uint32_t> &tile_count, const std::pair<float, float> &lower_lim_2d, const float &tile_size, const float &fill_ratio) : fill_ratio_(fill_ratio), tile_size_(tile_size)
+Arena::Arena(const std::pair<unsigned int, unsigned int> &tile_count, const std::pair<float, float> &lower_lim_2d, const float &tile_size, const float &fill_ratio) : fill_ratio_(fill_ratio), tile_size_(tile_size)
 {
     // Store arena dimensions
-    num_tiles_ = Arena::Dimensions<uint32_t>(tile_count.first, tile_count.second);
+    num_tiles_ = Arena::Dimensions<unsigned int>(tile_count.first, tile_count.second);
     lower_lim_ = Arena::Dimensions<float>(lower_lim_2d.first, lower_lim_2d.second);
 
     // Create layout to the desired size with values of 0
-    layout_.resize(num_tiles_.y, std::vector<uint32_t>(num_tiles_.x, 0));
+    layout_.resize(num_tiles_.y, std::vector<unsigned int>(num_tiles_.x, 0));
     GenerateTileArrangement();
 }
 
@@ -22,12 +22,12 @@ void Arena::GenerateTileArrangement()
     {
         for (size_t j = 0; j < num_tiles_.x; ++j)
         {
-            layout_[i][j] = static_cast<uint32_t>(distribution(generator));
+            layout_[i][j] = static_cast<unsigned int>(distribution(generator));
         }
     }
 }
 
-uint32_t Arena::GetColor(const float &x, const float &y)
+unsigned int Arena::GetColor(const float &x, const float &y)
 {
     size_t tile_count_x = static_cast<size_t>(std::floor((x - lower_lim_.x) / tile_size_));
     size_t tile_count_y = static_cast<size_t>(std::floor((y - lower_lim_.y) / tile_size_));
@@ -42,7 +42,7 @@ uint32_t Arena::GetColor(const float &x, const float &y)
 float Arena::GetTrueTileDistribution()
 {
     // Define lambda function for accumulating the number of black tiles
-    auto lambda = [](const int &a, const std::vector<uint32_t> &b)
+    auto lambda = [](const int &a, const std::vector<unsigned int> &b)
     {
         return a + std::count(b.begin(), b.end(), 1);
     }; // this is possible because std::accumulate goes from left to right (not possible with std::reduce)

@@ -220,7 +220,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         floor_entity_ptr_ = &space_entity.GetFloorEntity();
 
         // Get the size of the arena (in units of tiles)
-        uint32_t arena_x, arena_y;
+        unsigned int arena_x, arena_y;
 
         GetNodeAttribute(arena_tiles_node, "tile_count_x", arena_x);
         GetNodeAttribute(arena_tiles_node, "tile_count_y", arena_y);
@@ -748,7 +748,7 @@ void CollectivePerceptionLoopFunctions::SaveData()
 
 CColor CollectivePerceptionLoopFunctions::GetFloorColor(const CVector2 &c_position_on_plane)
 {
-    uint32_t color_int = arena_.GetColor(c_position_on_plane.GetX(), c_position_on_plane.GetY());
+    unsigned int color_int = arena_.GetColor(c_position_on_plane.GetX(), c_position_on_plane.GetY());
 
     return color_int == 1 ? CColor::BLACK : CColor::WHITE;
 }

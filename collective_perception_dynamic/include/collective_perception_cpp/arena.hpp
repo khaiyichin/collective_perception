@@ -57,7 +57,7 @@ public:
      * @param tile_size Size of square tiles in units of meters
      * @param fill_ratio Black tile fill ratio
      */
-    Arena(const std::pair<uint32_t, uint32_t> &tile_count, const std::pair<float, float> &lower_lim_2d, const float &tile_size, const float &fill_ratio);
+    Arena(const std::pair<unsigned int, unsigned int> &tile_count, const std::pair<float, float> &lower_lim_2d, const float &tile_size, const float &fill_ratio);
 
     /**
      * @brief Generate the tiles
@@ -70,9 +70,9 @@ public:
      *
      * @param x x coordinate
      * @param y y coordinate
-     * @return uint32_t The color either black (0) or white (1)
+     * @return unsigned int The color either black (0) or white (1)
      */
-    uint32_t GetColor(const float &x, const float &y);
+    unsigned int GetColor(const float &x, const float &y);
 
     /**
      * @brief Get the true fill ratio of black tiles to total tiles
@@ -84,20 +84,20 @@ public:
     /**
      * @brief Get the total number of tiles in the arena
      * 
-     * @return uint32_t Number of tiles
+     * @return unsigned int Number of tiles
      */
-    uint32_t GetTotalNumTiles() { return num_tiles_.x * num_tiles_.y; }
+    unsigned int GetTotalNumTiles() { return num_tiles_.x * num_tiles_.y; }
 
 private:
     float fill_ratio_; ///< Fill ratio
 
     float tile_size_; ///< Size of the tile in units of meters
 
-    Dimensions<uint32_t> num_tiles_; ///< Dimensions in units of tiles
+    Dimensions<unsigned int> num_tiles_; ///< Dimensions in units of tiles
 
     Dimensions<float> lower_lim_; ///< Lower limit coordinates of 2-D arena
 
-    std::vector<std::vector<uint32_t>> layout_; ///< Grid layout of the arena, with values 1 or 0
+    std::vector<std::vector<unsigned int>> layout_; ///< Grid layout of the arena, with values 1 or 0
 };
 
 #endif

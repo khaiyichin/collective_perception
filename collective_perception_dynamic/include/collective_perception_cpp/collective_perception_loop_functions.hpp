@@ -197,7 +197,7 @@ private:
 
     std::string output_folder_;
 
-    std::pair<uint32_t, uint32_t> arena_tile_count_;
+    std::pair<unsigned int, unsigned int> arena_tile_count_;
 
     std::pair<float, float> arena_lower_lim_;
 
