@@ -124,6 +124,16 @@ The following instructions apply directly for the local build; for the container
     ```
 3. When the execution completes, it will output protobuf files in a local directory specified in your configuration file.
 
+## Visualization of experiment data
+Once the simulation execution completes, you will need to convert the output data into a `VisualizationDataGroup` type data file. The workflow looks like the following:
+```mermaid
+    graph LR;
+    a(Execute simulated experiments) --> b(Obtain experiment data) --> c(Convert experiment data to visualization data) --> d(Visualize data);
+```
+See the [here](docs/scripts_explained.md) for detailed instructions, but the general idea is:
+1. Convert the experiment data with the `convert_exp_data_to_viz_data_group.py` script (static) or `convert_sim_stats_set_to_viz_data_group.py` script (dynamic).
+2. Visualize the converted data with the `visualize_multi_agent_data_*.py`.
+
 ## Testing
 Unit tests have been provided to aid any updates to the source code. Besides identifying the kinds of testing imposed on the source code, looking into the test files can help you understand how the algorithm works.
 
