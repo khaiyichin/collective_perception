@@ -12,8 +12,8 @@ To visualize the experiment data, they have to be converted into visualization d
 
 To visualize the data, a convergence threshold value $\delta$ must be provided; convergence is defined as the point in time when $|x^{k+1} - x^k| < \delta$ until the end of the experiment.
 
-Depending on whether the output is from a static or a dynamic simulation, use `convert_*_to_viz_data_group.py` to combine and convert the data:
-* static: `$ convert_exp_data_to_viz_data_group.py <DIRECTORY-CONTAINING-ALL-SIMULATION-DATA> -s <CONVERTED-FILE-PATH>`
+Depending on whether the output is from a static or a dynamic simulation, use `convert_*_to_viz_data_group.py` to combine and convert the data.
+* Static: `convert_exp_data_to_viz_data_group.py <DIRECTORY-CONTAINING-ALL-SIMULATION-DATA> -s <CONVERTED-FILE-PATH>`
     ```
     usage: convert_exp_data_to_viz_data_group.py [-h] [-s S] FOLDER
 
@@ -36,7 +36,7 @@ Depending on whether the output is from a static or a dynamic simulation, use `c
       -h, --help  show this help message and exit
       -s S        path to store the pickled VisualizationDataGroupStatic object
     ```
-* dynamic: `$ convert_sim_stats_set_to_viz_data_group.py <DIRECTORY-CONTAINING-ALL-SIMULATION-DATA -s <CONVERTED-FILE-PATH>`
+* Dynamic: `convert_sim_stats_set_to_viz_data_group.py <DIRECTORY-CONTAINING-ALL-SIMULATION-DATA -s <CONVERTED-FILE-PATH>`
     ```
     usage: convert_sim_stats_set_to_viz_data_group.py [-h] [-s S] FOLDER
 
@@ -68,8 +68,8 @@ You can generate 3 forms of plots using the visualization data (i.e., the conver
 2. `heatmap`: heatmap plot.
 3. `scatter`: scatter plot.
 
-Each of the 3 plot types is provided by a subcommand. Depending on whether the output is from a static or a dynamic simulation, use `visualize_multi_agent_data_*.py` to create the desired plot(s):
-- static: `$ visualize_multi_agent_data_static.py <OPTIONAL-FLAGS> <VISUALIZATION-DATA> <DESIRED-CONVERGENCE-THRESHOLD> <SUBCOMMANDS>`
+Each of the 3 plot types is provided by a subcommand. Depending on whether the output is from a static or a dynamic simulation, use `visualize_multi_agent_data_*.py` to create the desired plot(s).
+- Static: `visualize_multi_agent_data_static.py <OPTIONAL-FLAGS> <VISUALIZATION-DATA> <DESIRED-CONVERGENCE-THRESHOLD> <SUBCOMMANDS>`
     ```
     usage: visualize_multi_agent_data_static.py [-h] [-g] [-a] [-i] [-s] FILE CONV {series,heatmap,scatter} ...
 
@@ -91,30 +91,28 @@ Each of the 3 plot types is provided by a subcommand. Depending on whether the o
       -i                    flag to show individual agent data (only used for time series and scatter plot data with the "-U" flag; exclusive with the "-a" flag)
       -s                    flag to show the plots
     ```
-- dynamic: `$ visualize_multi_agent_data_dynamic.py <OPTIONAL-FLAGS> <VISUALIZATION-DATA> <DESIRED-CONVERGENCE-THRESHOLD> <SUBCOMMANDS>`
+- Dynamic: `visualize_multi_agent_data_dynamic.py <OPTIONAL-FLAGS> <VISUALIZATION-DATA> <DESIRED-CONVERGENCE-THRESHOLD> <SUBCOMMANDS>`
+    ```
+    usage: visualize_multi_agent_data_dynamic.py [-h] [-g] [-a] [-i] [-s] FILE CONV {series,heatmap,scatter} ...
 
-Top-level script help:
-```
-usage: visualize_multi_agent_data_*.py [-h] [-g] [-a] [-i] [-s] FILE CONV {series,heatmap,scatter} ...
+    Visualize dynamic multi-agent simulation data
 
-Visualize * multi-agent simulation data
+    positional arguments:
+    FILE                  path to folder containing serialized SimulationStatsSet protobuf files or path to a VisualizationDataGroup pickle file (see the "g" flag)
+    CONV                  convergence threshold value
+    {series,heatmap,scatter}
+                            commands for visualization type
+        series              visualize time series data
+        heatmap             visualize heatmap data
+        scatter             visualize scatter data
 
-positional arguments:
-  FILE                  path to folder containing serialized ExperimentData pickle files or path to a VisualizationDataGroup pickle file (see the "g" flag)
-  CONV                  convergence threshold value
-  {series,heatmap,scatter}
-                        commands for visualization type
-    series              visualize time series data
-    heatmap             visualize heatmap data
-    scatter             visualize scatter data
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -g                    flag to indicate if the path is pointing to a VisualizationDataGroup pickle file
-  -a                    flag to use aggregate data instead of data from individual trials (exclusive with the "-i" flag)
-  -i                    flag to show individual agent data (only used for time series and scatter plot data with the "-U" flag; exclusive with the "-a" flag)
-  -s                    flag to show the plots
-```
+    optional arguments:
+      -h, --help            show this help message and exit
+      -g                    flag to indicate if the path is pointing to a VisualizationDataGroup pickle file
+      -a                    flag to use aggregate data instead of data from individual trials (exclusive with the "-i" flag)
+      -i                    flag to show individual agent data (only used for time series and scatter plot data with the "-U" flag; exclusive with the "-a" flag)
+      -s                    flag to show the plots
+    ```
 
 Script help for the subcommands:
 - `series` general usage:
@@ -135,7 +133,6 @@ Script help for the subcommands:
     ```
       -U [U [U ...]]  robot speed and swarm density to use in plotting time series data
     ```
-
 - `heatmap` general usage:
     ```
     usage: visualize_multi_agent_data_*.py FILE CONV heatmap [-h] [-u [U [U ...]]] [-rstr RSTR [RSTR ...]] [-row ROW [ROW ...]] [-cstr CSTR [CSTR ...]] [-col COL [COL ...]]
@@ -158,7 +155,6 @@ Script help for the subcommands:
     ```
       -u [U [U ...]]        (optional) robot speed and swarm density to use in plotting single heatmap data
     ```
-
 - `scatter` general usage:
     ```
     usage: visualize_multi_agent_data_*.py FILE CONV scatter [-h] [-tfr TFR [TFR ...]] [-sp SP [SP ...]] -U [U [U ...]]
@@ -178,8 +174,7 @@ Script help for the subcommands:
       -U [U [U ...]]      robot speed and swarm density to use in plotting scatter data
     ```
 
-
-### Obtaining serialized data information.
+### Obtaining serialized data information
 `serial_data_info.py` displays information about a serialized pickle file. (TODO: currently only supports static simulation experiment outputs, i.e., pickled `ExperimentData` files):
 ```
 $ serial_data_info.py <FILE>
