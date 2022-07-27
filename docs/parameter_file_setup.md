@@ -141,17 +141,16 @@ The swarm density is modified indirectly through the positions of the 4 walls th
 ## Additional notes
 The `legacy` parameter allows you to switch between using legacy or updated social equations.
 
-With the $i$-th agent having $\mathcal{N}_i$ neighbors at timestep $k$, the *legacy* social estimate $\bar{x}$ and confidence $\beta$ are defined as
-$$
-\bar{x}^k_i = \frac{1}{\|\mathcal{N}_i\|} \sum_{j\in\mathcal{N}_i} \hat{x}^k_j\,,
-\\
-\beta^k_i = \bigg[ \frac{1}{\|\mathcal{N}_i\|} \sum \frac{1}{\alpha^k_j} \bigg]^{-1}\,,
-$$
+With the $i$-th agent having the set of $\mathcal N_i$ neighbors at timestep $k$, the *legacy* social estimate $\bar{x}$ and confidence $\beta$ are defined as
+
+$$ \bar{x}^k_i = \frac{1}{||\mathcal N_i||} \sum_{j \in \mathcal N_i} \hat{x}^k_j,$$
+
+$$ \beta^k_i = \bigg[ \frac{1}{||\mathcal N_i||} \sum_{j \in \mathcal N_i} \frac{1}{\alpha^k_j} \bigg]^{-1} $$
+
 where $\hat{x}$ is the local estimate and $\alpha$ is the local confidence.
 
 On the other hand, the *updated* social estimate and confidence are defined as
-$$
-\bar{x}^k_i = \frac{1}{\sum_{j\in\mathcal{N}_i} \alpha^k_j} \sum_{j\in\mathcal{N}_i} \alpha^k_j \hat{x}^k_j\,,
-\\
-\beta^k_i = \sum_{j\in\mathcal{N}_i} \alpha^k_j\,.
-$$
+
+$$ \bar{x}^k_i = \frac{1}{\sum_{j \in \mathcal N_i} \alpha^k_j} \sum_{j \in \mathcal N_i} \alpha^k_j \hat{x}^k_j, $$
+
+$$ \beta^k_i = \sum_{j \in \mathcal N_i} \alpha^k_j. $$
