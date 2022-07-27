@@ -98,7 +98,7 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="/home/khaiyichin/research/collective_perception/collective_perception_dynamic/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
+    <loop_functions library="build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
         <collective_perception>
             <arena_tiles tile_count_x="500" tile_count_y="500" /> <!-- number of tiles for the arena -->
             <fill_ratio_range min="0.05" max="0.95" steps="1" /> <!-- range of target fill ratios -->
@@ -115,6 +115,7 @@
             <robot_id prefix="kiv" base_num="0" /> <!-- must match the ones in the arena configuration -->
             <path folder="data" stats="multi_agent_sim_dynamic_stats.pbs" agent_data="multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
             <verbosity level="full" /> <!-- "full", "reduced", "none" -->
+            <legacy bool="false" /> <!-- flag to use legacy social and informed equations -->
         </collective_perception>
     </loop_functions>
 

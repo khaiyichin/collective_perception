@@ -182,28 +182,33 @@ class Sim:
 
         return np.nan_to_num(output, posinf=POSINF)
 
-    def compute_x_bar(self, x_arr, weights=None, legacy=False): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same social function)
+    def compute_x_bar(self, x_arr, weights, legacy=False): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same social function)
+
+        # Nullify the social estimate if weights are all 0
+        if all([i == 0 for i in weights]): return 0.0
 
         if legacy:
             return np.mean(x_arr)
         else:
-            return 0.0 if all([i == 0 for i in weights]) else np.average(x_arr, weights=weights)
+            return np.average(x_arr, weights=weights)
 
     def compute_fisher_bar(self, fisher_arr, legacy=False):
-        if legacy: return 0.0 if all([i == 0 for i in fisher_arr]) else np.nan_to_num( spy_stats.hmean(fisher_arr), posinf=POSINF )
-        else: return np.nan_to_num( np.mean(fisher_arr), posinf=POSINF )
 
-    def compute_x(self, x_hat, alpha, x_bar, rho, legacy=False): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
+        # Nullify the social confidence if weights are all 0
+        if all([i == 0 for i in fisher_arr]): return 0.0
+
+        if legacy: return np.nan_to_num( spy_stats.hmean(fisher_arr), posinf=POSINF )
+        else: return np.nan_to_num( np.sum(fisher_arr), posinf=POSINF )
+
+    def compute_x(self, x_hat, alpha, x_bar, rho): # TODO: need to split this out of the parent class since it should be modular (i.e., we may not use the same objective function)
 
         # Check if the confidences are zero
         if alpha == 0 and rho == 0: return x_hat # use the local estimate since that's the best possible guess at this time
 
-        if legacy: return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
-        else: return (alpha*x_hat + x_bar) / (alpha + rho)
+        return ( alpha*x_hat + rho*x_bar ) / (alpha + rho)
 
-    def compute_fisher(self, alpha, rho, legacy=False):
-        if legacy: return alpha + rho # alpha^-1 and rho^-1 are variances, so the sum is the result of the harmonic mean
-        else: return np.mean([alpha, rho])
+    def compute_fisher(self, alpha, rho):
+        return alpha + rho
 
 class MultiAgentSim(Sim):
 
@@ -584,7 +589,7 @@ class Agent:
 
         self.local_solver = self.LocalSolver(*local_functions)
         self.social_solver = self.SocialSolver(*social_functions, legacy=legacy)
-        self.informed_solver = self.InformedSolver(*informed_functions, legacy=legacy)
+        self.informed_solver = self.InformedSolver(*informed_functions)
 
     def reset(self):
 
@@ -663,7 +668,7 @@ class Agent:
         """Compute the final estimate using the informed function.
         """
         self.informed_solver.solve(self.local_solver.x, self.local_solver.conf,
-                                 self.social_solver.x, self.social_solver.conf)
+                                   self.social_solver.x, self.social_solver.conf)
 
     def get_x_hat(self): return self.local_solver.x
 
@@ -731,14 +736,12 @@ class Agent:
 
     class InformedSolver:
 
-        def __init__(self, primal_est_func, primal_conf_func, legacy=False):
+        def __init__(self, primal_est_func, primal_conf_func):
             self.x = 0.0
             self.conf = 0.0
 
             self.primal_est_func = primal_est_func
             self.primal_conf_func = primal_conf_func
-
-            self.legacy = legacy
 
         def reset(self):
             self.x = 0.0
@@ -749,8 +752,8 @@ class Agent:
             """
 
             # Compute the informed estimate
-            self.x = self.primal_est_func(local_est, local_conf, social_est, social_conf, self.legacy)
-            self.conf = self.primal_conf_func(local_conf, social_conf, self.legacy)
+            self.x = self.primal_est_func(local_est, local_conf, social_est, social_conf)
+            self.conf = self.primal_conf_func(local_conf, social_conf)
 
 class ExperimentData:
     """Class to store simulated experiment data.

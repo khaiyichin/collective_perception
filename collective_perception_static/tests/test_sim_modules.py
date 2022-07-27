@@ -337,8 +337,14 @@ def test_social_vals(mas):
             confidences.append(mas.alpha[trial_ind][neighbor][step_ind*mas.sim_data.comms_period])
 
         # Compute social values manually
-        social_est = 0.0 if all([i == 0 for i in confidences]) else np.average(estimates, weights=confidences)
-        social_conf = np.mean(confidences)
+        social_est = 0.0
+        social_conf = 0.0
+
+        if any([i != 0 for i in confidences]):
+            for est, conf in zip(estimates, confidences):
+                social_est += est*conf
+                social_conf += conf
+            social_est = social_est / social_conf
 
         np.testing.assert_allclose(mas.x_bar[trial_ind][agent_ind][step_ind], social_est)
         np.testing.assert_allclose(mas.rho[trial_ind][agent_ind][step_ind], social_conf)
@@ -376,8 +382,17 @@ def test_social_vals_legacy(mas):
             confidences.append(mas.alpha[trial_ind][neighbor][step_ind*mas.sim_data.comms_period])
 
         # Compute social values manually
-        social_est = np.mean(estimates)
-        social_conf = spy_stats.hmean(confidences)
+        social_est = 0.0
+        social_conf = 0.0
+        N = len(estimates)
+
+        if any([i != 0 for i in confidences]): # only compute if any confidence values are non-zero
+            for est, conf in zip(estimates, confidences):
+                social_est += est
+                social_conf += 1.0 / conf
+
+            social_est = 1.0 / N * social_est
+            social_conf = 1.0 / (1.0 / N * social_conf)
 
         np.testing.assert_allclose(mas.x_bar[trial_ind][agent_ind][step_ind], social_est)
         np.testing.assert_allclose(mas.rho[trial_ind][agent_ind][step_ind], social_conf)
@@ -393,44 +408,6 @@ def test_social_vals_legacy(mas):
     indirect=True
 )
 def test_informed_vals(mas):
-
-    # Execute simulation fully
-    mas.run()
-
-    for _ in range(cftest.TEST_REPEATS):
-        # Obtain random indices to test
-        trial_ind = np.random.randint(0, mas.sim_data.num_trials)
-        agent_ind = np.random.randint(0, mas.sim_data.num_agents)
-        step_ind = np.random.randint(0, mas.sim_data.num_steps//mas.sim_data.comms_period + 1)
-
-        # Obtain local and social values
-        local_est = mas.x_hat[trial_ind][agent_ind][step_ind*mas.sim_data.comms_period]
-        local_conf = mas.alpha[trial_ind][agent_ind][step_ind*mas.sim_data.comms_period]
-        social_est =  mas.x_bar[trial_ind][agent_ind][step_ind]
-        social_conf =  mas.rho[trial_ind][agent_ind][step_ind]
-
-        # Compute informed values manually
-        if local_conf == 0 and social_conf == 0:
-            informed_est = local_est
-        else:
-            informed_est = (local_conf * local_est + social_est) / (local_conf + social_conf)
-
-        informed_conf = np.mean([local_conf, social_conf])
-
-        np.testing.assert_allclose(mas.x[trial_ind][agent_ind][step_ind], informed_est)
-        np.testing.assert_allclose(mas.gamma[trial_ind][agent_ind][step_ind], informed_conf)
-
-"""Test legacy informed value computation
-"""
-@pytest.mark.parametrize(
-    "mas",
-    [cftest.MASParametrizer(sparam_num_steps=20, sparam_comms_graph_str="full", sparam_legacy=True),
-     cftest.MASParametrizer(sparam_num_steps=20, sparam_comms_graph_str="ring", sparam_legacy=True),
-     cftest.MASParametrizer(sparam_num_steps=20, sparam_comms_graph_str="line", sparam_legacy=True),
-     cftest.MASParametrizer(sparam_num_steps=20, sparam_comms_graph_str="scale-free", sparam_legacy=True)],
-    indirect=True
-)
-def test_informed_vals_legacy(mas):
 
     # Execute simulation fully
     mas.run()

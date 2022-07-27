@@ -92,7 +92,7 @@ public:
          * @brief Solve for informed values
          *
          */
-        void InformedSolve(const bool &legacy);
+        void InformedSolve();
 
         ValuePair local_vals; ///< Local values
 
