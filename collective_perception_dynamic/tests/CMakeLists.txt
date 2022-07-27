@@ -2,6 +2,7 @@
 set(UNIT_TEST_SOURCES
     test_header.hpp
     test_brain.cpp
+    test_arena.cpp
 )
 
 set(TEST_TARGET_NAME tests) # define test executable name

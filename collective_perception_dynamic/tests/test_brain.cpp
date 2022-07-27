@@ -4,7 +4,6 @@
 TEST_CASE("Brain class", "[BrainCls]")
 {
     // Initialize random number generator
-    // std::srand(std::time(nullptr));
     std::random_device rd;
     std::default_random_engine generator = std::default_random_engine(rd());
     std::uniform_real_distribution<float> sensor_distribution(0.0, 1.0);
