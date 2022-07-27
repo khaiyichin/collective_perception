@@ -85,35 +85,18 @@ void Brain::Solver::SocialSolve(const std::vector<ValuePair> &neighbor_vals, con
     }
 }
 
-void Brain::Solver::InformedSolve(const bool &legacy)
+void Brain::Solver::InformedSolve()
 {
-    // Check whether to use legacy equations
-    if (legacy)
+    if (local_vals.confidence == 0.0 && social_vals.confidence == 0.0)
     {
-        if (local_vals.confidence == 0.0 && social_vals.confidence == 0.0) // both confidence
-        {
-            informed_vals.x = local_vals.x;
-        }
-        else
-        {
-            informed_vals.x = (local_vals.confidence * local_vals.x + social_vals.confidence * social_vals.x) / (local_vals.confidence + social_vals.confidence);
-        }
-
-        informed_vals.confidence = local_vals.confidence + social_vals.confidence;
+        informed_vals.x = local_vals.x;
     }
     else
     {
-        if (local_vals.confidence == 0.0 && social_vals.confidence == 0.0)
-        {
-            informed_vals.x = local_vals.x;
-        }
-        else
-        {
-            informed_vals.x = (local_vals.confidence * local_vals.x + social_vals.confidence * social_vals.x) / (local_vals.confidence + social_vals.confidence);
-        }
-
-        informed_vals.confidence = (local_vals.confidence + social_vals.confidence) / 2.0;
+        informed_vals.x = (local_vals.confidence * local_vals.x + social_vals.confidence * social_vals.x) / (local_vals.confidence + social_vals.confidence);
     }
+
+    informed_vals.confidence = local_vals.confidence + social_vals.confidence;
 }
 
 void Brain::Solve()
@@ -128,5 +111,5 @@ void Brain::Solve()
     }
 
     // Solve informed values (since local values are always available, even if social values aren't)
-    solver_.InformedSolve(legacy_);
+    solver_.InformedSolve();
 }

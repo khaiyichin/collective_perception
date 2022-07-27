@@ -113,7 +113,7 @@ TEST_CASE("Brain class", "[BrainCls]")
             // Compute informed values manually
             manual_informed_est.push_back((local_est * local_conf + manual_social_est[i] * manual_social_conf[i]) /
                                           (local_conf + manual_social_conf[i]));
-            manual_informed_conf.push_back((local_conf + manual_social_conf[i]) / 2);
+            manual_informed_conf.push_back(local_conf + manual_social_conf[i]);
 
             // Compute local, social and informed values using Brain class
             brain.StoreObservations(n, t);
