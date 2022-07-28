@@ -93,8 +93,8 @@ class Sim:
 
                 # @todo: temporary hack to show individual robot values; in the future this should be stored
                 # elsewhere
-                self.x = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
-                self.gamma = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
+                self.x = np.zeros( (num_trials, num_agents, num_steps + 1) )
+                self.gamma = np.zeros( (num_trials, num_agents, num_steps + 1) )
 
                 self.x_hat_sample_mean = np.zeros( (num_trials, num_steps + 1) )
                 self.alpha_sample_mean = np.zeros( (num_trials, num_steps + 1) )
@@ -106,10 +106,10 @@ class Sim:
                 self.x_bar_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
                 self.rho_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
 
-                self.x_sample_mean = np.zeros( (num_trials, num_steps//comms_period + 1) )
-                self.gamma_sample_mean = np.zeros( (num_trials, num_steps//comms_period + 1) )
-                self.x_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
-                self.gamma_sample_std = np.zeros( (num_trials, num_steps//comms_period + 1) )
+                self.x_sample_mean = np.zeros( (num_trials, num_steps + 1) )
+                self.gamma_sample_mean = np.zeros( (num_trials, num_steps + 1) )
+                self.x_sample_std = np.zeros( (num_trials, num_steps + 1) )
+                self.gamma_sample_std = np.zeros( (num_trials, num_steps + 1) )
 
     def __init__(self, num_trials, num_steps, targ_fill_ratio, main_filename_suffix):
         self.num_trials = num_trials
@@ -241,8 +241,8 @@ class MultiAgentSim(Sim):
         self.alpha = np.zeros( (num_trials, num_agents, num_steps + 1) )
         self.x_bar = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
         self.rho = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
-        self.x = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
-        self.gamma = np.zeros( (num_trials, num_agents, num_steps//comms_period + 1) )
+        self.x = np.zeros( (num_trials, num_agents, num_steps + 1) )
+        self.gamma = np.zeros( (num_trials, num_agents, num_steps + 1) )
 
         # Setup up communication graph
         self.setup_comms_graph(sim_param_obj.comms_graph_str, sim_param_obj.comms_prob)
@@ -434,13 +434,16 @@ class MultiAgentSim(Sim):
 
             # Execute communication phase
             if (curr_iteration+1) % self.sim_data.comms_period == 0:
-                social_val_dict, informed_val_dict = self.run_communication_phase()
+                social_val_dict = self.run_communication_phase()
 
                 social_x.append(social_val_dict["x"])
                 social_conf.append(social_val_dict["conf"])
 
-                informed_x.append(informed_val_dict["x"])
-                informed_conf.append(informed_val_dict["conf"])
+            # Execute self computation phase
+            informed_val_dict = self.run_self_computation_phase()
+
+            informed_x.append(informed_val_dict["x"])
+            informed_conf.append(informed_val_dict["conf"])
 
             curr_iteration += 1
 
@@ -478,7 +481,9 @@ class MultiAgentSim(Sim):
             local_values["conf"].append(agent.get_alpha())
 
         # Collect social and informed estimates
-        social_values, informed_values = self.run_communication_phase()
+        social_values = self.run_communication_phase()
+
+        informed_values = self.run_self_computation_phase()
 
         return local_values, social_values, informed_values
 
@@ -486,12 +491,10 @@ class MultiAgentSim(Sim):
         """Execute one round of communication for all agents.
 
         Returns:
-            A dict containing a record of social estimations and confidences 
-            and a dict containing a record of informed estimations and confidences.
+            A dict containing a record of social estimations and confidences.
         """
 
         social_values = {"x": [], "conf": []}
-        informed_values = {"x": [], "conf": []}
 
         # Make agents communicate
         for e in self.sim_data.comms_network.graph.edges():
@@ -506,17 +509,15 @@ class MultiAgentSim(Sim):
 
         # Make the agents perform social (dual) and informed computation
         for v in self.sim_data.comms_network.graph.vertices():
+
             agent = self.sim_data.comms_network.agents_vp[v]
 
             agent.solve_social()
-            agent.solve_informed()
 
             social_values["x"].append(agent.get_x_bar())
             social_values["conf"].append(agent.get_rho())
-            informed_values["x"].append(agent.get_x())
-            informed_values["conf"].append(agent.get_gamma())
 
-        return social_values, informed_values
+        return social_values
 
     def run_observation_phase(self, tiles):
         """Execute one round of observation for all agents.
@@ -546,6 +547,24 @@ class MultiAgentSim(Sim):
             local_values["conf"].append(agent.get_alpha())
 
         return local_obs, local_values
+
+    def run_self_computation_phase(self):
+        """Execute one round of self computation for all agents.
+        """
+
+        informed_values = {"x": [], "conf": []}
+
+        # Make the agents perform social (dual) and informed computation
+        for v in self.sim_data.comms_network.graph.vertices():
+
+            agent = self.sim_data.comms_network.agents_vp[v]
+
+            agent.solve_informed()
+
+            informed_values["x"].append(agent.get_x())
+            informed_values["conf"].append(agent.get_gamma())
+
+        return informed_values
 
     def reset_agents(self):
 

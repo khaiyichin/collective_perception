@@ -70,14 +70,14 @@ def test_mas_initialization(mas): # @todo: add more test cases (use different pa
 
     for attr in sim_stats_mean_informed_attributes:
         assert len(attr) == num_trials_1
-        assert len(attr[0]) == num_steps_1//comms_period_1 + 1
+        assert len(attr[0]) == num_steps_1 + 1
 
     assert len(mas.stats.x) == num_trials_1
     assert len(mas.stats.x[0]) == num_agents_1
-    assert len(mas.stats.x[0][0]) == num_steps_1//comms_period_1 + 1
+    assert len(mas.stats.x[0][0]) == num_steps_1 + 1
     assert len(mas.stats.gamma) == num_trials_1
     assert len(mas.stats.gamma[0]) == num_agents_1
-    assert len(mas.stats.gamma[0][0]) == num_steps_1//comms_period_1 + 1
+    assert len(mas.stats.gamma[0][0]) == num_steps_1 + 1
 
     # Check actual agent number
     assert mas.sim_data.comms_network.graph.num_vertices() == num_agents_1
@@ -431,8 +431,8 @@ def test_informed_vals(mas):
             informed_est = (local_conf * local_est + social_conf * social_est) / (local_conf + social_conf)
         informed_conf = local_conf + social_conf
 
-        np.testing.assert_allclose(mas.x[trial_ind][agent_ind][step_ind], informed_est)
-        np.testing.assert_allclose(mas.gamma[trial_ind][agent_ind][step_ind], informed_conf)
+        np.testing.assert_allclose(mas.x[trial_ind][agent_ind][step_ind*mas.sim_data.comms_period], informed_est)
+        np.testing.assert_allclose(mas.gamma[trial_ind][agent_ind][step_ind*mas.sim_data.comms_period], informed_conf)
 
 """Test agent sensor accuracy
 """
