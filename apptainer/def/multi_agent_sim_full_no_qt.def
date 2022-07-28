@@ -61,7 +61,7 @@ From: ../containers/argos_buzz_protobuf_release_no_qt.sif
 
     # Install collective_perception_static
     pushd collective_perception/collective_perception_static
-    python3 setup.py install
+    pip install .
     popd
 
     # Insert additional labels

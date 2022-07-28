@@ -58,13 +58,13 @@ sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,1
     echo -e "\n################################### EXECUTION BEGIN ###################################"
     echo -e "################################# ${START_TIME} #################################\n"
 
-    for (( i = 0; i < 4; i++ )) # robot speeds
+    for (( i = 0; i < ${#SPEED[@]}; i++ )) # robot speeds
     do
         # Modify robot speeds
         speed=$(echo ${SPEED[i]})
         sed -i "s/<speed.*/<speed value=\"$speed\" \/>/" $ARGOSFILE
 
-        for (( j = 0; j < 4; j++ )) # wall positions
+        for (( j = 0; j < ${#POSITION[@]}; j++ )) # wall positions
         do
             # Modify wall positions
             pos=$(echo ${POSITION[j]})

@@ -4,9 +4,6 @@ This page describes scripts provided in this repository besides those that execu
 ## Python Scripts (built in `collective_perception_static`)
 The Python scripts are used for data processing, analysis, and visualization. To use them you will need `collective_perception_static` installed.
 
-  <!-- - Describe modules:
-    - how to use the classes, what do the classes do and where do they fit? -->
-
 ### Converting experiment data to visualization data
 To visualize the experiment data, they have to be converted into visualization data. In addition to pure conversion, the outputs from multiple simulation executions can be combined into a single visualization data.
 
@@ -236,20 +233,32 @@ Configuration for the .argos file (copy and paste this under the <arena> node):
 	</distribute>
 ```
 
+### Obtaining serialized data information
+`protobuf_info` displays information about a serialized protobuf file:
+```
+$ protobuf_info <FILE>
+```
+
 ## Bash
-- `bash`: scripts to execute multi-parameter simulations.
-  <!-- - Describe bash scripts:
-    - how can they be used? -->
+### Running batch simulated experiment executions
+As described in the [README](../README.md), a single simulation execution is defined to have a fixed values for the outer paramater group and varying values for the inner parameter group. The two `hpc_execute_multi_agent_sim_*.sh` bash scripts provided in `scripts/bash/` go one level further, letting you run multiple executions. *The scripts will run using the containerized simulator only, but modifying them to run a local build should be simple.*
+
+For example, you can choose a range of robot speeds and swarm densities (outer parameter group) for a dynamic topology simulation. Simply add the desired `SPEED` and `POSITION` values in the bash array:
+```bash
+# Define varying parameters
+SPEED=(10.0 15.0 20.0 25.0) # cm/s
+POSITION=(4.436599480604251 3.1517942390846527 2.011746925739275 1.4371645541621039) # for density = (1 2 5 10) with number of agents = 50
+```
+Then execute with the appropriate arguments
+```
+$ ./hpc_execute_multi_agent_sim_dynamic.sh param_multi_agent_sim_dynamic.argos multi_agent_sim_full_no_qt.sif output_data
+```
 
 ## Slurm
-- `slurm`: scripts to run jobs using the SLURM batch manager on a HPC cluster.
-  <!-- - how to use the slurm scripts?
-    - what arguments are required?
-    - where do you run them from? -->
+A number of scripts are provided to run batch jobs using the SLURM batch manager on a HPC cluster in `scripts/slurm/`. The `sbatch_multi_agent_sim_*.sh` scripts use the `hpc_execute_multi_agent_sim_*.sh` scripts under the hood, so you will need to adjust the experimental parameters accordingly.
 
 ## Apptainer definition files
-<!-- - what is the def file for?
-  - how does it work with the bash scripts to run hpc simulation? -->
+The definition files to build the Apptainers (containers) are provided in `apptainer/def/`. See the [official Apptainer documentation](https://apptainer.org/docs/) for more details.
 
 ## MATLAB scripts (no longer maintained)
 The MATLAB scripts are mostly for quick prototyping and data processing/visualization, and is no longer maintained.
@@ -267,32 +276,8 @@ w = b;                          % sensor probability to white tile
 sim_cycles = <INT>;             % number of agents to simulate (or simulation cycles for one agent)
 desired_fill_ratio = <FLOAT>;   % fill ratio, f (can be set to rand(1))
 ```
-
-### `plot_heat_surf.m`
-Used for plotting heatmap data from the following files (obtained from running `single_agent_sim.py`):
-- `fisher_inv_heatmap_*.csv`,
-- `f_hat_heatmap_*.csv`,
-- `des_f_avg_f_*.csv`.
-The script outputs heatmap and 3-D surface plots for `f_hat` and `fisher_inv`.
-
-To run the script, create/modify a `param_plot_heat_surf.m` file to set the desired parameters in the same folder, then run the `plot_heat_surf.m` script in MATLAB.
-
-The parameter file should look like the following:
-```matlab
-%% param_plot_heat_surf.m
-
-fisher_inv_filepath = <STRING>;       % path to Fisher inverse heatmap data file
-f_hat_filepath = <STRING>;            % path to f_hat heatmap data file
-sim_fill_ratios_filepath = <STRING>;  % path to fill ratio file
-
-xrange = <FLOAT ARRAY>;               % range of sensor probabilities
-yrange = <FLOAT ARRAY>;               % range of fill ratios
-sim_cycles = <INT>;                   % number of agents to simulate (or simulation cycles for one agent)
-num_obs = <INT>;                      % total number of observations
-```
-
-### `plot_mean_rel_err.m`
-Used for plotting the averaged `f_hat` errors for multiple simulations. *Currently only for `c200_o100`, `c200_o250`, `c200_o500`, and `c200_o1000` files.*
+### Visualizing data
+Use `plot_mean_rel_err.m` for plotting the averaged `f_hat` errors for multiple simulations. *Currently only for `c200_o100`, `c200_o250`, `c200_o500`, and `c200_o1000` files.*
 
 To run the script, create/modify a `param_plot_mean_rel_err.m` file to set the desired parameters in the same folder, then run the `plot_heat_surf.m` script in MATLAB.
 
