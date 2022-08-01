@@ -378,7 +378,7 @@ class VisualizationData:
             curves = [
                 self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean, # length of self.num_steps + 1
                 self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean, # length of self.num_steps / self.comms_period + 1
-                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean, # length of self.num_steps / self.comms_period + 1
+                self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean, # length of self.num_steps + 1
             ]
 
             # Go through all the curves
@@ -488,7 +488,7 @@ class VisualizationData:
         conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold, aggregate)
         acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst, aggregate)
 
-        conv_output = [conv_lst[2]*self.comms_period] if aggregate else [i*self.comms_period for i in conv_lst[2]]
+        conv_output = [conv_lst[2]] if aggregate else [i for i in conv_lst[2]]
         acc_output = [i for i in acc_lst[2]]
 
         return conv_output, acc_output
@@ -498,7 +498,7 @@ class VisualizationData:
         conv_lst = self.detect_convergence(target_fill_ratio, sensor_prob, threshold, aggregate=False, individual=True)
         acc_lst = self.compute_accuracy(target_fill_ratio, sensor_prob, conv_lst, False, True)
 
-        conv_output = [[agt_conv_ind*self.comms_period for agt_conv_ind in trial] for trial in conv_lst[2]] # (num_trials, num_agents, 1) size
+        conv_output = [[agt_conv_ind for agt_conv_ind in trial] for trial in conv_lst[2]] # (num_trials, num_agents, 1) size
         acc_output = acc_lst[2] # should end up as (num_trials, num_agents, 1) size
 
         return conv_output, acc_output
@@ -1249,7 +1249,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
 
     abscissa_values_x_hat = list(range(data_obj.num_steps + 1))
     abscissa_values_x_bar = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
-    abscissa_values_x = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
+    abscissa_values_x = list(range(data_obj.num_steps + 1))
 
     # Plot for all trials
     if not agg_data:
@@ -1292,7 +1292,7 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
             gamma_bounds = compute_std_bounds(stats_obj.gamma_sample_mean[i], stats_obj.gamma_sample_std[i])
 
             traj_x = ax_x[0].plot(abscissa_values_x, stats_obj.x_sample_mean[i], label="Exp {}".format(i))
-            ax_x[0].axvline(abscissa_values_x_bar[conv_ind_x[i]], color=traj_x[0].get_c(), linestyle=":")
+            ax_x[0].axvline(abscissa_values_x[conv_ind_x[i]], color=traj_x[0].get_c(), linestyle=":")
             ax_x[0].axhline(target_fill_ratio, color="black", linestyle="--")
             ax_x[0].fill_between(abscissa_values_x, x_bounds[0], x_bounds[1], alpha=0.2)
 
@@ -1389,7 +1389,7 @@ def plot_individual_timeseries(target_fill_ratio, sensor_prob, data_obj: Visuali
     fig_lst = [None for i in range(data_obj.num_trials)]
     ax_lst = [None for i in range(data_obj.num_trials)]
 
-    abscissa_values_x = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
+    abscissa_values_x = list(range(data_obj.num_steps + 1))
 
     # Compute convergence for informed estimates
     conv_lst = data_obj.detect_convergence(target_fill_ratio, sensor_prob, convergence_thresh, False, True)[2]

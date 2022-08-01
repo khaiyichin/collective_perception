@@ -43,7 +43,7 @@ class GenerateProtolPb2Command(setuptools.command.install.install):
 
 setuptools.setup(
     name="collective_perception_py",
-    version="0.2.0",
+    version="1.0.0",
     description= "Python simulator for studying collective perception problems with static communication topologies.",
     author="Khai Yi Chin",
     author_email="khaiyichin@gmail.com",

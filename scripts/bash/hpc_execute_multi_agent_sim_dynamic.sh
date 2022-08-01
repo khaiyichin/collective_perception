@@ -7,7 +7,7 @@
 
 # Verify that arguments are provided
 if [ $# != 3 ]; then
-    echo "Not enough arguments provided!"
+    echo "Incorrect number of arguments provided!"
     exit 1
 fi
 

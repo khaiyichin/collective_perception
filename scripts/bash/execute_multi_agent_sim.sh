@@ -5,41 +5,42 @@
 # which means that the Python script is run regularly.
 
 # Verify that arguments are provided
-if [ $# == 0 ]; then
-    echo "Not enough arguments provided!"
+if [ $# != 2 ]; then
+    echo "Incorrect number of arguments provided!"
     exit 1
 fi
 
-if [[ ! -d $1 ]]; then
-    echo "1st argument should be a working directory that exists!"
+PARAMFILE=$1
+
+s1="full"
+s2="ring"
+s3="line"
+s4="scale-free"
+
+if [ $2 != $s1 ] && [ $2 != $s2 ] && [ $2 != $s3 ] && [ $2 != $s4 ]; then
+    echo "2nd argument should be one of the following: \"full\", \"ring\", \"line\", \"scale-free\"!"
     exit 1
 fi
-
-# Switch to working directory
-CURR_DIR=$(pwd)
-echo "Changing to working directory: $1";
-pushd $1
-
-# Activate python virtual environment (assuming it's called .venv)
-source .venv/bin/activate
-
-# Copy scripts
-cp $CURR_DIR/../examples/param/param_multi_agent_sim.yaml .
-cp $CURR_DIR/../python/multi_agent_sim.py .
-cp $CURR_DIR/../python/sim_modules.py .
 
 # Iterate and run scripts for different param cases
-COMM=("full" "ring" "line" "scale-free")
+COMM=$2
 PERIOD=(1 2 5 10)
 AGENTS=(5 10 50 100 200)
 
-MIN=(0.05 0.35 0.65 0.95)
-MAX=(0.3 0.6 0.9 0.95)
-INC=(6 6 6 1)
-
 # Set fixed parameters
-sed -i "s/numTrials:.*/numTrials: 5/g" param_multi_agent_sim.yaml
-sed -i "s/numSteps:.*/numSteps: 1000/g" param_multi_agent_sim.yaml
+TFR_RANGE=(0.05 0.95 19)
+SP_RANGE=(0.525 0.975 19)
+TRIALS=5
+STEPS=20000
+LEGACY="False"
+
+sed -i "/targFillRatios:/{n;N;N;d}" $PARAMFILE # remove 3 lines after 'targFillRatios'
+sed -i "s/targFillRatios:/targFillRatios:\n  min: ${TFR_RANGE[0]}\n  max: ${TFR_RANGE[1]}\n  incSteps: ${TFR_RANGE[2]}/g" $PARAMFILE
+sed -i "/sensorProb:/{n;N;N;d}" $PARAMFILE # remove 3 lines after 'sensorProb'
+sed -i "s/sensorProb:/sensorProb:\n  min: ${SP_RANGE[0]}\n  max: ${SP_RANGE[1]}\n  incSteps: ${SP_RANGE[2]}/g" $PARAMFILE
+sed -i "s/numTrials:.*/numTrials: $TRIALS/g" $PARAMFILE
+sed -i "s/numSteps:.*/numSteps: $STEPS/g" $PARAMFILE
+sed -i "s/legacy:.*/legacy: $LEGACY/g" $PARAMFILE
 
 # Run simulations
 {
@@ -47,39 +48,29 @@ sed -i "s/numSteps:.*/numSteps: 1000/g" param_multi_agent_sim.yaml
 
     echo -e "\n################################### EXECUTION BEGIN ###################################"
     echo -e "################################# ${START_TIME} #################################\n"
-    for (( a = 0; a <= 3; a++ )) # comms type
+
+    sed -i "s/type:.*/type: \"$COMM\"/g" $PARAMFILE # communication network graph type
+
+    for (( b = 0; b < ${#PERIOD[@]}; b++ )) # comms period
     do
-        comm=$(echo ${COMM[a]})
-        sed -i "s/type:.*/type: \"$comm\"/g" param_multi_agent_sim.yaml
+        period=$(echo ${PERIOD[b]})
+        sed -i "s/commsPeriod:.*/commsPeriod: $period/" $PARAMFILE
 
-        for (( b = 0; b <= 3; b++ )) # comms period
+        for (( c = 0; c < ${#AGENTS[@]}; c++ )) # agent number
         do
-            period=$(echo ${PERIOD[b]})
-            sed -i "s/commsPeriod:.*/commsPeriod: $period/" param_multi_agent_sim.yaml
+            agents=$(echo ${AGENTS[c]})
+            sed -i "s/numAgents:.*/numAgents: $agents/" $PARAMFILE
 
-            for (( c = 0; c <= 4; c++ )) # agent number
-            do
-                agents=$(echo ${AGENTS[c]})
-                sed -i "s/numAgents:.*/numAgents: $agents/" param_multi_agent_sim.yaml
+            multi_agent_sim_static.py $PARAMFILE -p # run parallel
 
-                for (( d = 0; d <= 3; d++ )) # fill ratios
-                do
-                    min=$(echo ${MIN[d]})
-                    max=$(echo ${MAX[d]})
-                    inc=$(echo ${INC[d]})
-                    sed -i "/targFillRatios:/{n;N;N;d}" param_multi_agent_sim.yaml
-                    sed -i "s/targFillRatios:/targFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" param_multi_agent_sim.yaml
-                    python3 multi_agent_sim.py -p # run parallel
-                done
-
-                # Copy and move the data
-                folder=${comm}_${period}_${agents} # concatenate string and numbers as folder name
-                mkdir -p $folder
-                mv data/* $folder
-            done
+            # Copy and move the data
+            folder=${COMM}_${period}_${agents} # concatenate string and numbers as folder name
+            mkdir -p $folder
+            mv data/* $folder
         done
     done
+
     END_TIME=$(date +%m/%d/%Y-%H:%M:%S)
     echo -e "\n################################### EXECUTION END ###################################"
     echo -e "################################# ${END_TIME} #################################\n"
-} > execute_multi_agent_sim.out 2> execute_multi_agent_sim.err # collect logs
+}
