@@ -15,10 +15,10 @@
 # $4: argument for path to the converted VisualizationDataGroup save location and name, relative to $1
 
 # Load required modules
-module load singularity/3.6.2
+module load singularity
 
 # Change to working directory (this is so that the log files are in the correct folders)
 cd $1
 
 # Run conversion
-singularity exec $4 convert_sim_stats_set_to_viz_data_group.py $2 -s $3
+singularity exec $3 convert_sim_stats_set_to_viz_data_group.py $2 -s $4

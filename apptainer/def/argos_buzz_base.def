@@ -3,7 +3,7 @@ From: ubuntu:20.04
 
 %labels
     AUTHOR khaiyichin@gmail.com
-    VERSION 1.0.0
+    VERSION 1.1.0
     NAME argos_buzz_base
 
 %help
@@ -15,19 +15,42 @@ From: ubuntu:20.04
     v1.0.0
     Initial release.
 
+    v1.1.0
+    Removed files after installation.
+
 %post -c /bin/bash
+    # Setup color output macro
+    loginfo() {
+        GREEN="\033[0;32m"
+        GREENB="\033[1;32m"
+        YELLOW="\033[0;33m"
+        YELLOWB="\033[1;33m"
+        RESET="\033[0m"
+
+        echo -e "${!1}APPTAINER BUILD:    ${2}${RESET}"
+    }
+
     # Prevent user prompts
     export DEBIAN_FRONTEND=noninteractive
 
+    # Terminate on errors
+    set -e
+
     # Update and upgrade packages
+    loginfo "YELLOWB" "Updating and upgrading packages..."
+
     apt update && apt upgrade -qy
 
     # Install dependencies
+    loginfo "YELLOWB" "Installing dependencies..."
+
     apt install -qy git wget build-essential cmake libfreeimage-dev libfreeimageplus-dev \
         qt5-default freeglut3-dev libxi-dev libxmu-dev liblua5.3-dev \
         lua5.3 doxygen graphviz libgraphviz-dev asciidoc
 
     # Install ARGoS
+    loginfo "YELLOWB" "Installing ARGoS..."
+
     wget "https://github.com/ilpincy/argos3/archive/da33b8786293dad40307e4182bb791add1e89172.tar.gz" -O argos3.tar.gz
     mkdir argos3
     tar -xvf argos3.tar.gz -C argos3 --strip-components=1
@@ -40,6 +63,8 @@ From: ubuntu:20.04
     popd
 
     # Install Buzz
+    loginfo "YELLOWB" "Installing Buzz..."
+
     wget "https://github.com/NESTLab/Buzz/archive/6a9a51f9b658b76fc995152546d4b625e74abb6d.tar.gz" -O buzz.tar.gz
     mkdir buzz
     tar -xvf buzz.tar.gz -C buzz --strip-components=1
@@ -52,6 +77,8 @@ From: ubuntu:20.04
     popd
 
     # Install ARGoS-KheperaIV plugin
+    loginfo "YELLOWB" "Installing KheperaIV plugin for ARGoS..."
+
     wget "https://github.com/ilpincy/argos3-kheperaiv/archive/7807c3b71e13256c915dcc909707fee50a179273.tar.gz" -O argos3_kheperaiv.tar.gz
     mkdir argos3_kheperaiv
     tar -xvf argos3_kheperaiv.tar.gz -C argos3_kheperaiv --strip-components=1
@@ -62,6 +89,12 @@ From: ubuntu:20.04
     make install
     ldconfig
     popd
+
+    # Remove files
+    loginfo "YELLOWB" "Removing unneeded files and folders..."
+
+    rm -rf argos3.tar.gz buzz.tar.gz argos3_kheperaiv.tar.gz
+    rm -rf argos3 buzz argos3_kheperaiv
 
     # Insert additional labels
     echo "CREATED $(date)" >> $APPTAINER_LABELS

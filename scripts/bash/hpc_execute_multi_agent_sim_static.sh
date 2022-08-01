@@ -34,8 +34,13 @@ MAX=(0.95)
 INC=(19)
 
 # Set fixed parameters
+TRIALS=5
+STEPS=20000
+LEGACY="False"
+
 sed -i "s/numTrials:.*/numTrials: 5/g" $PARAMFILE
 sed -i "s/numSteps:.*/numSteps: 2000/g" $PARAMFILE
+sed -i "s/legacy:.*/legacy: $LEGACY/g" $PARAMFILE
 
 # Run simulations
 {
@@ -63,12 +68,12 @@ sed -i "s/numSteps:.*/numSteps: 2000/g" $PARAMFILE
                 inc=$(echo ${INC[d]})
                 sed -i "/targFillRatios:/{n;N;N;d}" $PARAMFILE # remove the line and 2 lines after 'targFillRatios'
                 sed -i "s/targFillRatios:/targFillRatios:\n  min: $min\n  max: $max\n  incSteps: $inc/g" $PARAMFILE
-                singularity exec $SIFFILE multi_agent_sim_static.py -p
+                singularity exec $SIFFILE multi_agent_sim_static.py $PARAMFILE -p
             done
 
             # Copy and move the data
             folder=${COMM}_${period}_${agents} # concatenate string and numbers as folder name
-            mkdir $folder
+            mkdir -p $folder
             mv data/* $folder
         done
     done

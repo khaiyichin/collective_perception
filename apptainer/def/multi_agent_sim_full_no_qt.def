@@ -30,38 +30,55 @@ From: ../containers/argos_buzz_protobuf_release_no_qt.sif
     ../../collective_perception_static/requirements.txt /collective_perception/collective_perception_static/requirements.txt
 
 %post -c /bin/bash
+    # Setup color output macro
+    loginfo() {
+        GREEN="\033[0;32m"
+        GREENB="\033[1;32m"
+        YELLOW="\033[0;33m"
+        YELLOWB="\033[1;33m"
+        RESET="\033[0m"
+
+        echo -e "${!1}APPTAINER BUILD:    ${2}${RESET}"
+    }
+
     # Prevent user prompts
     export DEBIAN_FRONTEND=noninteractive
 
+    # Terminate on errors
+    set -e
+
     # Update and upgrade packages
+    loginfo "YELLOWB" "Updating and upgrading packages..."
     apt update && apt upgrade -qy
 
+    # Install graph-tool dependencies
+    loginfo "YELLOWB" "Installing graph-tool dependencies..."
+    apt install -q -y gnupg ca-certificates python3.8-dev python3-pip libcairo2-dev
+
+    # Install graph-tool
+    loginfo "YELLOWB" "Installing graph-tool..."
+    echo "deb [ arch=amd64 ] https://downloads.skewed.de/apt focal main" >> /etc/apt/sources.list
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-key 612DEFB798507F25
+    apt update && apt install -qy python3-graph-tool
+
+    # Install required Python packages
+    loginfo "YELLOWB" "Installing collective_perception_static dependencies..."
+    pip install --upgrade pip
+    pip install -r /collective_perception/collective_perception_static/requirements.txt
+
+    # Install collective_perception_static
+    loginfo "YELLOWB" "Installing collective_perception_static..."
+    pushd collective_perception/collective_perception_static
+    pip install .
+    popd
+
     # Build collective_perception_dynamic
+    loginfo "YELLOWB" "Building collective_perception_dynamic..."
     pushd collective_perception/collective_perception_dynamic
     rm -rf build
     mkdir build && cd build
     cmake -DCMAKE_BUILD_TYPE=Release ..
     make -j$(nproc)
-    popd
-
-    # Install graph-tool dependencies
-    apt install -q -y gnupg ca-certificates python3.8-dev python3-pip libcairo2-dev
-
-    # Install graph-tool
-    echo "deb [ arch=amd64 ] https://downloads.skewed.de/apt focal main" >> /etc/apt/sources.list
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-key 612DEFB798507F25
-    apt update && apt install -qy python3-graph-tool
-
-    # Upgrade packages
-    apt upgrade -qy
-
-    # Install required Python packages
-    pip install --upgrade pip
-    pip install -r /collective_perception/collective_perception_static/requirements.txt
-
-    # Install collective_perception_static
-    pushd collective_perception/collective_perception_static
-    pip install .
     popd
 
     # Insert additional labels

@@ -101,6 +101,7 @@ def run_sim_parallel_sp(param_obj, target_fill_ratio, sensor_prob):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Execute multi-agent simulation with static topologies.")
+    parser.add_argument("FILE", type=str, help="path to the \"param_multi_agent_sim_static.yaml\" file relative to the current/execution directory")
     parser.add_argument("-p", action="store_true", help="flag to use cores to run simulations in parallel")
     args = parser.parse_args()
 
@@ -108,7 +109,7 @@ if __name__ == "__main__":
     curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
 
     # Parse simulation parameters
-    param_obj = parse_yaml_param_file("param_multi_agent_sim_static.yaml")
+    param_obj = parse_yaml_param_file(args.FILE)
 
     # Create a folder to store simulation data
     create_simulation_folder(param_obj.full_suffix, curr_time)
