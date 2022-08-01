@@ -102,13 +102,16 @@ The following instructions apply directly for the local build; for the container
     *When running the container simulator, you can skip this step; there's no need to activate any virtual environment since the Python modules are installed directly to the container.*
 3. Run the simulation (ensure that the parameter file is present in the execution directory).
     ```
-    $ multi_agent_sim_static.py
+    $ multi_agent_sim_static.py <PARAM-FILE>
     ```
     Script help:
     ```
-    usage: multi_agent_sim_static.py [-h] [-p]
+    usage: multi_agent_sim_static.py [-h] [-p] FILE
 
     Execute multi-agent simulation with static topologies.
+
+    positional arguments:
+      FILE        path to the "param_multi_agent_sim_static.yaml" file relative to the current/execution directory
 
     optional arguments:
       -h, --help  show this help message and exit

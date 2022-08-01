@@ -1,9 +1,9 @@
 Bootstrap: localimage
-From: ../containers/argos_buzz_base_release.sif
+From: argos_buzz_base.sif
 
 %labels
     AUTHOR khaiyichin@gmail.com
-    VERSION 1.0.0
+    VERSION 1.1.0
     NAME protobuf_layer
 
 %help
@@ -16,17 +16,37 @@ From: ../containers/argos_buzz_base_release.sif
     v1.0.0
     Initial release.
 
+    v1.1.0
+    Removed files after installation.
+
 %post -c /bin/bash
+    # Setup color output macro
+    loginfo() {
+        GREEN="\033[0;32m"
+        GREENB="\033[1;32m"
+        YELLOW="\033[0;33m"
+        YELLOWB="\033[1;33m"
+        RESET="\033[0m"
+
+        echo -e "${!1}APPTAINER BUILD:    ${2}${RESET}"
+    }
+
     # Prevent user prompts
     export DEBIAN_FRONTEND=noninteractive
 
+    # Terminate on errors
+    set -e
+
     # Update and upgrade packages
+    loginfo "YELLOWB" "Updating and upgrading packages..."
     apt update && apt upgrade -qy
     
     # Install dependencies
+    loginfo "YELLOWB" "Installing dependencies..."
     apt install -q -y autoconf automake libtool curl make g++ unzip
 
     # Install Protobuf (and dependencies of collective_perception_cpp)
+    loginfo "YELLOWB" "Installing Protobuf..."
     wget "https://github.com/protocolbuffers/protobuf/releases/download/v21.1/protobuf-python-4.21.1.tar.gz"
     tar -xvf protobuf-python-4.21.1.tar.gz
     pushd protobuf-3.21.1
@@ -36,6 +56,10 @@ From: ../containers/argos_buzz_base_release.sif
     make install
     ldconfig
     popd
+
+    # Remove files
+    loginfo "YELLOWB" "Removing unneeded files and folders..."
+    rm -rf protobuf-python-4.21.1.tar.gz protobuf-3.21.1
 
     # Insert additional labels
     echo "CREATED $(date)" >> $APPTAINER_LABELS

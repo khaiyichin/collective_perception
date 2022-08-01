@@ -25,12 +25,14 @@ THREADS=40
 TFR_RANGE=(0.05 0.95 19)
 SP_RANGE=(0.525 0.975 19)
 TRIALS=5
+STEPS=50
 TILES=1000
 STATSPATH="multi_agent_sim_dynamic_stats.pbs"
 AGENTDATAPATH="multi_agent_sim_dynamic_agent_data.pbad"
 AGENTS=50
 WALL_THICKNESS=0.1
 ARENA_LEN=10
+LEGACY="false"
 
 sed -i "s/<fill_ratio_range.*/<fill_ratio_range min=\"${TFR_RANGE[0]}\" max=\"${TFR_RANGE[1]}\" steps=\"${TFR_RANGE[2]}\" \/>/" $ARGOSFILE # fill ratio range
 sed -i "s/<sensor_probability_range.*/<sensor_probability_range min=\"${SP_RANGE[0]}\" max=\"${SP_RANGE[1]}\" steps=\"${SP_RANGE[2]}\" \/>/" $ARGOSFILE # sensor prob range
@@ -38,7 +40,8 @@ sed -i "s/<num_trials.*/<num_trials value=\"$TRIALS\" \/>/" $ARGOSFILE # number 
 sed -i "s/<arena_tiles.*/<arena_tiles tile_count_x=\"$TILES\" tile_count_y=\"$TILES\" \/>/" $ARGOSFILE # tile count
 sed -i "s/<path.*/<path folder=\"$OUTPUTDIR\" stats=\"$STATSPATH\" agent_data=\"$AGENTDATAPATH\"  include_datetime=\"true\" \/>/" $ARGOSFILE # output path
 sed -i "s/<verbosity.*/<verbosity level=\"full\" \/>/" $ARGOSFILE # verbosity
-sed -i "s/<experiment.*/<experiment length=\"200\" ticks_per_second=\"10\" random_seed=\"0\" \/>/" $ARGOSFILE # experiment length
+sed -i "s/<legacy.*/<legacy bool=\"$LEGACY\" \/>/" $ARGOSFILE # legacy equations
+sed -i "s/<experiment.*/<experiment length=\"$STEPS\" ticks_per_second=\"10\" random_seed=\"0\" \/>/" $ARGOSFILE # experiment length
 sed -i "s/<entity.*/<entity quantity=\"$AGENTS\" max_trials=\"100\" base_num=\"0\">/" $ARGOSFILE
 if [ $AGENTS -ge 100 ]; then # thread number
     sed -i "s/<system threads=.*/<system threads=\"$THREADS\" \/>/" $ARGOSFILE
@@ -82,7 +85,7 @@ sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,1
 
             # Copy and move the data
             folder="spd${speed}_den${DENSITY[j]}" # concatenate string and numbers as folder name
-            mkdir $folder
+            mkdir -p $folder
             mv $OUTPUTDIR/* $folder
         done
     done

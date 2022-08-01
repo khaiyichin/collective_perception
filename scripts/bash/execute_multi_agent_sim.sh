@@ -74,7 +74,7 @@ sed -i "s/numSteps:.*/numSteps: 1000/g" param_multi_agent_sim.yaml
 
                 # Copy and move the data
                 folder=${comm}_${period}_${agents} # concatenate string and numbers as folder name
-                mkdir $folder
+                mkdir -p $folder
                 mv data/* $folder
             done
         done

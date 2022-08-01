@@ -15,7 +15,7 @@
 # $4: argument for path to the converted VisualizationDataGroup save location and name, relative to $1
 
 # Load required modules
-module load singularity/3.6.2
+module load singularity
 
 # Change to working directory (this is so that the log files are in the correct folders)
 cd $1
