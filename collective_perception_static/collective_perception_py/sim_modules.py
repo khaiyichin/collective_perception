@@ -339,37 +339,37 @@ class MultiAgentSim(Sim):
 
         self.sim_data.comms_network.agents_vp = agents_vprop
 
-    def compute_sample_mean(self, experiment_index):
-        """Compute the sample mean for the results per experiment.
+    def compute_sample_mean(self, trial_index):
+        """Compute the sample mean for the results per trial.
 
         Args:
-            experiment_index: Index of the experiment.
+            trial_index: Index of the trial.
         """
 
-        self.stats.x_hat_sample_mean[experiment_index] = np.mean(self.x_hat[experiment_index], axis=0)
-        self.stats.alpha_sample_mean[experiment_index] = np.mean(self.alpha[experiment_index], axis=0)
+        self.stats.x_hat_sample_mean[trial_index] = np.mean(self.x_hat[trial_index], axis=0)
+        self.stats.alpha_sample_mean[trial_index] = np.mean(self.alpha[trial_index], axis=0)
 
-        self.stats.x_bar_sample_mean[experiment_index] = np.mean(self.x_bar[experiment_index], axis=0)
-        self.stats.rho_sample_mean[experiment_index] = np.mean(self.rho[experiment_index], axis=0)
+        self.stats.x_bar_sample_mean[trial_index] = np.mean(self.x_bar[trial_index], axis=0)
+        self.stats.rho_sample_mean[trial_index] = np.mean(self.rho[trial_index], axis=0)
 
-        self.stats.x_sample_mean[experiment_index] = np.mean(self.x[experiment_index], axis=0)
-        self.stats.gamma_sample_mean[experiment_index] = np.mean(self.gamma[experiment_index], axis=0)
+        self.stats.x_sample_mean[trial_index] = np.mean(self.x[trial_index], axis=0)
+        self.stats.gamma_sample_mean[trial_index] = np.mean(self.gamma[trial_index], axis=0)
 
-    def compute_sample_std(self, experiment_index):
-        """Compute the sample standard deviation for the results per experiment.
+    def compute_sample_std(self, trial_index):
+        """Compute the sample standard deviation for the results per trial.
 
         Args:
-            experiment_index: Index of the experiment.
+            trial_index: Index of the trial.
         """
 
-        self.stats.x_hat_sample_std[experiment_index] = np.std(self.x_hat[experiment_index], axis=0, ddof=1)
-        self.stats.alpha_sample_std[experiment_index] = np.std(self.alpha[experiment_index], axis=0, ddof=1)
+        self.stats.x_hat_sample_std[trial_index] = np.std(self.x_hat[trial_index], axis=0, ddof=1)
+        self.stats.alpha_sample_std[trial_index] = np.std(self.alpha[trial_index], axis=0, ddof=1)
 
-        self.stats.x_bar_sample_std[experiment_index] = np.std(self.x_bar[experiment_index], axis=0, ddof=1)
-        self.stats.rho_sample_std[experiment_index] = np.std(self.rho[experiment_index], axis=0, ddof=1)
+        self.stats.x_bar_sample_std[trial_index] = np.std(self.x_bar[trial_index], axis=0, ddof=1)
+        self.stats.rho_sample_std[trial_index] = np.std(self.rho[trial_index], axis=0, ddof=1)
 
-        self.stats.x_sample_std[experiment_index] = np.std(self.x[experiment_index], axis=0, ddof=1)
-        self.stats.gamma_sample_std[experiment_index] = np.std(self.gamma[experiment_index], axis=0, ddof=1)
+        self.stats.x_sample_std[trial_index] = np.std(self.x[trial_index], axis=0, ddof=1)
+        self.stats.gamma_sample_std[trial_index] = np.std(self.gamma[trial_index], axis=0, ddof=1)
 
     def run(self):
 
@@ -386,10 +386,10 @@ class MultiAgentSim(Sim):
         self.stats.x = self.x
         self.stats.gamma = self.gamma
 
-    def run_sim(self, experiment_index):
+    def run_sim(self, trial_index):
 
         # Generate tiles (bernoulli instances for each agent)
-        self.sim_data.tiles[experiment_index] = self.generate_tiles(self.sim_data.num_agents)
+        self.sim_data.tiles[trial_index] = self.generate_tiles(self.sim_data.num_agents)
 
         # Need period timing condition here to decide when to switch
         # between observation and communication
@@ -424,7 +424,7 @@ class MultiAgentSim(Sim):
         while curr_iteration < self.num_steps:
 
             # Execute observation phase
-            local_obs_dict, local_val_dict = self.run_observation_phase(self.sim_data.tiles[experiment_index][:, curr_iteration])
+            local_obs_dict, local_val_dict = self.run_observation_phase(self.sim_data.tiles[trial_index][:, curr_iteration])
 
             local_obs.append(local_obs_dict["curr_obs"])
             local_avg_black_obs.append(local_obs_dict["avg_black_obs"])
@@ -448,19 +448,38 @@ class MultiAgentSim(Sim):
             curr_iteration += 1
 
         # Store observations and average black tile observations into log
-        self.sim_data.agent_obs[experiment_index] = np.asarray(local_obs).T
+        self.sim_data.agent_obs[trial_index] = np.asarray(local_obs).T
 
         # Store local estimates and confidences into log
-        self.x_hat[experiment_index] = np.asarray(local_x).T
-        self.alpha[experiment_index] = np.asarray(local_conf).T
+        self.x_hat[trial_index] = np.asarray(local_x).T
+        self.alpha[trial_index] = np.asarray(local_conf).T
 
         # Store social estimates and confidences into log
-        self.x_bar[experiment_index] = np.asarray(social_x).T
-        self.rho[experiment_index] = np.asarray(social_conf).T
+        self.x_bar[trial_index] = np.asarray(social_x).T
+        self.rho[trial_index] = np.asarray(social_conf).T
 
         # Store informed estimates and confidences into log
-        self.x[experiment_index] = np.asarray(informed_x).T
-        self.gamma[experiment_index] = np.asarray(informed_conf).T
+        self.x[trial_index] = np.asarray(informed_x).T
+        self.gamma[trial_index] = np.asarray(informed_conf).T
+
+        # Ensure correctness
+        assert self.sim_data.agent_obs[trial_index].shape[0] == self.sim_data.num_agents
+        assert self.sim_data.agent_obs[trial_index].shape[1] == self.sim_data.num_steps
+
+        assert self.x_hat[trial_index].shape[0] == self.sim_data.num_agents
+        assert self.x_hat[trial_index].shape[1] == self.sim_data.num_steps + 1
+        assert self.alpha[trial_index].shape[0] == self.sim_data.num_agents
+        assert self.alpha[trial_index].shape[1] == self.sim_data.num_steps + 1
+
+        assert self.x_bar[trial_index].shape[0] == self.sim_data.num_agents
+        assert self.x_bar[trial_index].shape[1] == self.sim_data.num_steps//self.sim_data.comms_period + 1
+        assert self.rho[trial_index].shape[0] == self.sim_data.num_agents
+        assert self.rho[trial_index].shape[1] == self.sim_data.num_steps//self.sim_data.comms_period + 1
+
+        assert self.x[trial_index].shape[0] == self.sim_data.num_agents
+        assert self.x[trial_index].shape[1] == self.sim_data.num_steps + 1
+        assert self.gamma[trial_index].shape[0] == self.sim_data.num_agents
+        assert self.gamma[trial_index].shape[1] == self.sim_data.num_steps + 1
 
     def get_initial_estimates(self):
         """Get the initial estimates for all agents.

@@ -382,22 +382,32 @@ class VisualizationData:
             ]
 
             # Go through all the curves
-            output = Parallel(n_jobs=3, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves)
+            output = Parallel(n_jobs=3, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves) # a list of 3 variables
+
+            assert len(output) == 3
+            assert not isinstance(output[0], list)
+            assert not isinstance(output[1], list)
+            assert not isinstance(output[2], list)
 
         elif individual and not aggregate: # @todo: only computing for informed estimate!
 
-            # Split the curve by trials; each element in trial_curves is a (num_agents, num_steps+1) ndarray
-            curves = [*self.stats_obj_dict[target_fill_ratio][sensor_prob].x] # curves is a array of num_trials elements
+            # Split the curve by trials
+            # curves is an array of num_trials elements; each element in curves is a (num_agents, num_steps+1) ndarray
+            curves = [*self.stats_obj_dict[target_fill_ratio][sensor_prob].x]
 
             # Go through all the curves
-            conv_ind = [None for i in range(self.num_trials)] # ends up being (num_trials, num_agents, 1) size
+            conv_ind = [None for _ in range(self.num_trials)] # ends up being (num_trials, num_agents, 1) size
 
             for ind, agt_curves in enumerate(curves):
-                conv_ind[ind] = Parallel(n_jobs=-1, verbose=0)(delayed(parallel_inner_loop)(c) for c in agt_curves)
+                conv_ind[ind] = Parallel(n_jobs=-1, verbose=0)(delayed(parallel_inner_loop)(c) for c in agt_curves) # agt_curves has shape (num_steps+1, 1)
 
-            output = ([], [], conv_ind) # @todo: this is a temporary hack! must remove to outside of statement
+            output = ([], [], conv_ind) # a tuple containing only the convergence indices of the informed estimates of all agents in all trials
 
-        elif not aggregate and not individual:
+            assert len(output) == 3
+            assert len(output[2]) == self.num_trials
+            assert len(output[2][0]) == self.num_agents
+
+        elif not aggregate and not individual: # not aggregate and not individual so num_trials curves
             curves = [
                 self.stats_obj_dict[target_fill_ratio][sensor_prob].x_hat_sample_mean, # (num_trials, num_steps+1) ndarray
                 self.stats_obj_dict[target_fill_ratio][sensor_prob].x_bar_sample_mean, # (num_trials, num_steps+1) ndarray
@@ -410,6 +420,10 @@ class VisualizationData:
             conv_x = Parallel(n_jobs=5, verbose=0)(delayed(parallel_inner_loop)(c) for c in curves[2])
 
             output = (conv_x_hat, conv_x_bar, conv_x)
+
+            assert len(output) == 3
+            assert len(output[0]) == len(output[1]) and len(output[1]) == len(output[2])
+            assert len(output[0]) == self.num_trials
 
         return output
 
@@ -436,38 +450,55 @@ class VisualizationData:
             conv_ind_lst = self.detect_convergence(target_fill_ratio, sensor_prob, aggregate, individual)
 
         if aggregate and not individual:
+            # conv_ind_lst has the shape (3, 1)
+
             acc_x_hat = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_hat_mean[conv_ind_lst[0]] - target_fill_ratio)
             acc_x_bar = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_bar_mean[conv_ind_lst[1]] - target_fill_ratio)
             acc_x = abs(self.agg_stats_dict[target_fill_ratio][sensor_prob].x_mean[conv_ind_lst[2]] - target_fill_ratio)
 
             output = ([acc_x_hat], [acc_x_bar], [acc_x])
 
+            assert len(output) == 3
+            assert len(output[0]) == len(output[1]) and len(output[1]) == len(output[2])
+            assert len(output[0]) == self.num_trials
+
         elif individual and not aggregate: # only interested in informed estimates
-            output = []
+            # conv_ind_lst has the form ([], [], index_lst) where index_lst has the shape (num_trials, num_agents)
+
+            acc_x = []
             for trial_ind in range(self.num_trials):
                 err = [
                     abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x[trial_ind][agt_ind][agt_conv_ind] - target_fill_ratio)
-                            for agt_ind, agt_conv_ind in enumerate(conv_ind_lst[2])
-                ]
-                output.append(err[0])
+                            for agt_ind, agt_conv_ind in enumerate(conv_ind_lst[2][trial_ind])
+                ] # err is a list with num_agents elements
+                acc_x.append(err)
 
-            output = ([], [], output) # to maintain output consistency
+            output = ([], [], acc_x) # to maintain output consistency
+
+            assert len(output[2]) == self.num_trials
+            assert len(output[2][0]) == self.num_agents
 
         else:
+            # conv_ind_lst has the shape (3, num_trials)
+
             acc_x_hat = [
-                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_hat_sample_mean[ind][conv_ind] - target_fill_ratio)
-                for ind, conv_ind in enumerate(conv_ind_lst[0])
+                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_hat_sample_mean[trial_ind][conv_ind] - target_fill_ratio)
+                for trial_ind, conv_ind in enumerate(conv_ind_lst[0])
             ]
             acc_x_bar = [
-                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_bar_sample_mean[ind][conv_ind] - target_fill_ratio)
-                for ind, conv_ind in enumerate(conv_ind_lst[1])
+                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_bar_sample_mean[trial_ind][conv_ind] - target_fill_ratio)
+                for trial_ind, conv_ind in enumerate(conv_ind_lst[1])
             ]
             acc_x = [
-                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_sample_mean[ind][conv_ind] - target_fill_ratio)
-                for ind, conv_ind in enumerate(conv_ind_lst[2])
+                abs(self.stats_obj_dict[target_fill_ratio][sensor_prob].x_sample_mean[trial_ind][conv_ind] - target_fill_ratio)
+                for trial_ind, conv_ind in enumerate(conv_ind_lst[2])
             ]
 
             output = (acc_x_hat, acc_x_bar, acc_x)
+
+            assert len(output) == 3
+            assert len(output[0]) == len(output[1]) and len(output[1]) == len(output[2])
+            assert len(output[0]) == self.num_trials
 
         return output
 
@@ -1105,7 +1136,7 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         n = args["num_agents"]
         filename_param_1 = "prd{0}_cprob{1}_agt{2}".format(int(period), 1, int(n))
         data_obj_type = "sta"
-        ylim = 0.125 # @todo: temporary hack
+        ylim = 0.225 # @todo: temporary hack
 
     elif args["data_type"] == "dynamic":
         speed = args["speed"]

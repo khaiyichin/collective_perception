@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -n 30
-#SBATCH --mem=512G
+#SBATCH --mem=256G
 #SBATCH -p short
 #SBATCH -o log_%x_%j.out
 #SBATCH -e log_%x_%j.err
