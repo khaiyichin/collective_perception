@@ -5,8 +5,7 @@
 from collective_perception_py.sim_modules import ExperimentData
 import argparse
 
-if __name__ == "__main__":
-
+def main():
     parser = argparse.ArgumentParser(description="Display information of the serialized data.")
     parser.add_argument("DATA", type=str, help="Filename to the data file.")
     args = parser.parse_args()
@@ -32,3 +31,6 @@ if __name__ == "__main__":
     print("\t\tGraph type:\t\t\t{0}".format(data.graph_type))
     print("\t\tCommunication period:\t\t{0}".format(data.comms_period))
     print("\t\tCommunication probability:\t{0}".format(data.comms_prob))
+
+if __name__ == "__main__":
+    main()

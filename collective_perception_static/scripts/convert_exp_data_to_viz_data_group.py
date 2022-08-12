@@ -5,8 +5,7 @@
 import collective_perception_py.viz_modules as vm
 import argparse
 
-if __name__ == "__main__":
-
+def main():
     parser = argparse.ArgumentParser(description="Load and convert ExperimentData objects into a VisualizationDataGroupStatic object. \
         \nThis script will convert and store ExperimentData objects with the same: \
             \n\t- communication network type, and \
@@ -30,3 +29,6 @@ if __name__ == "__main__":
 
     # Pickle data
     v.save(args.s)
+
+if __name__ == "__main__":
+    main()

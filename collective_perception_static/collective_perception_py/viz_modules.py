@@ -165,12 +165,14 @@ class VisualizationData:
                 if not similarity_bool:
                     raise RuntimeError("The objects in the \"{0}\" directory do not have the same parameters.".format(exp_data_obj_paths))
 
-        self.tfr_range = sorted(self.tfr_range)
-        self.sp_range = sorted(self.sp_range)
+        # Check whether the class was instantiated as an empty container or with actual paths
+        if exp_data_obj_folder:
+            self.tfr_range = sorted(self.tfr_range)
+            self.sp_range = sorted(self.sp_range)
 
-        self.aggregate_statistics()
+            self.aggregate_statistics()
 
-    def load_pkl_file(self, folder_path): return ExperimentData.load(folder_path, False)
+    def load_pkl_file(self, folder_path, debug_data=False): return ExperimentData.load(folder_path, debug_data)
 
     def load_proto_file(self, folder_path):
         """Load SimulationStatsSet protobuf file into VisualizationData object.
@@ -1098,28 +1100,6 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
     ax.grid(True, which="both")
     ax.grid(which="both", color="#999999", linestyle=":")
 
-    """
-    The code below is unused for now, but useful in the future
-    """
-
-    # Loop over the data and create a `Text` for each "pixel".
-    # Change the text's color depending on the data.
-    # texts = []
-    # textcolors = ("white", "black")
-
-    # Get the formatter in case a string is supplied
-    # if isinstance(valfmt, str):
-    #     valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
-
-    # Normalize the threshold to the images color range.
-    # threshold = im.norm(heatmap_data.max())/2
-
-    # for i in range(heatmap_data.shape[0]):
-    #     for j in range(heatmap_data.shape[1]):
-    #         kwargs.update(color=textcolors[int(im.norm(heatmap_data[i, j]) > threshold)])
-    #         text = im.axes.text(j, i, valfmt(heatmap_data[i, j], None), **kwargs)
-    #         texts.append(text)
-
     return fig, ax, im
 
 def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual=True):
@@ -1201,10 +1181,10 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
     print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
     print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
 
-    ax_lst[0].set_xlabel("Normalized Convergence")
+    ax_lst[0].set_xlabel("Normalized Convergence Time")
     ax_lst[0].set_ylabel("Absolute Error")
-    ax_lst[0].set_xlim(0, 1.0)
-    ax_lst[0].set_ylim(0, ylim)
+    ax_lst[0].set_xlim(0, 1.02)
+    ax_lst[0].set_ylim(-0.005, ylim)
     ax_lst[0].xaxis.set_tick_params(labelsize=6)
     ax_lst[0].yaxis.set_tick_params(labelsize=6)
     ax_lst[0].grid()
@@ -1527,6 +1507,8 @@ class Visualizer:
             help="flag to show individual agent data (only used for time series and scatter plot data with the \"-U\" flag; exclusive with the \"-a\" flag)")
         parser.add_argument("-s", action="store_true", \
             help="flag to show the plots")
+        parser.add_argument("--steps", type=int, \
+            help="first n simulation steps  to evaluate to (default: evaluate from start to end of simulation)")
 
         # Add subparsing arguments
         viz_type_subparser = parser.add_subparsers(dest="viz_type", required=True, help ="commands for visualization type")
@@ -1636,6 +1618,15 @@ class Visualizer:
         else:
             self.sp = self.data.sp_range if isinstance(self.data, VisualizationData) else self.data.get_sp_range()
 
+        # Truncate data based on steps
+        try:
+            args_steps = args.steps
+        except Exception as e:
+            args_steps = None
+
+        if args_steps:
+            self.truncate_data_steps(args_steps)
+
     def generate_plot(self, args):
 
         if args.viz_type == "series":
@@ -1670,3 +1661,128 @@ class Visualizer:
                 self.sim_args.update({"tfr": self.tfr, "sp": self.sp})
 
                 plot_scatter(self.data, args.CONV, self.sim_args, args.i)
+
+    def truncate_data_steps(self, steps):
+        """Truncate the number of simulation steps used in visualization of the data.
+
+        Args:
+            steps: number of steps to truncate the data to.
+        """
+
+        def truncate_vd_steps(data_obj: VisualizationData):
+            """Internal function to process step truncation for the VisualizationData type object.
+            """
+
+            data_obj.num_steps = steps
+
+            for tfr in data_obj.tfr_range:
+                for sp in data_obj.sp_range:
+
+                    # Update the SimStats object
+                    stats = data_obj.stats_obj_dict[tfr][sp]
+
+                    stats.x_hat_sample_mean = np.delete(stats.x_hat_sample_mean, removal_ind, axis=-1)
+                    stats.x_bar_sample_mean = np.delete(stats.x_bar_sample_mean, removal_ind, axis=-1)
+                    stats.x_sample_mean = np.delete(stats.x_sample_mean, removal_ind, axis=-1)
+
+                    stats.alpha_sample_mean = np.delete(stats.alpha_sample_mean, removal_ind, axis=-1)
+                    stats.rho_sample_mean = np.delete(stats.rho_sample_mean, removal_ind, axis=-1)
+                    stats.gamma_sample_mean = np.delete(stats.gamma_sample_mean, removal_ind, axis=-1)
+
+                    stats.x_hat_sample_std = np.delete(stats.x_hat_sample_std, removal_ind, axis=-1)
+                    stats.x_bar_sample_std = np.delete(stats.x_bar_sample_std, removal_ind, axis=-1)
+                    stats.x_sample_std = np.delete(stats.x_sample_std, removal_ind, axis=-1)
+
+                    stats.alpha_sample_std = np.delete(stats.alpha_sample_std, removal_ind, axis=-1)
+                    stats.rho_sample_std = np.delete(stats.rho_sample_std, removal_ind, axis=-1)
+                    stats.gamma_sample_std = np.delete(stats.gamma_sample_std, removal_ind, axis=-1)
+
+                    stats.x = np.delete(stats.x, removal_ind, axis=-1)
+                    stats.gamma = np.delete(stats.gamma, removal_ind, axis=-1)
+
+                    # Ensure that the dimensions are as expected
+                    assert stats.x_hat_sample_mean.shape[-1] == steps + 1
+                    assert stats.x_bar_sample_mean.shape[-1] == steps + 1
+                    assert stats.x_sample_mean.shape[-1] == steps + 1
+
+                    assert stats.alpha_sample_mean.shape[-1] == steps + 1
+                    assert stats.rho_sample_mean.shape[-1] == steps + 1
+                    assert stats.gamma_sample_mean.shape[-1] == steps + 1
+
+                    assert stats.x_hat_sample_std.shape[-1] == steps + 1
+                    assert stats.x_bar_sample_std.shape[-1] == steps + 1
+                    assert stats.x_sample_std.shape[-1] == steps + 1
+
+                    assert stats.alpha_sample_std.shape[-1] == steps + 1
+                    assert stats.rho_sample_std.shape[-1] == steps + 1
+                    assert stats.gamma_sample_std.shape[-1] == steps + 1
+
+                    assert stats.x.shape[-1] == steps + 1
+                    assert stats.gamma.shape[-1] == steps + 1
+
+                    data_obj.stats_obj_dict[tfr][sp] = stats
+
+                    # Update AggregateStats object (if it exists)
+                    try:
+                        agg_stats_obj = data_obj.agg_stats_dict[tfr][sp]
+
+                        agg_stats_obj.x_hat_sample_mean = np.delete(agg_stats_obj.x_hat_sample_mean, removal_ind, axis=-1)
+                        agg_stats_obj.x_bar_sample_mean = np.delete(agg_stats_obj.x_bar_sample_mean, removal_ind, axis=-1)
+                        agg_stats_obj.x_sample_mean = np.delete(agg_stats_obj.x_sample_mean, removal_ind, axis=-1)
+
+                        agg_stats_obj.alpha_sample_mean = np.delete(agg_stats_obj.alpha_sample_mean, removal_ind, axis=-1)
+                        agg_stats_obj.rho_sample_mean = np.delete(agg_stats_obj.rho_sample_mean, removal_ind, axis=-1)
+                        agg_stats_obj.gamma_sample_mean = np.delete(agg_stats_obj.gamma_sample_mean, removal_ind, axis=-1)
+
+                        agg_stats_obj.x_hat_sample_std = np.delete(agg_stats_obj.x_hat_sample_std, removal_ind, axis=-1)
+                        agg_stats_obj.x_bar_sample_std = np.delete(agg_stats_obj.x_bar_sample_std, removal_ind, axis=-1)
+                        agg_stats_obj.x_sample_std = np.delete(agg_stats_obj.x_sample_std, removal_ind, axis=-1)
+
+                        agg_stats_obj.alpha_sample_std = np.delete(agg_stats_obj.alpha_sample_std, removal_ind, axis=-1)
+                        agg_stats_obj.rho_sample_std = np.delete(agg_stats_obj.rho_sample_std, removal_ind, axis=-1)
+                        agg_stats_obj.gamma_sample_std = np.delete(agg_stats_obj.gamma_sample_std, removal_ind, axis=-1)
+
+                        # Ensure that the dimensions are as expected
+                        assert agg_stats_obj.x_hat_sample_mean.shape[-1] == steps + 1
+                        assert agg_stats_obj.x_bar_sample_mean.shape[-1] == steps + 1
+                        assert agg_stats_obj.x_sample_mean.shape[-1] == steps + 1
+
+                        assert agg_stats_obj.alpha_sample_mean.shape[-1] == steps + 1
+                        assert agg_stats_obj.rho_sample_mean.shape[-1] == steps + 1
+                        assert agg_stats_obj.gamma_sample_mean.shape[-1] == steps + 1
+
+                        assert agg_stats_obj.x_hat_sample_std.shape[-1] == steps + 1
+                        assert agg_stats_obj.x_bar_sample_std.shape[-1] == steps + 1
+                        assert agg_stats_obj.x_sample_std.shape[-1] == steps + 1
+
+                        assert agg_stats_obj.alpha_sample_std.shape[-1] == steps + 1
+                        assert agg_stats_obj.rho_sample_std.shape[-1] == steps + 1
+                        assert agg_stats_obj.gamma_sample_std.shape[-1] == steps + 1
+
+                        data_obj.agg_stats_dict[tfr][sp] = agg_stats_obj
+
+                    except Exception as e:
+                        pass
+
+            return data_obj
+
+        assert steps < self.data.num_steps
+
+        removal_ind = range(steps+1, self.data.num_steps+1) # this takes the initial step into account
+
+        if isinstance(self.data, VisualizationData): # VisualizationData object
+            self.data = truncate_vd_steps(self.data)
+
+        else: # VisualizationDataGroup object
+            # Iterate until a VisualizationData object is reached
+            for k1, v1 in self.data.viz_data_obj_dict.items(): # entering first level
+
+                for k2, v2 in v1.items(): # entering second level
+
+                    # Check to see if there's a third level (only applicable for static topologies)
+                    if isinstance(v2, dict):
+                        for k3, v3 in v2.items():
+                            self.data.viz_data_obj_dict[k1][k2][k3] = truncate_vd_steps(self.data.viz_data_obj_dict[k1][k2][k3])
+
+                    else:
+                        self.data.viz_data_obj_dict[k1][k2] = truncate_vd_steps(self.data.viz_data_obj_dict[k1][k2])

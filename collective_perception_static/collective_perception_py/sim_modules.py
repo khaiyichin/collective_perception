@@ -111,7 +111,7 @@ class Sim:
                 self.x_sample_std = np.zeros( (num_trials, num_steps + 1) )
                 self.gamma_sample_std = np.zeros( (num_trials, num_steps + 1) )
 
-    def __init__(self, num_trials, num_steps, targ_fill_ratio, main_filename_suffix):
+    def __init__(self, num_trials=0, num_steps=0, targ_fill_ratio=0.0, main_filename_suffix=""):
         self.num_trials = num_trials
         self.num_steps = num_steps
         self.targ_fill_ratio = targ_fill_ratio

@@ -5,7 +5,7 @@
 import collective_perception_py.viz_modules as vm
 import argparse
 
-if __name__ == "__main__":
+def main():
 
     parser = argparse.ArgumentParser(description="Load and convert SimulationStatsSet protobuf files into a VisualizationDataGroupDynamic object. \
         \nThis script will convert and store SimulationStatsSet protobuf files with the same: \
@@ -28,3 +28,6 @@ if __name__ == "__main__":
 
     # Pickle data
     v.save(args.s)
+
+if __name__ == "__main__":
+    main()

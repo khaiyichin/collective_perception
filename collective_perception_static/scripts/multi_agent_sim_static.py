@@ -89,7 +89,6 @@ def run_sim_parallel_tfr(param_obj, target_fill_ratio):
 
     return outputs
 
-
 def run_sim_parallel_sp(param_obj, target_fill_ratio, sensor_prob):
     print("\tRunning case with probability = " + str(sensor_prob) + "... ")
 
@@ -98,8 +97,7 @@ def run_sim_parallel_sp(param_obj, target_fill_ratio, sensor_prob):
 
     return (target_fill_ratio, sensor_prob, s.stats, s.sim_data)
 
-if __name__ == "__main__":
-
+def main():
     parser = argparse.ArgumentParser(description="Execute multi-agent simulation with static topologies.")
     parser.add_argument("FILE", type=str, help="path to the \"param_multi_agent_sim_static.yaml\" file relative to the current/execution directory")
     parser.add_argument("-p", action="store_true", help="flag to use cores to run simulations in parallel")
@@ -162,3 +160,6 @@ if __name__ == "__main__":
     data.save(curr_time) # serialize and store data
 
     print("\nSimulation complete!")
+
+if __name__ == "__main__":
+    main()
