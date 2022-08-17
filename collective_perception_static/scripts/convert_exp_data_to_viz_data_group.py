@@ -18,7 +18,7 @@ def main():
             \n\t- communication period, \
             \n\t- communication probability.", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("FOLDER", type=str, help="path to the top level directory containing the serialized ExperimentData files")
-    parser.add_argument("-s", type=str, help="path to store the pickled VisualizationDataGroupStatic object")
+    parser.add_argument("-s", type=str, help="path to store the pickled VisualizationDataGroupStatic object (without extension)")
     args = parser.parse_args()
 
     # Initialize default values

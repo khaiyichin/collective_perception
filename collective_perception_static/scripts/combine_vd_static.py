@@ -10,7 +10,7 @@
 # and one of the following:
 #   - tfr_range, or sp_range.
 # 
-# For example, 2 VDGs that have varying target fill ratio ranges can only be combined if their:
+# For example, 2 VDs that have varying target fill ratio ranges can only be combined if their:
 #   - number of trials
 #   - comms probability
 #   - number of agent range
@@ -18,7 +18,7 @@
 #   - sp_range
 #   are exactly the same.
 # 
-# Similarly, 2 VDGs that have varying sensor probabilities can only be combined if their:
+# Similarly, 2 VDs that have varying sensor probabilities can only be combined if their:
 #   - number of trials
 #   - comms probability
 #   - number of agent range
@@ -68,7 +68,7 @@ def main():
     parser.add_argument("COMMS_PROB", type=float, help="specific communications probability")
     parser.add_argument("NUM_AGENTS", type=int, help="specific number of agents")
     parser.add_argument("--part", type=str, help="path to the other VisualationDataGroupStatic pickled object to be added to the base")
-    parser.add_argument("-s", type=str, help="path to store the pickled VisualizationData object")
+    parser.add_argument("-s", type=str, help="path to store the pickled VisualizationData object (without extension)")
     args = parser.parse_args()
 
     # Load base data
@@ -86,11 +86,14 @@ def main():
 
             output_vdg = combine_vd(base_vd, part_vd, args, True)
 
-        elif any([a != b for a,b in zip(base_vd.sp_range, part_vd.sp_range)]): # tfr_range doesn't match
+        elif any([a != b for a, b in zip(base_vd.tfr_range, part_vd.tfr_range)]): # tfr_range doesn't match
 
-            assert all(base_vd.sp_range == part_vd.sp_range)
+            assert all([a == b for a,b in zip(base_vd.sp_range, part_vd.sp_range)])
 
             output_vdg = combine_vd(base_vd, part_vd, args, False)
+
+        else:
+            raise RuntimeError("Both the target fill ratio and sensor probability ranges do not match!")
 
     else: # pure conversion
         output_vdg = vm.VisualizationDataGroupStatic()

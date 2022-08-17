@@ -1,7 +1,7 @@
 """Visualization module
 """
 import numpy as np
-from matplotlib.colors import LogNorm
+from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 import os
 import pickle
@@ -19,6 +19,7 @@ from pb2 import simulation_set_pb2
 CONV_THRESH = 5e-3
 FIG_SIZE = (16, 12)
 ACC_ABS_MAX = 0.25 # maximum accuracy threshold to draw in heatmap
+YMAX_SCATTER = 0.36 # default maximum y-limit for the scatter plots
 
 warnings.filterwarnings("ignore", category=UserWarning) # ignore UserWarning type warnings
 
@@ -536,6 +537,41 @@ class VisualizationData:
 
         return conv_output, acc_output
 
+    def get_decision_fractions(self, target_fill_ratio: float, sensor_prob: float or list, sim_step: int, bins=2):
+        """Evaluate the decisions of each agent based on its informed estimate.
+
+        Returns:
+            A dict containing the fraction of correct decisions for each sensor probability.
+        """
+
+        # Create bins for the estimates
+        bin_arr = np.linspace(0.0, 1.0, bins+1) # linspace gives the "checkpoints" for the bins, thus the bins are actually between each values
+
+        # Define correct bin decision
+        correct_bin = np.digitize(target_fill_ratio, bin_arr) # the output is between 1 to the number of bins, i.e., 1st bin, 2nd bin, etc.
+
+        output_dict = {}
+
+        # Process decision for each sensor probability
+        for sp in sensor_prob:
+
+            # Convert estimate to decision based on the number of bins
+            estimates = self.stats_obj_dict[target_fill_ratio][sp].x
+
+            decisions = np.take(estimates, sim_step, axis=2).flatten() # sim_step is the index to take from, thus has considered the initial estimate at t=0 already
+
+            # Sort the decisions into bins
+            binned_decisions = np.digitize(decisions, bin_arr)
+
+            assert len(binned_decisions) == self.num_agents*self.num_trials
+
+            # Count the fraction of correct decisions
+            fraction = np.count_nonzero(binned_decisions == correct_bin) / len(binned_decisions)
+
+            output_dict[sp] = fraction
+
+        return output_dict
+
     def save(self, filepath=None, curr_time=None):
         """Serialize the class into a pickle.
         """
@@ -545,10 +581,9 @@ class VisualizationData:
             curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
 
         if filepath:
-            root, ext = os.path.splitext(filepath)
-            save_path = root + "_" + curr_time + ext
+            save_path = filepath + "_" + curr_time + ".vd"
         else:
-            save_path = "viz_data_" + curr_time + ".pkl"
+            save_path = "vd_" + curr_time + ".vd"
 
         with open(save_path, "wb") as fopen:
             pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
@@ -700,10 +735,9 @@ class VisualizationDataGroupStatic(VisualizationDataGroupBase):
             curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
 
         if filepath:
-            root, ext = os.path.splitext(filepath)
-            save_path = root + "_" + curr_time + ext
+            save_path = filepath + "_" + curr_time + ".vdg"
         else:
-            save_path = "viz_data_group_static_" + curr_time + ".pkl"
+            save_path = "vdg_static_" + curr_time + ".vdg"
 
         with open(save_path, "wb") as fopen:
             pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
@@ -770,10 +804,9 @@ class VisualizationDataGroupDynamic(VisualizationDataGroupBase):
             curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
 
         if filepath:
-            root, ext = os.path.splitext(filepath)
-            save_path = root + "_" + curr_time + ext
+            save_path = filepath + "_" + curr_time + ".vdg"
         else:
-            save_path = "viz_data_group_dynamic_" + curr_time + ".pkl"
+            save_path = "vdg_dynamic_" + curr_time + ".vdg"
 
         with open(save_path, "wb") as fopen:
             pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
@@ -1102,7 +1135,7 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
 
     return fig, ax, im
 
-def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual=True):
+def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual=True, **kwargs):
 
     # Define variables depending on individual vs. average and static vs. dynamic
     if individual:
@@ -1116,14 +1149,12 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         n = args["num_agents"]
         filename_param_1 = "prd{0}_cprob{1}_agt{2}".format(int(period), 1, int(n))
         data_obj_type = "sta"
-        ylim = 0.225 # @todo: temporary hack
 
     elif args["data_type"] == "dynamic":
         speed = args["speed"]
         density = args["density"]
         filename_param_1 = "spd{0}_den{1}".format(int(speed), int(density))
         data_obj_type = "dyn"
-        ylim = 0.225 # @todo: temporary hack
 
     tfr = args["tfr"]
     sp = args["sp"]
@@ -1150,6 +1181,11 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         fixed = "tfr"
         manipulated_var = [sp]
 
+    # Decode distribution values
+    distributed_case = [ val for val in manipulated_var if val < 0.0 ]
+    if distributed_case: id_offset = 0 # enable the black marker (which has index = 0)
+    else: id_offset = 1 # black marker is reserved for the heterogeneous data
+
     # Create the scatter plots
     median_lst = []
     for ind, var in enumerate(manipulated_var):
@@ -1174,30 +1210,49 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
 
         # Calculate median
         median_lst.append( (np.median(conv_norm), np.median(acc_lst)) )
-        scatter([conv_norm, acc_lst], [ind]*len(conv_lst), ax_lst[0], vmin=0, vmax=len(manipulated_var)-1, edgecolors="none", alpha=0.2, s=25) # general transparent data
+        scatter(
+            [conv_norm, acc_lst],
+            c=[ind + id_offset]*len(conv_lst),
+            ax=ax_lst[0],
+            vmin=0,
+            vmax=len(manipulated_var)-1 + id_offset,
+            edgecolors="none",
+            alpha=0.2,
+            s=25
+        ) # general transparent data
 
-    scatter( list(zip(*median_lst)), range(len(median_lst)), ax_lst[0], vmin=0, vmax=len(manipulated_var)-1, edgecolors="black", alpha=1.0, s=50) # median
+        # Modify the label for the distributed case
+        if var < 0.0: manipulated_var[ind] = decode_sp_distribution_key(var)
+
+    scatter(
+        list(zip(*median_lst)),
+        c=range(id_offset, len(median_lst) + id_offset),
+        ax=ax_lst[0],
+        vmin=0,
+        vmax=len(manipulated_var)-1 + id_offset,
+        edgecolors="black",
+        alpha=1.0,
+        s=50
+    ) # median points
 
     print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
     print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
 
+    # Set plot parameters
+    if "ymax" in kwargs: ymax = kwargs["ymax"]
+    else: ymax = YMAX_SCATTER
+
     ax_lst[0].set_xlabel("Normalized Convergence Time")
     ax_lst[0].set_ylabel("Absolute Error")
-    ax_lst[0].set_xlim(0, 1.02)
-    ax_lst[0].set_ylim(-0.005, ylim)
+    ax_lst[0].set_xlim(-0.01, 1.01)
+    ax_lst[0].set_ylim(-0.005, ymax)
     ax_lst[0].xaxis.set_tick_params(labelsize=6)
     ax_lst[0].yaxis.set_tick_params(labelsize=6)
     ax_lst[0].grid()
 
-    # Decode distribution values
-    distributed_case = [(ind, val) for ind, val in enumerate(manipulated_var) if val < 0.0]
-    if distributed_case:
-        for ind, val in distributed_case:
-            manipulated_var[ind] = decode_sp_distribution_key(val)
-
     # Create color bar
-    color_bar_img = list(zip(*[list(range(len(manipulated_var)))])) # size of len(manipulated_var) x 1 list
-    ax_lst[1].imshow(color_bar_img, aspect=2, cmap="nipy_spectral")
+    color_bar_img = list(zip(*[list(range(id_offset, len(manipulated_var) + id_offset))])) # size of len(manipulated_var) x 1 list
+    ax_lst[1].imshow(color_bar_img, aspect=2, cmap="nipy_spectral", vmin=0, vmax=(len(manipulated_var) - 1 + id_offset))
 
     # Modify tick labels
     ax_lst[1].yaxis.set_label_position("right")
@@ -1228,12 +1283,140 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         ".png",
     bbox_inches="tight", dpi=300)
 
-def scatter(scatter_data, scatter_data_id: int, ax=None, vmin=None, vmax=None, **kwargs):
+def plot_decision(data_obj: VisualizationData, args):
+
+    # Assigned fixed colors to sensor probabilities; @TODO: kind of hacky
+    fixed_sensor_probability_bins = np.linspace(0.5125, 0.9875, 20) # 19 bins
+
+    tfr = args["tfr"]
+    sp = args["sp"]
+    bins = args["bins"]
+    sim_steps = args["sim_steps"]
+
+    if args["data_type"] == "static":
+        period = args["comms_period"]
+        n = args["num_agents"]
+        filename_param_1 = "prd{0}_cprob{1}_agt{2}_bins{3}".format(int(period), 1, int(n), bins)
+        data_obj_type = "sta"
+
+    elif args["data_type"] == "dynamic":
+        speed = args["speed"]
+        density = args["density"]
+        filename_param_1 = "spd{0}_den{1}_bins{2}".format(int(speed), int(density), bins)
+        data_obj_type = "dyn"
+
+    # Create the figures and axes
+    fig_size = (6,4)
+    fig, ax_lst = plt.subplots(1, 2, tight_layout=True, figsize=fig_size, dpi=175, gridspec_kw={"width_ratios": [6*len(fixed_sensor_probability_bins)/len(sp), 1]})
+
+    # Convert sensor probability values into IDs used for deciding marker colors (the colors are fixed for sensor probability values)
+    id_lst = []
+
+    for s in sp:
+        if s >= 0.0: id_lst.append(np.digitize(s, fixed_sensor_probability_bins)) # homogeneous sensor probabilities
+        else: id_lst.append(0) # the distributed sensor probability case uses the black marker
+
+    # Define array of colors according to the nipy_spectral colormap
+    c = plt.cm.nipy_spectral(np.array(id_lst)/(len(fixed_sensor_probability_bins)-1))
+
+    # Obtain the decision fractions
+    decision_fractions = {step: data_obj.get_decision_fractions(tfr, sp, step, bins) for step in sim_steps}
+
+    # Check the decision fraction of each sensor probability to find the ones that clutter close to 1 (using 0.9 as a threshold)
+    cluttered_keys = set()
+    for sp_dict in decision_fractions.values():
+        cluttered_keys.update( (k for k, v in sp_dict.items() if v > 0.9) )
+
+    # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
+    offset = (np.linspace(0, 1, len(cluttered_keys)) * 1e3 - 1e3/2).tolist()
+    offset = [offset.pop(0) if s in cluttered_keys else 0.0 for _, s in enumerate(sp)]
+
+    # Plot the lines for each sensor probability
+    for ind, s in enumerate(sp):
+
+        points = [decision_fractions[k][s] for k in decision_fractions.keys()]
+
+        line(
+            line_data=[np.array(sim_steps) + offset[ind], points],
+            ax=ax_lst[0],
+            ls="-",     # line style
+            lw=1,       # line width
+            marker="d", # marker type
+            ms="10",     # marker size
+            mfc=c[ind], # marker face color
+            c=c[ind]    # color
+        )
+
+        # Add markers to those that have 100% correct decisions
+        consensus_ind = [i for i, p in enumerate(points) if p == 1.0]
+        if consensus_ind:
+            line(
+                line_data=[np.array(sim_steps[consensus_ind]) + offset[ind], [1.0]*len(consensus_ind)],
+                ax=ax_lst[0],
+                marker="|", # marker type
+                ms="30",    # marker size
+                c=c[ind]    # color
+            )
+
+    # Modify the label for the distributed case
+    if 0 in id_lst:
+        sp[id_lst.index(0)] = decode_sp_distribution_key(sp[id_lst.index(0)])
+
+    # Add ticker formatter (mostly for the log scale that is unused for now, but may be helpful in the future)
+    ticker_formatter = FuncFormatter(lambda y, _: "{:.4g}".format(y))
+
+    ax_lst[0].set_xlabel("Simulation Time Steps")
+    ax_lst[0].set_ylabel("Fraction of Correct Decisions")
+    ax_lst[0].set_xticks(sim_steps)
+    # ax_lst[0].set_yscale("log")
+    ax_lst[0].set_ylim(bottom=None, top=1.1)
+    ax_lst[0].xaxis.set_tick_params(which="both", labelsize=6)
+    ax_lst[0].yaxis.set_tick_params(which="both", labelsize=6)
+    ax_lst[0].yaxis.grid(which="both", linestyle=":")
+    ax_lst[0].xaxis.grid(which="major", linestyle=":")
+    ax_lst[0].yaxis.set_major_formatter(ticker_formatter)
+    ax_lst[0].yaxis.set_minor_formatter(ticker_formatter)
+
+    # Create color bar
+    color_bar_img = np.array(id_lst, ndmin=2).T
+    ax_lst[1].imshow(color_bar_img, aspect=2, cmap="nipy_spectral", vmin=0, vmax=len(fixed_sensor_probability_bins)-1)
+
+    # Modify tick labels
+    ax_lst[1].yaxis.set_label_position("right")
+    ax_lst[1].yaxis.tick_right()
+    ax_lst[1].set_xticks([])
+    ax_lst[1].set_yticks(range(len(id_lst)), sp, fontsize=6)
+    ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=10)
+
+    filename_param_2 = "tfr{0}".format(int(tfr*1e3))
+
+    # Save the decision plot
+    filename_param = "{0}_{1}".format(filename_param_2, filename_param_1)
+
+    fig.savefig(
+        "decision_" +
+        data_obj_type +
+        "_" +
+        "s{0}_t{1}_{2}".format(
+            int(data_obj.num_steps),
+            int(data_obj.num_trials),
+            filename_param
+        ) +
+        ".png",
+    bbox_inches="tight", dpi=300)
+
+def line(line_data, ax=None, **kwargs):
+    if ax is None:
+        raise NotImplementedError("Line drawing function is not generally available yet.")
+    else:
+        ax.plot(line_data[0], line_data[1], **kwargs)
+
+def scatter(scatter_data, ax=None, **kwargs):
 
     if ax is None:
         fig, ax = plt.subplots()
     else:
-        ax.scatter(scatter_data[0], scatter_data[1], c=scatter_data_id, cmap="nipy_spectral", vmin=vmin, vmax=vmax, **kwargs)
+        ax.scatter(scatter_data[0], scatter_data[1], cmap="nipy_spectral", **kwargs)
 
 def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False, convergence_thresh=CONV_THRESH):
     """Plot the time series data.
@@ -1496,7 +1679,7 @@ class Visualizer:
         # Create common arguments
         parser = argparse.ArgumentParser(description="Visualize {0} multi-agent simulation data".format(data_type))
         parser.add_argument("FILE", type=str, \
-            help="path to folder containing serialized {0} files or path to a VisualizationDataGroup pickle file (see the \"g\" flag)".format(v_type_str))
+            help="path to folder containing serialized {0} files or path to a VisualizationDataGroup pickle file (see the \"-g\" flag)".format(v_type_str))
         parser.add_argument("CONV", type=float, \
             help="convergence threshold value")
         parser.add_argument("-g", action="store_true", \
@@ -1508,13 +1691,14 @@ class Visualizer:
         parser.add_argument("-s", action="store_true", \
             help="flag to show the plots")
         parser.add_argument("--steps", type=int, \
-            help="first n simulation steps  to evaluate to (default: evaluate from start to end of simulation)")
+            help="first n simulation steps to evaluate to (default: evaluate from start to end of simulation)")
 
         # Add subparsing arguments
         viz_type_subparser = parser.add_subparsers(dest="viz_type", required=True, help ="commands for visualization type")
         series_subparser = viz_type_subparser.add_parser("series", help="visualize time series data")
         heatmap_subparser = viz_type_subparser.add_parser("heatmap", help="visualize heatmap data")
         scatter_subparser = viz_type_subparser.add_parser("scatter", help="visualize scatter data")
+        decision_subparser = viz_type_subparser.add_parser("decision", help="visualize collective-decision making data")
 
         # Time series plot options
         series_subparser.add_argument("-TFR", required=True, type=float, help="single target fill ratio to use in plotting time series data")
@@ -1533,6 +1717,14 @@ class Visualizer:
         scatter_subparser.add_argument("-tfr", nargs="+", type=float, help="(optional) target fill ratio to use in plotting scatter data (must provide single \"-sp\" argument if this is not provided)")
         scatter_subparser.add_argument("-sp", nargs="+", type=float, help="(optional) sensor probability to use in plotting scatter data (must provide single \"-tfr\" argument if this is not provided)")
         scatter_subparser.add_argument("-U", required=True, nargs="*", type=float, help="{0} to use in plotting scatter data".format(u_types_str))
+        scatter_subparser.add_argument("--ymax", default=None, type=float, help="(optional) maximum y limit value for the scatter plot")
+
+        # Decision scatter plot options
+        decision_subparser.add_argument("-TFR", required=True, type=float, help="single target fill ratio to use in plotting collective decision data")
+        decision_subparser.add_argument("-sp", nargs="+", type=float, help="(optional) sensor probability to use in plotting collective decision data")
+        decision_subparser.add_argument("-U", required=True, nargs="+", help="{0} to use in plotting collective decision data".format(u_types_str))
+        decision_subparser.add_argument("--bins", type=int, default=2, help="(optional) the number of bins to separate the swarm's decision (default: 2")
+        decision_subparser.add_argument("--step_inc", type=int, default=1000, help="(optional) the increment in simulation steps to evaluate decisions (default: 1000)")
 
         args = parser.parse_args()
 
@@ -1660,7 +1852,18 @@ class Visualizer:
             else:
                 self.sim_args.update({"tfr": self.tfr, "sp": self.sp})
 
-                plot_scatter(self.data, args.CONV, self.sim_args, args.i)
+                plot_scatter(self.data, args.CONV, self.sim_args, args.i, ymax=args.ymax)
+
+        elif args.viz_type == "decision":
+
+            if not isinstance(self.data, VisualizationData): raise NotImplementedError("Collective decision plot for VisualizationDataGroup not implemented!")
+            else:
+                # Calculate the number of steps to evaluate the decisions at
+                decision_sim_steps = np.arange(args.step_inc, self.data.num_steps+1, args.step_inc)
+
+                self.sim_args.update({"tfr": self.tfr, "sp": self.sp, "bins": args.bins, "sim_steps": decision_sim_steps})
+
+                plot_decision(self.data, self.sim_args)
 
     def truncate_data_steps(self, steps):
         """Truncate the number of simulation steps used in visualization of the data.

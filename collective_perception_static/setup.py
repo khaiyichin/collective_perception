@@ -59,7 +59,7 @@ setuptools.setup(
         "scripts/convert_exp_data_to_viz_data_group.py",
         "scripts/convert_sim_stats_set_to_viz_data_group.py",
         "scripts/multi_agent_sim_static.py",
-        "scripts/extract_local_values_to_viz_data_group.py",
+        "scripts/extract_local_values_to_viz_data.py",
         "scripts/extract_vd_from_vdg.py",
         "scripts/combine_vd_static.py"
     ]

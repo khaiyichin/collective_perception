@@ -17,7 +17,7 @@ def main():
             \n\t- robot speed, and \
             \n\t- swarm density.", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("FOLDER", type=str, help="path to the top level directory containing the serialized SimulationStatsSet protobuf files")
-    parser.add_argument("-s", type=str, help="path to store the pickled VisualizationDataGroupDynamic object")
+    parser.add_argument("-s", type=str, help="path to store the pickled VisualizationDataGroupDynamic object (without extension)")
     args = parser.parse_args()
 
     # Initialize default values

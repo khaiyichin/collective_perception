@@ -854,10 +854,9 @@ class ExperimentData:
             curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
 
         if filepath:
-            root, ext = os.path.splitext(filepath)
-            save_path = root + "_" + curr_time + ext
+            save_path = filepath + "_" + curr_time + ".ped"
         else:
-            save_path = "multi_agent_sim_data_" + curr_time + ".pkl"
+            save_path = "multi_agent_sim_data_" + curr_time + ".ped"
 
         with open(save_path, "wb") as fopen:
             pickle.dump(self, fopen, pickle.HIGHEST_PROTOCOL)
