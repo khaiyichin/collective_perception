@@ -19,7 +19,12 @@ from pb2 import simulation_set_pb2
 CONV_THRESH = 5e-3
 FIG_SIZE = (16, 12)
 ACC_ABS_MAX = 0.25 # maximum accuracy threshold to draw in heatmap
+XMIN_SCATTER = -0.01 # default minimum x-limit for the scatter plots
+XMAX_SCATTER = 1.01 # default maximum x-limit for the scatter plots
+YMIN_SCATTER = -0.01 # default minimum y-limit for the scatter plots
 YMAX_SCATTER = 0.36 # default maximum y-limit for the scatter plots
+YMIN_DECISION = 0.15 # default minimum y-limit for the decision plots
+YMAX_DECISION = 1.1 # default maximum y-limit for the decision plots
 
 warnings.filterwarnings("ignore", category=UserWarning) # ignore UserWarning type warnings
 
@@ -1239,13 +1244,13 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
     print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
 
     # Set plot parameters
-    if "ymax" in kwargs: ymax = kwargs["ymax"]
+    if args["ymax"]: ymax = args["ymax"]
     else: ymax = YMAX_SCATTER
 
     ax_lst[0].set_xlabel("Normalized Convergence Time")
     ax_lst[0].set_ylabel("Absolute Error")
-    ax_lst[0].set_xlim(-0.01, 1.01)
-    ax_lst[0].set_ylim(-0.005, ymax)
+    ax_lst[0].set_xlim(XMIN_SCATTER, XMAX_SCATTER)
+    ax_lst[0].set_ylim(YMIN_SCATTER, ymax)
     ax_lst[0].xaxis.set_tick_params(labelsize=6)
     ax_lst[0].yaxis.set_tick_params(labelsize=6)
     ax_lst[0].grid()
@@ -1282,6 +1287,13 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         ) +
         ".png",
     bbox_inches="tight", dpi=300)
+
+def scatter(scatter_data, ax=None, **kwargs):
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        ax.scatter(scatter_data[0], scatter_data[1], cmap="nipy_spectral", **kwargs)
 
 def plot_decision(data_obj: VisualizationData, args):
 
@@ -1369,7 +1381,7 @@ def plot_decision(data_obj: VisualizationData, args):
     ax_lst[0].set_ylabel("Fraction of Correct Decisions")
     ax_lst[0].set_xticks(sim_steps)
     # ax_lst[0].set_yscale("log")
-    ax_lst[0].set_ylim(bottom=None, top=1.1)
+    ax_lst[0].set_ylim(bottom=YMIN_DECISION, top=YMAX_DECISION)
     ax_lst[0].xaxis.set_tick_params(which="both", labelsize=6)
     ax_lst[0].yaxis.set_tick_params(which="both", labelsize=6)
     ax_lst[0].yaxis.grid(which="both", linestyle=":")
@@ -1410,13 +1422,6 @@ def line(line_data, ax=None, **kwargs):
         raise NotImplementedError("Line drawing function is not generally available yet.")
     else:
         ax.plot(line_data[0], line_data[1], **kwargs)
-
-def scatter(scatter_data, ax=None, **kwargs):
-
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        ax.scatter(scatter_data[0], scatter_data[1], cmap="nipy_spectral", **kwargs)
 
 def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False, convergence_thresh=CONV_THRESH):
     """Plot the time series data.
@@ -1850,9 +1855,9 @@ class Visualizer:
 
             if not isinstance(self.data, VisualizationData): raise NotImplementedError("Scatter plot for VisualizationDataGroup not implemented!")
             else:
-                self.sim_args.update({"tfr": self.tfr, "sp": self.sp})
+                self.sim_args.update({"tfr": self.tfr, "sp": self.sp, "ymax": args.ymax})
 
-                plot_scatter(self.data, args.CONV, self.sim_args, args.i, ymax=args.ymax)
+                plot_scatter(self.data, args.CONV, self.sim_args, args.i)
 
         elif args.viz_type == "decision":
 

@@ -7,7 +7,7 @@
 #SBATCH -e log_%x_%j.err
 #SBATCH -t 24:00:00
 #SBATCH --mail-user=kchin@wpi.edu
-#SBATCH --mail-type=all
+#SBATCH --mail-type=fail,end
 
 # To run this you need `param_multi_agent_sim_static.yaml` in the same directory as `hpc_execute_multi_agents_sim_static.sh`.
 

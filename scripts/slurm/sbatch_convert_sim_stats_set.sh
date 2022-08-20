@@ -7,7 +7,7 @@
 #SBATCH -e log_%x_%j.err
 #SBATCH -t 00:30:00
 #SBATCH --mail-user=kchin@wpi.edu
-#SBATCH --mail-type=all
+#SBATCH --mail-type=fail,end
 
 # $1: argument for path to working directory to change to, relative to the current directory
 # $2: argument for path to the top-level directory containing all the sim data to combine into one VisualizationDataGroup object, relative to $1

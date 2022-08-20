@@ -26,9 +26,9 @@ From: argos_buzz_protobuf_no_qt.sif
     ../../collective_perception_dynamic/src /collective_perception/collective_perception_dynamic/src
     ../../collective_perception_dynamic/CMakeLists.txt /collective_perception/collective_perception_dynamic/CMakeLists.txt
 
-    ../../collective_perception_static/collective_perception_py/ /collective_perception/collective_perception_static/collective_perception_py
-    ../../collective_perception_static/pb2 /collective_perception/collective_perception_static/pb2
-    ../../collective_perception_static/scripts /collective_perception/collective_perception_static/scripts
+    ../../collective_perception_static/collective_perception_py/*.py /collective_perception/collective_perception_static/collective_perception_py/
+    ../../collective_perception_static/pb2/*.py /collective_perception/collective_perception_static/pb2/
+    ../../collective_perception_static/scripts/*.py /collective_perception/collective_perception_static/scripts/
     ../../collective_perception_static/setup.py /collective_perception/collective_perception_static/setup.py
     ../../collective_perception_static/requirements.txt /collective_perception/collective_perception_static/requirements.txt
 
