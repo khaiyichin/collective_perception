@@ -1210,20 +1210,21 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         if individual: conv_lst = [c for i in conv_lst for c in i]
         if individual: acc_lst = [c for i in acc_lst for c in i]
 
-        conv_norm = normalize(np.asarray(conv_lst), 0, data_obj.num_steps).tolist()
+        # conv_norm = normalize(np.asarray(conv_lst), 0, data_obj.num_steps).tolist()
         # acc_norm = normalize(np.asarray(acc_lst), 0, ACC_ABS_MAX)
+        comms_steps = convert_sim_steps_to_comms_rounds(np.asarray(conv_lst), data_obj.comms_period)
 
         # Calculate median
-        median_lst.append( (np.median(conv_norm), np.median(acc_lst)) )
+        median_lst.append( (np.median(comms_steps), np.median(acc_lst)) )
         scatter(
-            [conv_norm, acc_lst],
+            [comms_steps, acc_lst],
             c=[ind + id_offset]*len(conv_lst),
             ax=ax_lst[0],
             vmin=0,
             vmax=len(manipulated_var)-1 + id_offset,
             edgecolors="none",
             alpha=0.2,
-            s=25
+            s=30
         ) # general transparent data
 
         # Modify the label for the distributed case
@@ -1237,7 +1238,7 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         vmax=len(manipulated_var)-1 + id_offset,
         edgecolors="black",
         alpha=1.0,
-        s=50
+        s=65
     ) # median points
 
     print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
@@ -1246,13 +1247,14 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
     # Set plot parameters
     if args["ymax"]: ymax = args["ymax"]
     else: ymax = YMAX_SCATTER
+    max_comms_rounds = data_obj.num_steps/data_obj.comms_period # convert the x-axis to use communications rounds
 
-    ax_lst[0].set_xlabel("Normalized Convergence Time")
-    ax_lst[0].set_ylabel("Absolute Error")
-    ax_lst[0].set_xlim(XMIN_SCATTER, XMAX_SCATTER)
+    ax_lst[0].set_xlabel("Communication Rounds", fontsize=14)
+    ax_lst[0].set_ylabel("Absolute Error", fontsize=14)
+    ax_lst[0].set_xlim(-0.02*max_comms_rounds, 1.02*max_comms_rounds)
     ax_lst[0].set_ylim(YMIN_SCATTER, ymax)
-    ax_lst[0].xaxis.set_tick_params(labelsize=6)
-    ax_lst[0].yaxis.set_tick_params(labelsize=6)
+    ax_lst[0].xaxis.set_tick_params(labelsize=10)
+    ax_lst[0].yaxis.set_tick_params(labelsize=10)
     ax_lst[0].grid()
 
     # Create color bar
@@ -1263,13 +1265,13 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
     ax_lst[1].yaxis.set_label_position("right")
     ax_lst[1].yaxis.tick_right()
     ax_lst[1].set_xticks([])
-    ax_lst[1].set_yticks(list(range(len(manipulated_var))), manipulated_var, fontsize=6)
+    ax_lst[1].set_yticks(list(range(len(manipulated_var))), manipulated_var, fontsize=8)
 
     if fixed == "tfr":
-        ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=10)
+        ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=14)
         filename_param_2 = "tfr{0}".format(int(tfr*1e3))
     elif fixed == "sp":
-        ax_lst[1].set_ylabel("Target fill ratios", fontsize=10)
+        ax_lst[1].set_ylabel("Target fill ratios", fontsize=14)
         filename_param_2 = "tfr{0}".format(int(sp*1e3))
 
     # Save the scatter plot
@@ -1340,7 +1342,8 @@ def plot_decision(data_obj: VisualizationData, args):
         cluttered_keys.update( (k for k, v in sp_dict.items() if v > 0.9) )
 
     # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
-    offset = (np.linspace(0, 1, len(cluttered_keys)) * 1e3 - 1e3/2).tolist()
+    max_comms_rounds = data_obj.num_steps/data_obj.comms_period
+    offset = (np.linspace(0, 1, len(cluttered_keys)) * max_comms_rounds/10 - max_comms_rounds/20).tolist()
     offset = [offset.pop(0) if s in cluttered_keys else 0.0 for _, s in enumerate(sp)]
 
     # Plot the lines for each sensor probability
@@ -1349,12 +1352,12 @@ def plot_decision(data_obj: VisualizationData, args):
         points = [decision_fractions[k][s] for k in decision_fractions.keys()]
 
         line(
-            line_data=[np.array(sim_steps) + offset[ind], points],
+            line_data=[np.array(sim_steps)/data_obj.comms_period + offset[ind], points],
             ax=ax_lst[0],
             ls="-",     # line style
             lw=1,       # line width
             marker="d", # marker type
-            ms="10",     # marker size
+            ms="15",     # marker size
             mfc=c[ind], # marker face color
             c=c[ind]    # color
         )
@@ -1363,10 +1366,10 @@ def plot_decision(data_obj: VisualizationData, args):
         consensus_ind = [i for i, p in enumerate(points) if p == 1.0]
         if consensus_ind:
             line(
-                line_data=[np.array(sim_steps[consensus_ind]) + offset[ind], [1.0]*len(consensus_ind)],
+                line_data=[np.array(sim_steps[consensus_ind])/data_obj.comms_period + offset[ind], [1.0]*len(consensus_ind)],
                 ax=ax_lst[0],
                 marker="|", # marker type
-                ms="30",    # marker size
+                ms="35",    # marker size
                 c=c[ind]    # color
             )
 
@@ -1377,13 +1380,13 @@ def plot_decision(data_obj: VisualizationData, args):
     # Add ticker formatter (mostly for the log scale that is unused for now, but may be helpful in the future)
     ticker_formatter = FuncFormatter(lambda y, _: "{:.4g}".format(y))
 
-    ax_lst[0].set_xlabel("Simulation Time Steps")
-    ax_lst[0].set_ylabel("Fraction of Correct Decisions")
-    ax_lst[0].set_xticks(sim_steps)
+    ax_lst[0].set_xlabel("Communication Rounds", fontsize=14)
+    ax_lst[0].set_ylabel("Fraction of Correct Decisions", fontsize=14)
+    ax_lst[0].set_xticks(np.array(sim_steps)/data_obj.comms_period)
     # ax_lst[0].set_yscale("log")
     ax_lst[0].set_ylim(bottom=YMIN_DECISION, top=YMAX_DECISION)
-    ax_lst[0].xaxis.set_tick_params(which="both", labelsize=6)
-    ax_lst[0].yaxis.set_tick_params(which="both", labelsize=6)
+    ax_lst[0].xaxis.set_tick_params(which="both", labelsize=10)
+    ax_lst[0].yaxis.set_tick_params(which="both", labelsize=10)
     ax_lst[0].yaxis.grid(which="both", linestyle=":")
     ax_lst[0].xaxis.grid(which="major", linestyle=":")
     ax_lst[0].yaxis.set_major_formatter(ticker_formatter)
@@ -1397,8 +1400,8 @@ def plot_decision(data_obj: VisualizationData, args):
     ax_lst[1].yaxis.set_label_position("right")
     ax_lst[1].yaxis.tick_right()
     ax_lst[1].set_xticks([])
-    ax_lst[1].set_yticks(range(len(id_lst)), sp, fontsize=6)
-    ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=10)
+    ax_lst[1].set_yticks(range(len(id_lst)), sp, fontsize=8)
+    ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=14)
 
     filename_param_2 = "tfr{0}".format(int(tfr*1e3))
 
@@ -1643,6 +1646,9 @@ def normalize(arr, min_val, max_val, flip=False):
     arr_range = max_val - min_val
     return ( arr_range - ( arr - min_val ) ) / arr_range if flip else ( arr - min_val ) / arr_range
 
+def convert_sim_steps_to_comms_rounds(sim_steps_arr, comms_period):
+    return sim_steps_arr / comms_period
+
 def compute_std_bounds(mean_val, std_val):
     return [ np.add(mean_val, std_val),  np.subtract(mean_val, std_val) ]
 
@@ -1728,7 +1734,7 @@ class Visualizer:
         decision_subparser.add_argument("-TFR", required=True, type=float, help="single target fill ratio to use in plotting collective decision data")
         decision_subparser.add_argument("-sp", nargs="+", type=float, help="(optional) sensor probability to use in plotting collective decision data")
         decision_subparser.add_argument("-U", required=True, nargs="+", help="{0} to use in plotting collective decision data".format(u_types_str))
-        decision_subparser.add_argument("--bins", type=int, default=2, help="(optional) the number of bins to separate the swarm's decision (default: 2")
+        decision_subparser.add_argument("--bins", type=int, default=2, help="(optional) the number of bins to separate the swarm's decision (default: 2)")
         decision_subparser.add_argument("--step_inc", type=int, default=1000, help="(optional) the increment in simulation steps to evaluate decisions (default: 1000)")
 
         args = parser.parse_args()

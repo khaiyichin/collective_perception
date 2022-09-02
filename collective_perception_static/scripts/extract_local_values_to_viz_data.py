@@ -31,6 +31,7 @@ def create_vd_obj(obj_filepath: str):
     vd.num_trials = obj.num_trials
     vd.num_steps = obj.num_steps
     vd.stats_obj_dict = {}
+    vd.comms_period = 1
     vd.sim_data_obj_dict = obj.sim_data_obj_dict # adding a temporary attribute to instance
 
     return vd
@@ -93,7 +94,7 @@ def main():
                 "multi",
                 vd.num_trials,
                 vd.num_steps,
-                1, # comms period
+                vd.comms_period,
                 vd.num_agents,
                 False
             )
