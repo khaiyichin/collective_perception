@@ -15,13 +15,13 @@ def create_vd_obj(obj_filepath: str):
     # Load the object
     ext = os.path.splitext(obj_filepath)[1]
 
-    if ext == ".pkl":
+    if ext == ".ped":
         obj = vd.load_pkl_file(obj_filepath, True)
 
     elif ext == ".pbs":
         obj = vd.load_proto_file(obj_filepath)
 
-    else: raise RuntimeError("Unknown extension encountered; please provide \".pkl\" or \".pbs\" files.")
+    else: raise RuntimeError("Unknown extension encountered; please provide \".ped\" or \".pbs\" files.")
 
     # Populate VisualizationData object parameters
     vd.sp_range = obj.sp_range

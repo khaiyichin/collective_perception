@@ -81,16 +81,16 @@ class VisualizationData:
 
         for root, _, files in os.walk(exp_data_obj_folder):
             for f in files:
-                if os.path.splitext(f)[1] == ".pkl" or os.path.splitext(f)[1] == ".pbs":
+                if os.path.splitext(f)[1] == ".ped" or os.path.splitext(f)[1] == ".pbs":
                     exp_data_obj_paths.append( os.path.join(root, f) )
 
         # Load the files
         for path in exp_data_obj_paths:
 
             # Check type of file to load
-            if os.path.splitext(path)[1] == ".pkl": obj = self.load_pkl_file(path)
+            if os.path.splitext(path)[1] == ".ped": obj = self.load_pkl_file(path)
             elif os.path.splitext(path)[1] == ".pbs": obj = self.load_proto_file(path)
-            else: raise RuntimeError("Unknown extension encountered; please provide \".pkl\" or \".pbs\" files.")
+            else: raise RuntimeError("Unknown extension encountered; please provide \".ped\" or \".pbs\" files.")
 
             # Check that common simulation parameters are the same before combining
             if first_obj:
@@ -698,7 +698,7 @@ class VisualizationDataGroupStatic(VisualizationDataGroupBase):
 
     def __init__(self, data_folder=""):
 
-        super().__init__(data_folder, ".pkl")
+        super().__init__(data_folder, ".ped")
 
         # Load the VisualizationData objects and store them
         for folder in self.folders:
