@@ -420,6 +420,9 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
     // Create Packet to store data
     CreateNewPacket();
+
+    // Setup experiment
+    SetupExperiment();
 }
 
 void CollectivePerceptionLoopFunctions::CreateNewPacket()

@@ -33,8 +33,9 @@ int main(int n_argc, char **ppch_argv)
          // Run experiments
          while (!cSimulator.GetLoopFunctions().IsExperimentFinished())
          {
-            cSimulator.Reset();
+            // cSimulator.Reset();
             cSimulator.Execute();
+            cSimulator.Reset();
          }
          break;
       }
