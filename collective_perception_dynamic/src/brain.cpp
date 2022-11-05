@@ -113,3 +113,19 @@ void Brain::Solve()
     // Solve informed values (since local values are always available, even if social values aren't)
     solver_.InformedSolve();
 }
+
+void Brain::Disable()
+{
+    // Apply dummy values
+    StoreObservations(-1, -1);
+
+    solver_.local_vals.x = -1.0;
+    solver_.local_vals.confidence = -1.0;
+    solver_.social_vals.x = -1.0;
+    solver_.social_vals.confidence = -1.0;
+    solver_.informed_vals.x = -1.0;
+    solver_.informed_vals.confidence = -1.0;
+
+    // Clear the log of neighboring values
+    StoreNeighborValuePairs(std::vector<Brain::ValuePair>{});
+}

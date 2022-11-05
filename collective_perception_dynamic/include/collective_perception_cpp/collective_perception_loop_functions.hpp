@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
+#include <algorithm>
+#include <numeric>
 
 // Buzz and ARGoS headers
 #include <buzz/argos/buzz_loop_functions.h>
@@ -62,17 +64,22 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
      */
     virtual void operator()(const std::string &str_robot_id, buzzvm_t t_vm);
 
+    /**
+     * @brief Generate a sensor probability at random based on a probability distribution
+     *
+     * @return float The sensor probability
+     */
     float GenerateRandomSensorProbability();
 
-    bool legacy;
+    bool legacy; ///< Flag to indicate whether legacy equations are being used
 
-    double b_prob;
+    double b_prob; ///< Sensor quality in identifying black tiles
 
-    double w_prob;
+    double w_prob; ///< Sensor quality in identifying white tiles
 
-    float spd;
+    float spd; ///< Robot speed
 
-    std::default_random_engine generator;
+    std::default_random_engine generator; ///< Random number generator
 
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr; ///< Pointer to unordered map containing robot IDs and corresponding Brain instances
 };
@@ -83,6 +90,10 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
  */
 struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
 {
+    /**
+     * @brief Construct a new ProcessRobotThought object
+     *
+     */
     ProcessRobotThought() : id_brain_map_ptr(nullptr), agt_data_vec_ptr(nullptr) {}
 
     /**
@@ -95,8 +106,9 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
      */
     ProcessRobotThought(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr,
                         std::vector<AgentData> *agt_vec_ptr,
-                        const std::string &id_prefix, const int &id_base_num)
-        : id_brain_map_ptr(id_brain_ptr), agt_data_vec_ptr(agt_vec_ptr), prefix(id_prefix), base_num(id_base_num) {}
+                        const std::string &id_prefix,
+                        const int &id_base_num,
+                        const std::vector<int> &disabled_ids);
 
     /**
      * @brief Overload the () operator (used to process each robot's values using BuzzForeachVM())
@@ -106,6 +118,17 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
      */
     virtual void operator()(const std::string &str_robot_id, buzzvm_t t_vm);
 
+    /**
+     * @brief Strips the string prefix in the robot ID to obtain the numeric part
+     *
+     * @param str_robot_id Robot ID
+     * @return int Numeric part of the robot ID
+     */
+    inline int GetNumericId(std::string str_robot_id)
+    {
+        return std::stoi(str_robot_id.erase(0, prefix.length()));
+    }
+
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr; ///< Pointer to unordered map containing robot IDs and corresponding Brain instances
 
     std::vector<AgentData> *agt_data_vec_ptr; ///< Pointer to vector of agent data
@@ -113,6 +136,10 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
     std::string prefix; ///< Prefix to robot ID
 
     int base_num; ///< Base number offset for robot ID
+
+    bool disabled = false; ///< Flag to activate disabling of robots
+
+    std::unordered_map<int, bool> id_disabled_status_map; ///< Map that contains the IDs that need to be disabled and whether or not they're disabled
 };
 
 /**
@@ -164,18 +191,60 @@ public:
     inline bool IsExperimentFinished() { return finished_; }
 
 private:
+    /**
+     * @brief Compute the swarm statistics
+     *
+     */
     void ComputeStats();
 
+    /**
+     * @brief Setup experiment
+     *
+     */
     void SetupExperiment();
 
+    /**
+     * @brief Create a new data packet objects
+     *
+     */
     void CreateNewPacket();
 
+    /**
+     * @brief Write data to disk
+     *
+     */
     void SaveData();
 
+    /**
+     * @brief Randomly draw robots to disable
+     *
+     */
+    void SampleRobotsToDisable();
+
+    /**
+     * @brief Collect robot estimates and confidences
+     *
+     * @return std::array<std::vector<Brain::ValuePair>, 3> STL array of 3 vector of ValuePair objects; local, social, and informed respectively
+     */
     std::array<std::vector<Brain::ValuePair>, 3> GetAllSolverValues();
 
+    /**
+     * @brief Compute the sample statistics
+     *
+     * @param input
+     * @return std::pair<Brain::ValuePair, Brain::ValuePair> STL pair containing sample statistics
+     */
     std::pair<Brain::ValuePair, Brain::ValuePair> ComputeValuePairsSampleMeanAndStdDev(const std::vector<Brain::ValuePair> &input);
 
+    /**
+     * @brief Generate a linearly spaced range of values
+     *
+     * @tparam T Any numeric type
+     * @param min Minimum value of range
+     * @param max Maximum value of range
+     * @param steps Number of increments to take in range
+     * @return std::vector<T> STL vector containing the linearly spaced values
+     */
     template <typename T>
     std::vector<T> GenerateLinspace(const T &min, const T &max, const size_t &steps);
 
@@ -189,6 +258,10 @@ private:
 
     int id_base_num_;
 
+    int disabled_time_in_ticks_; ///< Simulation time in ticks that robots are disabled
+
+    unsigned int disabled_robot_amount_; ///< Number of robots that are/should be disabled
+
     float arena_tile_size_;
 
     std::string verbose_level_;
@@ -201,6 +274,8 @@ private:
 
     std::pair<float, float> arena_lower_lim_;
 
+    std::vector<int> disabled_ids_;
+
     std::vector<std::pair<double, double>> tfr_sp_ranges_;
 
     std::vector<std::pair<double, double>>::iterator curr_tfr_sp_range_itr_;
@@ -210,6 +285,8 @@ private:
     Arena arena_; ///< Arena object
 
     CFloorEntity *floor_entity_ptr_ = NULL; ///< Pointer to the floor entity class
+
+    CSpace *space_ptr_ = NULL; ///< Pointer to the space class
 
     SimulationSet simulation_parameters_;
 

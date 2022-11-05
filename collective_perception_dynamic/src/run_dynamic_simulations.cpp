@@ -31,11 +31,19 @@ int main(int n_argc, char **ppch_argv)
          cSimulator.LoadExperiment();
 
          // Run experiments
-         while (!cSimulator.GetLoopFunctions().IsExperimentFinished())
+         while (true)
          {
-            // cSimulator.Reset();
             cSimulator.Execute();
-            cSimulator.Reset();
+
+            // Check whether to reset experiment or terminate
+            if (!cSimulator.GetLoopFunctions().IsExperimentFinished())
+            {
+               cSimulator.Reset();
+            }
+            else
+            {
+               break;
+            }
          }
          break;
       }

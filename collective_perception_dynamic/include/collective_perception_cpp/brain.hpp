@@ -158,6 +158,12 @@ public:
     void Solve();
 
     /**
+     * @brief Solve values for disabled robots
+     * This is used for robots so that dummy (negative) values can be filled
+     */
+    void Disable();
+
+    /**
      * @brief Store robot observations
      *
      * @param total_b_obs Total number of black tiles observed

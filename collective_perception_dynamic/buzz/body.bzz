@@ -19,33 +19,48 @@ function init()
         }
     )
     
-    # Set custom seed
-    math.rng.setseed(id)
+    ### Set custom seed that depends on the clock ###
+    # This has to be done so that not all the robots are set to the same clock seed:
+    #   * Default seed (i.e., clock) causes all the robots to be seeded the same, making them behave the same
+    #   * Vanilla ID custom seed (i.e., `math.rng.setseed(id)`) causes deterministic behaviors across different trials
+    # Solution: `math.rng.uniform()` is seeded by the clock, while `id` modifies the seed for the number generator used in the motion
+    # Robots now all behave differently, across different trials.
+    math.rng.setseed(id + math.rng.uniform())
 }
 
 function step()
 {
-    # while not observing obstacles, move
-    var obstacles = detect_obstacles()
-    if (not obstacles)
+    # Check whether robot is disabled
+    if (not disabled)
     {
-        # Move robot in random walk fashion
-        move()
+        # while not observing obstacles, move
+        var obstacles = detect_obstacles()
+        if (not obstacles)
+        {
+            # Move robot in random walk fashion
+            move()
 
-        # Make observation
-        observe()
+            # Make observation
+            observe()
+        }
+        else
+        {
+            # Avoid obstacles
+            avoid_obstacles(obstacles)
+        }
+
+        # Broadcast values
+        communicate_tx()
+
+        # Update values
+        update_received_messages()
     }
     else
     {
-        # Avoid obstacles
-        avoid_obstacles(obstacles)
+        gotop(0.0, 0.0) # stop robot
+        # kill listener callback function
+        neighbors.ignore("local_vals")
     }
-
-    # Broadcast values
-    communicate_tx()
-
-    # Update values
-    update_received_messages()
 }
 
 # Executed once when the robot (or the simulator) is reset.
@@ -98,6 +113,8 @@ function reset_values()
     rot_direction = nil
 
     debug_data = {.encounter = 0, .observation = 0} # stored for debugging; not used in actual computation
+
+    disabled = 0
 }
 
 # Execute robot motion
