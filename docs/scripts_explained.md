@@ -141,7 +141,6 @@ positional arguments:
     scatter             visualize scatter data
     decision            visualize collective-decision making data
 
-
 optional arguments:
   -h, --help            show this help message and exit
   -g                    flag to indicate if the path is pointing to a VisualizationDataGroup pickle file
@@ -162,7 +161,7 @@ Script help for the subcommands:
       -SP SP          single sensor probability to use in plotting time series data
       <SPECIFIC-HELP-SEE-BELOW>
     ```
-    with the static version:
+    with specific help for the static version:
     ```
       -U [U [U ...]]  communications period, communication probability, and number of agents to use in plotting time series data
     ```
@@ -173,7 +172,7 @@ Script help for the subcommands:
 
     <details><summary>Example: visualize time series plot</summary>
 
-    Suppose we are interested in seeing the time-series behavior of the robots in the dynamic simulation.
+    Suppose we are interested in seeing the time-series behavior of the robots in the dynamic simulation with a convergence threshold of 0.01.
 
     Specifically, we are interested in seeing the experiment with the following parameters:
     - homogeneous robots of `0.525` sensor probability,
@@ -197,13 +196,13 @@ Script help for the subcommands:
       -h, --help            show this help message and exit
       <SPECIFIC-HELP-SEE-BELOW>
       -rstr RSTR [RSTR ...]
-                              (optional) outer grid row labels (must match number of "ROW" arguments; unused if "-u" arguments are used)
+                            (optional) outer grid row labels (must match number of "ROW" arguments; unused if "-u" arguments are used)
       -row ROW [ROW ...]    (optional) outer grid row coordinates (unused if "-u" arguments are used)
       -cstr CSTR [CSTR ...]
-                              (optional) outer grid column labels (must match number of "COL" arguments; unused if "-u" arguments are used)
+                            (optional) outer grid column labels (must match number of "COL" arguments; unused if "-u" arguments are used)
       -col COL [COL ...]    (optional) outer grid column coordinates (unused if "-u" arguments are used)
     ```
-    with the static version:
+    with specific help for the static version:
     ```
       -u [U [U ...]]        (optional) communications period, communication probability, and number of agents to use in plotting single heatmap data
     ```
@@ -214,7 +213,21 @@ Script help for the subcommands:
 
     <details><summary>Example: visualize heatmap</summary>
 
-    WIP
+    Suppose we are interested in seeing the heatmap of the robot estimates in the static simulation with a convergence threshold of 0.01.
+
+    Specifically, we are interested in seeing the experiment with the following parameters:
+    - homogeneous robots with sensor probability ranging from `0.525` to `0.975`,
+    - environment fill ratio ranging from `0.05` to `0.95`,
+    - scale-free network,
+    - communication period ranging from `1` to `10`, and
+    - number of agents ranging from `10` to `100`.
+
+    Then the command is as follows (needs testing since repository update):
+    ```
+    $ visualize_multi_agent_data_static.py /home/user/converted_from_sf_network_ped.vdg 0.01 -gs heatmap -rstr "Num = 10" "Num = 20" "Num = 50" "Num = 100" -row 10 20 50 100 -cstr "Period = 1" "Period = 2" "Period = 5" "Period = 10" -col 1 2 5 10
+    ```
+
+    ![](img/heatmap_sta_conv10_s2000_t5.png)
 
     </details>
 
@@ -228,7 +241,7 @@ Script help for the subcommands:
       -sp SP [SP ...]     (optional) sensor probability to use in plotting scatter data (must provide single "-tfr" argument if this is not provided)
       <SPECIFIC-HELP-SEE-BELOW>
     ```
-    with the static version:
+    with specific help for the static version:
     ```
       -U [U [U ...]]      communications period, communication probability, and number of agents to use in plotting scatter data
     ```
@@ -239,7 +252,21 @@ Script help for the subcommands:
 
     <details><summary>Example: visualize scatter plot</summary>
 
-    WIP
+    Suppose we are interested in seeing the scatter plot of robot estimates in the static simulation with a convergence threshold of 0.01.
+
+    Specifically, we are interested in seeing the experiment with the following parameters:
+    - homogeneous robots with sensor probabilities `{0.525, 0.575, 0.625, ..., 0.975}`, and heterogeneous robots with uniformly distributed sensor probabilities `U(0.525, 0.975)`,
+    - environment fill ratio of `0.75`,
+    - line network,
+    - communication period of `10`, and
+    - number of agents of `100`.
+
+    Then the command is as follows:
+    ```
+    $ visualize_multi_agent_data_static.py /home/user/converted_from_line_network_ped.vdg 0.01 -gsi scatter -tfr 0.75 -U 10 1 100
+    ```
+
+    ![](img/scatter_sta_conv10_s10000_t30_tfr750_prd10_cprob1_agt100.png)
 
     </details>
 
@@ -255,7 +282,7 @@ Script help for the subcommands:
       --bins BINS          (optional) the number of bins to separate the swarm's decision (default: 2)
       --step_inc STEP_INC  (optional) the increment in simulation steps to evaluate decisions (default: 1000)
     ```
-    with the static version:
+    with specific help for the static version:
     ```
       -U U [U ...]         communications period, communication probability, and number of agents to use in plotting collective decision data
     ```
@@ -266,7 +293,22 @@ Script help for the subcommands:
 
     <details><summary>Example: visualize decision plot</summary>
 
-    WIP
+    Suppose we are interested in seeing the collective decisions of robots in the dynamic simulation.
+
+    Specifically, we are interested in seeing the experiment with the following parameters:
+    - homogeneous robots with sensor probabilities `{0.525, 0.675, 0.825, 0.975}`, and heterogeneous robots with uniformly distributed sensor probabilities `U(0.525, 0.975)`,
+    - environment fill ratio of `0.55`,
+    - robot speed of `10` cm/s, and
+    - swarm density of `1`,
+
+    with robots choosing from 10 bins at 1000 step increments.
+
+    Then the command is as follows (the heterogeneous sensor probability is encoded as the `identifier`, `min`, `max` in a negative integer; [see the paramater file for more details](parameter_file_setup.md)):
+    ```
+    $ visualize_multi_agent_data_dynamic.py /home/user/converted_from_pbs.vdg 0.01 -gsi decision -sp -205250975 0.525 0.675 0.825 0.975 -tfr 0.5 -U 10 1
+    ```
+
+    ![](img/decision_dyn_s10000_t30_tfr550_spd10_den1_bins10.png)
 
     </details>
 
