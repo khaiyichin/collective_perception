@@ -7,7 +7,7 @@ The Python scripts are used for data processing, analysis, and visualization. To
 ### Converting experiment data to visualization data
 To visualize the experiment data, they have to be converted into visualization data. In addition to pure conversion, the outputs from multiple simulation executions can be combined into a single visualization data.
 
-To visualize the data, a convergence threshold value $\delta$ must be provided; convergence is defined as the point in time when $|x^{k+1} - x^k| < \delta$ until the end of the experiment.
+To plot the visualization data, a convergence threshold value $\delta$ must be provided; convergence is defined as the point in time when $|x^{k+1} - x^k| < \delta$ until the end of the experiment.
 
 Depending on whether the output is from a static or a dynamic simulation, use `convert_*_to_viz_data_group.py` to combine and convert the data.
 * Static:
@@ -133,11 +133,14 @@ Visualize (*) multi-agent simulation data
 
 positional arguments:
   FILE                  path to folder containing serialized (**) pickle files or path to a VisualizationDataGroup pickle file (see the "g" flag)
-  CONV                  convergence threshold value  {series,heatmap,scatter,decision}
-                          commands for visualization type
-      series              visualize time series data
-      heatmap             visualize heatmap data
-      scatter             visualize scatter data    decision            visualize collective-decision making data
+  CONV                  convergence threshold value
+  {series,heatmap,scatter,decision}
+                        commands for visualization type
+    series              visualize time series data
+    heatmap             visualize heatmap data
+    scatter             visualize scatter data
+    decision            visualize collective-decision making data
+
 
 optional arguments:
   -h, --help            show this help message and exit
