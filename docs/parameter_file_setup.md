@@ -6,7 +6,7 @@ Using the template from `examples/param/param_multi_agent_sim_static.yaml`, fill
 numAgents: <INT>      # number of agents
 commsGraph:
   type: <STRING>      # communications graph type: full, line, ring, scale-free
-  commsPeriod: <INT>  # in units of steps
+  commsPeriod: <INT>  # number of steps per communication instance
   commsProb: <FLOAT>  # communication probability (only 1.0 is supported currently)
 sensorProb:           # sensor probability/accuracy range (inclusive) to simulate
   min: <FLOAT>        # min sensor probability
@@ -56,9 +56,11 @@ For the location of the `collective_perception_loop_functions` library, specify 
     <collective_perception>
 
         <!-- Number of tiles for the arena in the x and y direction -->
+        <!-- NOTE: must have equal number of tile counts -->
         <arena_tiles tile_count_x="1000" tile_count_y="1000" />
 
         <!-- Range of target fill ratios between `min` and `max` of `steps` increments -->
+        <!-- NOTE: must be between 0.0 to 1.0 -->
         <fill_ratio_range min="0.05" max="0.95" steps="19" />
 
         <!-- Range of sensor probabilities between `min` and `max` of `steps` increments if `steps is a positive integer; otherwise:
@@ -73,19 +75,27 @@ For the location of the `collective_perception_loop_functions` library, specify 
         <!-- Number of trials for a specific fill ratio and sensor probability -->
         <num_trials value="5" /> 
 
-        <!-- Robot ID and base number; must match the ones in the arena configuration; NO MODIFICATION NEEDED -->
+        <!-- Robot ID and base number; must match the ones in the arena configuration -->
+        <!-- NO MODIFICATION NEEDED -->
         <robot_id prefix="kiv" base_num="0" />
 
+        <!-- Disable n random robots at specified time in seconds; disabled robots would stop completely and retain its last values -->
+        <!-- Note: `amount` = 0 to prevent any disabling of robots -->
+        <robot_disabling amount="5" sim_clock_time="10" />
+
         <!-- Path to the output data and datetime in filename -->
+        <!-- Note: the extensions ".pbs" and ".pbad" must be retained -->
         <path folder="data"
               stats="multi_agent_sim_dynamic_stats.pbs"
               agent_data="multi_agent_sim_dynamic_agent_data.pbad"
               include_datetime="true" />
 
         <!-- Verbosity level -->
+        <!-- Options: "full", "reduced", "none" -->
         <verbosity level="reduced" />
 
         <!-- Legacy equations -->
+        <!-- Options: "true", "false" -->
         <legacy bool="false" />
 
     </collective_perception>

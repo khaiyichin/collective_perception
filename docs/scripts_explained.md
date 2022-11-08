@@ -10,7 +10,7 @@ To visualize the experiment data, they have to be converted into visualization d
 To visualize the data, a convergence threshold value $\delta$ must be provided; convergence is defined as the point in time when $|x^{k+1} - x^k| < \delta$ until the end of the experiment.
 
 Depending on whether the output is from a static or a dynamic simulation, use `convert_*_to_viz_data_group.py` to combine and convert the data.
-* Static: `convert_exp_data_to_viz_data_group.py <DIRECTORY-CONTAINING-ALL-SIMULATION-DATA> -s <CONVERTED-FILE-PATH>`
+* Static:
     ```
     usage: convert_exp_data_to_viz_data_group.py [-h] [-s S] FOLDER
 
@@ -33,7 +33,7 @@ Depending on whether the output is from a static or a dynamic simulation, use `c
       -h, --help  show this help message and exit
       -s S        path to store the pickled VisualizationDataGroupStatic object
     ```
-* Dynamic: `convert_sim_stats_set_to_viz_data_group.py <DIRECTORY-CONTAINING-ALL-SIMULATION-DATA -s <CONVERTED-FILE-PATH>`
+* Dynamic:
     ```
     usage: convert_sim_stats_set_to_viz_data_group.py [-h] [-s S] FOLDER
 
@@ -54,62 +54,99 @@ Depending on whether the output is from a static or a dynamic simulation, use `c
       -h, --help  show this help message and exit
       -s S        path to store the pickled VisualizationDataGroupDynamic object
     ```
-The conversion results in a new pickle file (containing a populated `VisualizationDataGroup` class instance).
+The conversion results in a new `.vdg` pickle file (containing a populated `VisualizationDataGroup` class instance). You can then use this file to [visualize the data](#visualizing-data).
+
+<details><summary>Example: converting static experiment data</summary>
+
+Given a directory `data` containing the following static simulation data files:
+  - `agt100_prd10_prob1.ped` = 100 agents, comms. period of 1,
+  - `agt1000_prd10_prob1.ped` = 1000 agents, comms. period of 10,
+  - `agt100_prd1_prob1.ped` = 100 agents, comms. period of 1, and
+  - `agt1000_prd1_prob1.ped` = 1000 agents, comms. period of 1,
+
+they can be combined as long as their
+  - communication network type,
+  - target fill ratio *range*,
+  - sensor probability *range*,
+  - number of steps,
+  - and number of trials,
+
+are the same. For instance, they could all have the following experimental parameters:
+  - network type = `scale-free`,
+  - target fill ratios = `{0.55, 0.95}`
+  - sensor probability range = `[0.525, 0.975]`
+  - number of steps = `10000`
+  - number of trials = `30`
+
+Then the conversion can happen as follows.
+```
+$ convert_exp_data_to_viz_data_group.py data -s /home/user/converted_from_ped.vdg
+Saved VisualizationDataGroupStatic object containing 4 items at: /home/usr/converted_from_ped.vdg.
+```
+
+</details>
+
+<details><summary> Example: converting dynamic experiment data </summary>
+
+Given a directory `data` containing dynamic simulation data files:
+  - `den1_spd10.pbs` = swarm density of 1, robot speed of 10 cm/s,
+  - `den10_spd10.pbs` = swarm density of 10, robot speed of 10 cm/s,
+
+they can be combined as long as their
+  - target fill ratio *range*,
+  - sensor probability *range*,
+  - number of steps,
+  - and number of trials,
+
+are the same. For instance, they could all have the following experimental parameters:
+  - target fill ratios = `{0.55, 0.95}`
+  - sensor probability range = `[0.525, 0.975]`
+  - number of steps = `10000`
+  - number of trials = `30`
+
+Then the conversion can happen as follows.
+```
+$ convert_sim_stats_to_viz_data_group.py data -s /home/user/converted_from_pbs.vdg
+Saved VisualizationDataGroupDynamic object containing 2 items at: /home/user/converted_from_pbs.vdg.
+```
+
+</details>
 
 >:warning: Depending on the size of the simulated experiment (i.e., simulation duration, number of agents, number of tested parameters tested in a single execution), the conversion process may take a substantial amount of time (10 minutes to 1 hour). It is recommended that you start small to gauge the required conversion time.
 
 ### Visualizing data
 You can generate 3 forms of plots using the visualization data (i.e., the converted pickle file):
 
-1. `series`: time-series plot.
-2. `heatmap`: heatmap plot.
-3. `scatter`: scatter plot.
+1. `series`: time-series plot of agent estimates, for a fixed inner parameter pair (target fill ratio and sensor probability) and a fixed outer parameter pair.
+2. `heatmap`: heatmap plot, containing average agent estimate values across for all the inner and outer parameters.
+3. `scatter`: scatter plot of agents' estimates across all trials for a fixed outer parameter pair and one fixed inner parameter (either target fill ratio or sensor probability).
+4. `decision`: collective decision plot of agents' decisions (through bins picked based on their informed estimates).
 
-Each of the 3 plot types is provided by a subcommand. Depending on whether the output is from a static or a dynamic simulation, use `visualize_multi_agent_data_*.py` to create the desired plot(s).
-- Static: `visualize_multi_agent_data_static.py <OPTIONAL-FLAGS> <VISUALIZATION-DATA> <DESIRED-CONVERGENCE-THRESHOLD> <SUBCOMMANDS>`
-    ```
-    usage: visualize_multi_agent_data_static.py [-h] [-g] [-a] [-i] [-s] FILE CONV {series,heatmap,scatter} ...
+**Each of the 4 plot types is provided by a subcommand (required argument)**. Depending on whether the output is from a static or a dynamic simulation, use `visualize_multi_agent_data_*.py` to create the desired plot(s).
 
-    Visualize static multi-agent simulation data
+The static and dynamic visualization scripts are only different when it comes to subcommand usage. Both have the same help message for the main command (with (*) denoting `static`/`dynamic` and (**) denoting `ExperimentData pickle`/`SimulationStatsSet protobuf`):
 
-    positional arguments:
-      FILE                  path to folder containing serialized ExperimentData pickle files or path to a VisualizationDataGroup pickle file (see the "g" flag)
-      CONV                  convergence threshold value
-      {series,heatmap,scatter}
-                              commands for visualization type
-          series              visualize time series data
-          heatmap             visualize heatmap data
-          scatter             visualize scatter data
+```
+usage: visualize_multi_agent_data_(*).py [-h] [-g] [-a] [-i] [-s] [--steps STEPS] FILE CONV {series,heatmap,scatter,decision} ...
 
-    optional arguments:
-      -h, --help            show this help message and exit
-      -g                    flag to indicate if the path is pointing to a VisualizationDataGroup pickle file
-      -a                    flag to use aggregate data instead of data from individual trials (exclusive with the "-i" flag)
-      -i                    flag to show individual agent data (only used for time series and scatter plot data with the "-U" flag; exclusive with the "-a" flag)
-      -s                    flag to show the plots
-    ```
-- Dynamic: `visualize_multi_agent_data_dynamic.py <OPTIONAL-FLAGS> <VISUALIZATION-DATA> <DESIRED-CONVERGENCE-THRESHOLD> <SUBCOMMANDS>`
-    ```
-    usage: visualize_multi_agent_data_dynamic.py [-h] [-g] [-a] [-i] [-s] FILE CONV {series,heatmap,scatter} ...
+Visualize (*) multi-agent simulation data
 
-    Visualize dynamic multi-agent simulation data
+positional arguments:
+  FILE                  path to folder containing serialized (**) pickle files or path to a VisualizationDataGroup pickle file (see the "g" flag)
+  CONV                  convergence threshold value  {series,heatmap,scatter,decision}
+                          commands for visualization type
+      series              visualize time series data
+      heatmap             visualize heatmap data
+      scatter             visualize scatter data    decision            visualize collective-decision making data
 
-    positional arguments:
-    FILE                  path to folder containing serialized SimulationStatsSet protobuf files or path to a VisualizationDataGroup pickle file (see the "g" flag)
-    CONV                  convergence threshold value
-    {series,heatmap,scatter}
-                            commands for visualization type
-        series              visualize time series data
-        heatmap             visualize heatmap data
-        scatter             visualize scatter data
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      -g                    flag to indicate if the path is pointing to a VisualizationDataGroup pickle file
-      -a                    flag to use aggregate data instead of data from individual trials (exclusive with the "-i" flag)
-      -i                    flag to show individual agent data (only used for time series and scatter plot data with the "-U" flag; exclusive with the "-a" flag)
-      -s                    flag to show the plots
-    ```
+optional arguments:
+  -h, --help            show this help message and exit
+  -g                    flag to indicate if the path is pointing to a VisualizationDataGroup pickle file
+  -a                    flag to use aggregate data instead of data from individual trials (exclusive with the "-i" flag)
+  -i                    flag to show individual agent data (only used for time series and scatter plot data with the "-U" flag; exclusive with the "-a" flag)
+  -s                    flag to show the plots
+  --steps STEPS         first n simulation steps to evaluate to (default: evaluate from start to end of simulation)
+```
 
 Script help for the subcommands:
 - `series` general usage:
@@ -130,6 +167,25 @@ Script help for the subcommands:
     ```
       -U [U [U ...]]  robot speed and swarm density to use in plotting time series data
     ```
+
+    <details><summary>Example: visualize time series plot</summary>
+
+    Suppose we are interested in seeing the time-series behavior of the robots in the dynamic simulation.
+
+    Specifically, we are interested in seeing the experiment with the following parameters:
+    - homogeneous robots of `0.525` sensor probability,
+    - environment fill ratio of `0.05`,
+    - robot speed of `10` cm/s, and
+    - swarm density of `1`.
+
+    Then the command is as follows:
+    ```
+    $ visualize_multi_agent_data_dynamic.py /home/user/converted_from_pbs.vdg 0.01 -gsi series -TFR 0.05 -SP 0.525 -U 10 1
+    ```
+    This will only create figures for viewing without saving (you have to save them manually).
+
+    </details>
+
 - `heatmap` general usage:
     ```
     usage: visualize_multi_agent_data_*.py FILE CONV heatmap [-h] [-u [U [U ...]]] [-rstr RSTR [RSTR ...]] [-row ROW [ROW ...]] [-cstr CSTR [CSTR ...]] [-col COL [COL ...]]
@@ -152,6 +208,13 @@ Script help for the subcommands:
     ```
       -u [U [U ...]]        (optional) robot speed and swarm density to use in plotting single heatmap data
     ```
+
+    <details><summary>Example: visualize heatmap</summary>
+
+    WIP
+
+    </details>
+
 - `scatter` general usage:
     ```
     usage: visualize_multi_agent_data_*.py FILE CONV scatter [-h] [-tfr TFR [TFR ...]] [-sp SP [SP ...]] -U [U [U ...]]
@@ -170,6 +233,39 @@ Script help for the subcommands:
     ```
       -U [U [U ...]]      robot speed and swarm density to use in plotting scatter data
     ```
+
+    <details><summary>Example: visualize scatter plot</summary>
+
+    WIP
+
+    </details>
+
+- `decision` general usage:
+    ```
+    usage: visualize_multi_agent_data_dynamic.py FILE CONV decision [-h] -TFR TFR [-sp SP [SP ...]] -U U [U ...] [--bins BINS] [--step_inc STEP_INC]
+
+    optional arguments:
+      -h, --help           show this help message and exit
+      -TFR TFR             single target fill ratio to use in plotting collective decision data
+      -sp SP [SP ...]      (optional) sensor probability to use in plotting collective decision data
+      <SPECIFIC-HELP-SEE-BELOW>
+      --bins BINS          (optional) the number of bins to separate the swarm's decision (default: 2)
+      --step_inc STEP_INC  (optional) the increment in simulation steps to evaluate decisions (default: 1000)
+    ```
+    with the static version:
+    ```
+      -U U [U ...]         communications period, communication probability, and number of agents to use in plotting collective decision data
+    ```
+    and the dynamic version:
+    ```
+      -U U [U ...]         robot speed and swarm density to use in plotting collective decision data
+    ```
+
+    <details><summary>Example: visualize decision plot</summary>
+
+    WIP
+
+    </details>
 
 ### Obtaining serialized data information
 `serial_data_info.py` displays information about a serialized pickle file. (TODO: currently only supports static simulation experiment outputs, i.e., pickled `ExperimentData` files):

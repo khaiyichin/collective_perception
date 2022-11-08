@@ -1,6 +1,6 @@
 # Collective Perception with Imperfect Sensors
 ## Introduction
-This repository provides the code to simulate collective perception experiments shown in [Collective Perception with Imperfect Sensors (work-in-progress)]().
+This repository provides the code to simulate collective perception experiments shown in [Collective Perception with Imperfect Sensors (ICRA 2023 submission pre-print)](https://arxiv.org/abs/2209.12858).
 
 Two simulators are provided here:
 1. Python-based static topology simulator `collective_perception_static`, and
@@ -30,7 +30,7 @@ The robots in the dynamic topology simulator move around a square arena of black
 
 ## Installation
 ### Local build
-The following instructions were tested on Ubuntu 20.04 LTS Focal Fossa. It's likely they would work on MacOS and Windows with some modification.
+The following instructions were tested on Ubuntu 20.04 LTS Focal Fossa. They may work on MacOS and Windows with some modification.
 1. Ensure that all requirements are satisfied.
 2. Clone the repository and go to the root directory.
     ```
