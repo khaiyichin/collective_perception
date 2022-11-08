@@ -227,7 +227,7 @@ Script help for the subcommands:
     $ visualize_multi_agent_data_static.py /home/user/converted_from_sf_network_ped.vdg 0.01 -gs heatmap -rstr "Num = 10" "Num = 20" "Num = 50" "Num = 100" -row 10 20 50 100 -cstr "Period = 1" "Period = 2" "Period = 5" "Period = 10" -col 1 2 5 10
     ```
 
-    ![](img/heatmap_sta_conv10_s2000_t5.png)
+    <img src="img/heatmap_sta_conv10_s2000_t5.png" width="1000" />
 
     </details>
 
@@ -266,7 +266,7 @@ Script help for the subcommands:
     $ visualize_multi_agent_data_static.py /home/user/converted_from_line_network_ped.vdg 0.01 -gsi scatter -tfr 0.75 -U 10 1 100
     ```
 
-    ![](img/scatter_sta_conv10_s10000_t30_tfr750_prd10_cprob1_agt100.png)
+    <img src="img/scatter_sta_conv10_s10000_t30_tfr750_prd10_cprob1_agt100.png" width="1000" />
 
     </details>
 
@@ -308,7 +308,7 @@ Script help for the subcommands:
     $ visualize_multi_agent_data_dynamic.py /home/user/converted_from_pbs.vdg 0.01 -gsi decision -sp -205250975 0.525 0.675 0.825 0.975 -tfr 0.5 -U 10 1
     ```
 
-    ![](img/decision_dyn_s10000_t30_tfr550_spd10_den1_bins10.png)
+    <img src="img/decision_dyn_s10000_t30_tfr550_spd10_den1_bins10.png" width="1000" />
 
     </details>
 
