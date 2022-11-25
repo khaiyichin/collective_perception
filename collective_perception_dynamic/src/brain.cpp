@@ -128,4 +128,7 @@ void Brain::Disable()
 
     // Clear the log of neighboring values
     StoreNeighborValuePairs(std::vector<Brain::ValuePair>{});
+
+    // Set disabled status
+    disabled_ = true;
 }

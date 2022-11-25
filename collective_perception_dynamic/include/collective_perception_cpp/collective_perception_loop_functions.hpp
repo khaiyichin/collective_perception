@@ -24,6 +24,7 @@
 #include "simulation_set.hpp"
 #include "simulation_stats_set.hpp"
 #include "simulation_agent_data_set.hpp"
+#include "dac_plugin.hpp"
 
 using namespace argos;
 
@@ -222,6 +223,13 @@ private:
     void SampleRobotsToDisable();
 
     /**
+     * @brief Get the current time in string
+     *
+     * @return std::string in mmddyy_HHMMSS form
+     */
+    std::string GetCurrentTimeStr();
+
+    /**
      * @brief Collect robot estimates and confidences
      *
      * @return std::array<std::vector<Brain::ValuePair>, 3> STL array of 3 vector of ValuePair objects; local, social, and informed respectively
@@ -248,17 +256,21 @@ private:
     template <typename T>
     std::vector<T> GenerateLinspace(const T &min, const T &max, const size_t &steps);
 
-    bool finished_ = false;
+    bool finished_ = false; ///< Flag to indicate whether all simulation parameters have been executed
 
-    bool legacy_;
+    bool legacy_; ///< Flag to activate usage of legacy social estimate computation
 
-    bool proto_datetime_;
+    bool proto_datetime_; ///< Flag to enable datetime in output data filename
 
-    int trial_counter_ = 0;
+    bool run_dac_plugin_; ///< Flag to enable usage of the DAC plugin
+
+    int trial_counter_ = 0; ///< Counter to keep track of trials
 
     int id_base_num_;
 
     int disabled_time_in_ticks_; ///< Simulation time in ticks that robots are disabled
+
+    int dac_plugin_write_period_in_ticks_; ///< Write period to DAC-SysML CSV file in ticks
 
     unsigned int disabled_robot_amount_; ///< Number of robots that are/should be disabled
 
@@ -283,6 +295,8 @@ private:
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr_ = std::make_shared<RobotIdBrainMap>(); ///< Pointer to unordered map containing robot IDs and Brain instances
 
     Arena arena_; ///< Arena object
+
+    DACPlugin dac_plugin_; ///< DAC plugin object
 
     CFloorEntity *floor_entity_ptr_ = NULL; ///< Pointer to the floor entity class
 

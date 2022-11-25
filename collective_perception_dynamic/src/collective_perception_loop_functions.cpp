@@ -254,12 +254,12 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
 
 void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 {
-    // Call parent's Init
-    CBuzzLoopFunctions::Init(t_tree);
-
     // Extract XML information
     try
     {
+        // Call parent's Init
+        CBuzzLoopFunctions::Init(t_tree);
+
         // Grab the reference to the XML node with the tag "collective_perception"
         TConfigurationNode &col_per_root_node = GetNode(t_tree, "collective_perception");
 
@@ -433,7 +433,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(robot_id_node, "base_num", id_base_num_);
 
         // Grab number of robots to terminate, if any
-        double disabled_time_in_sec;
+        float disabled_time_in_sec;
 
         TConfigurationNode &disable_node = GetNode(col_per_root_node, "robot_disabling");
 
@@ -452,7 +452,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         else
         {
             // Compute disabled_time in ticks
-            double ticks_per_sec;
+            float ticks_per_sec;
 
             TConfigurationNode &framework_experiment_node = GetNode(GetNode(GetSimulator().GetConfigurationRoot(), "framework"), "experiment");
             GetNodeAttribute(framework_experiment_node, "ticks_per_second", ticks_per_sec);
@@ -473,6 +473,32 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         // Populate simulation parameters for SimulationStatsSet and SimulationAgentDataSet objects
         sim_stats_set_.PopulateSimulationSetParams(simulation_parameters_);
         sim_agent_data_set_.PopulateSimulationSetParams(simulation_parameters_);
+
+        // Grab DAC plugin parameters
+        TConfigurationNode &dac_node = GetNode(col_per_root_node, "dac_plugin");
+        GetNodeAttribute(dac_node, "activate", run_dac_plugin_);
+        if (run_dac_plugin_)
+        {
+            unsigned int num_bins, density;
+            float area, range, speed, dac_plugin_write_period, ticks_per_sec;
+            std::string path;
+
+            TConfigurationNode &param_node = GetNode(dac_node, "param");
+            GetNodeAttribute(param_node, "num_bins", num_bins);
+            GetNodeAttribute(param_node, "write_period", dac_plugin_write_period);
+            GetNodeAttribute(param_node, "csv_path", path);
+            dac_plugin_ = DACPlugin(num_bins,
+                                    simulation_parameters_.num_agents_,
+                                    simulation_parameters_.density_,
+                                    constrained_area,
+                                    simulation_parameters_.comms_range_,
+                                    simulation_parameters_.speed_,
+                                    path);
+
+            TConfigurationNode &framework_experiment_node = GetNode(GetNode(GetSimulator().GetConfigurationRoot(), "framework"), "experiment");
+            GetNodeAttribute(framework_experiment_node, "ticks_per_second", ticks_per_sec);
+            dac_plugin_write_period_in_ticks_ = static_cast<int>(std::floor(dac_plugin_write_period * ticks_per_sec));
+        }
 
         if (verbose_level_ == "full" || verbose_level_ == "reduced")
         {
@@ -503,6 +529,16 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
     // Create Packet to store data
     CreateNewPacket();
+
+    // Write new stats for next parameter set
+    if (run_dac_plugin_)
+    {
+        dac_plugin_.UpdateCurrentExperimentParams(curr_tfr_sp_range_itr_->first, curr_tfr_sp_range_itr_->second);
+
+        dac_plugin_.WriteCurrentExperimentStats(GetCurrentTimeStr(), false);
+
+        dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), true);
+    }
 
     // Setup experiment
     SetupExperiment();
@@ -586,6 +622,17 @@ void CollectivePerceptionLoopFunctions::PostStep()
         space_ptr_->GetSimulationClock() >= disabled_time_in_ticks_ - 1) // the appropriate disabling time has come (because it's post step so we need one step prior)
     {
         process_thought_functor_.disabled = true;
+    }
+
+    // Execute DAC plugin operations
+    if (run_dac_plugin_)
+    {
+        if (dac_plugin_write_period_in_ticks_ > 0 && space_ptr_->GetSimulationClock() % dac_plugin_write_period_in_ticks_ == 0)
+        {
+            dac_plugin_.ComputeFractionOfCorrectDecisions(id_brain_map_ptr_);
+
+            dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), false);
+        }
     }
 }
 
@@ -714,6 +761,14 @@ std::pair<Brain::ValuePair, Brain::ValuePair> CollectivePerceptionLoopFunctions:
 
 void CollectivePerceptionLoopFunctions::PostExperiment()
 {
+    // Write final trial stats
+    if (run_dac_plugin_ && dac_plugin_write_period_in_ticks_ < 0)
+    {
+        dac_plugin_.ComputeFractionOfCorrectDecisions(id_brain_map_ptr_);
+
+        dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), false);
+    }
+
     // Check to see if all trials are complete
     if (++trial_counter_ % simulation_parameters_.num_trials_ == 0) // all trials for current param set is done
     {
@@ -738,6 +793,16 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
 
             // Create Packet to store data
             CreateNewPacket();
+
+            // Write new stats for next parameter set
+            if (run_dac_plugin_)
+            {
+                dac_plugin_.UpdateCurrentExperimentParams(curr_tfr_sp_range_itr_->first, curr_tfr_sp_range_itr_->second);
+
+                dac_plugin_.WriteCurrentExperimentStats(GetCurrentTimeStr(), false); // experiments are not done, so false flag
+
+                dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), true); // trials are done, so true flag
+            }
         }
         else // no more parameter sets
         {
@@ -748,6 +813,12 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
 
             SaveData();
 
+            // Finalize writing
+            if (run_dac_plugin_)
+            {
+                dac_plugin_.WriteCurrentExperimentStats(GetCurrentTimeStr(), true);
+            }
+
             finished_ = true;
         }
     }
@@ -757,6 +828,12 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
         if (verbose_level_ == "full")
         {
             LOG << "[INFO] Running trial " << trial_counter_ + 1 << " with same parameters." << std::endl;
+        }
+
+        // Write new stats for next trial (with same parameter set)
+        if (run_dac_plugin_)
+        {
+            dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), true);
         }
     }
 }
@@ -803,15 +880,7 @@ void CollectivePerceptionLoopFunctions::SaveData()
     if (proto_datetime_)
     {
         // Get current time in string form
-        time_t curr_time;
-        time(&curr_time);
-        tm *curr_tm = localtime(&curr_time);
-
-        std::string datetime_str;
-        datetime_str.resize(100);
-
-        strftime(&(datetime_str[0]), datetime_str.size(), "%m%d%y_%H%M%S", curr_tm);
-        datetime_str = std::string(datetime_str.c_str());
+        std::string datetime_str = GetCurrentTimeStr();
 
         // Strip extension from filename
         std::pair<std::string, std::string> name_ext_pair_stats, name_ext_pair_agent_data;
@@ -843,6 +912,21 @@ void CollectivePerceptionLoopFunctions::SaveData()
     WriteProtoToDisk(sim_agent_data_set_proto_msg, output_file_agent_data);
 
     google::protobuf::ShutdownProtobufLibrary();
+}
+
+std::string CollectivePerceptionLoopFunctions::GetCurrentTimeStr()
+{
+    // Grab current local time
+    time_t curr_time;
+    time(&curr_time);
+    tm *curr_tm = localtime(&curr_time);
+
+    std::string datetime;
+    datetime.resize(100);
+
+    // Convert to string
+    strftime(&(datetime[0]), datetime.size(), "%m%d%y_%H%M%S", curr_tm);
+    return std::string(datetime.c_str());
 }
 
 void CollectivePerceptionLoopFunctions::SampleRobotsToDisable()

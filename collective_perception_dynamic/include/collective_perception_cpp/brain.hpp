@@ -182,8 +182,18 @@ public:
      */
     void StoreNeighborValuePairs(const std::vector<ValuePair> &value_pair_vec) { neighbors_value_pairs_ = value_pair_vec; }
 
+    /**
+     * @brief Check if brain instance is disabled
+     *
+     * @return true
+     * @return false
+     */
+    inline bool IsDisabled() { return disabled_; }
+
 private:
     bool legacy_; ///< legacy solver mode @todo may be removed in the future
+
+    bool disabled_ = false; ///< Flag to indicate whether current brain is disabled
 
     std::string id_; ///< Robot ID
 

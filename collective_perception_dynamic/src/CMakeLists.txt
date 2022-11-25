@@ -33,6 +33,7 @@ add_library(collective_perception_loop_functions
     collective_perception_loop_functions.cpp
     arena.cpp
     brain.cpp
+    dac_plugin.cpp
 )
 target_link_libraries(collective_perception_loop_functions
     PUBLIC

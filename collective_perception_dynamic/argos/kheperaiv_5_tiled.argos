@@ -113,10 +113,19 @@
             <speed value="10.0" /> <!-- in units of cm/s -->
             <num_trials value="3" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <robot_id prefix="kiv" base_num="0" /> <!-- must match the ones in the arena configuration -->
-            <robot_disabling amount="5" sim_clock_time="10" />  <!-- randomly disable n robots at specified time in seconds -->
+            <robot_disabling amount="5" sim_clock_time="51" /> <!-- randomly disable n robots at specified time in seconds -->
             <path folder="data" stats="multi_agent_sim_dynamic_stats.pbs" agent_data="multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
             <verbosity level="full" /> <!-- "full", "reduced", "none" -->
-            <legacy bool="false" /> <!-- flag to use legacy social and informed equations -->
+            <legacy bool="false" /> <!-- flag to use legacy social equations -->
+            <dac_plugin activate="true">
+                <!-- flag to use the DAC plugin -->
+                <!--
+                    num_bins: number of bins to partition the fill ratio
+                    write_period: csv file writing period in seconds; use -1 if only write once at the end of each trial
+                    csv_path: path to csv file
+                -->
+                <param num_bins="5" write_period="50" csv_path="/home/khaiyichin/test.csv" />
+            </dac_plugin>
         </collective_perception>
     </loop_functions>
 
@@ -177,7 +186,7 @@
             <!-- <position method="uniform" min="-1.290717695633861,-1.290717695633861,0" max="1.290717695633861,1.290717695633861,0" /> -->
             <position method="uniform" min="-0.9273198961208501,-0.9273198961208501,0" max="0.9273198961208501,0.9273198961208501,0" />
             <orientation method="uniform" min="0,0,0" max="360,0,0" />
-            <entity quantity="6" max_trials="100" base_num="0">
+            <entity quantity="11" max_trials="100" base_num="0">
                 <kheperaiv id="kiv" rab_data_size="50" rab_range="0.7">
                     <controller config="bck" />
                 </kheperaiv>
@@ -231,13 +240,13 @@
       $ argos3 -q visualizations
   -->
     <visualization>
-        <qt-opengl>
+        <!-- <qt-opengl>
             <camera>
                 <placements>
                     <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="35" />
                 </placements>
             </camera>
-        </qt-opengl>
+        </qt-opengl> -->
     </visualization>
 
 </argos-configuration>
