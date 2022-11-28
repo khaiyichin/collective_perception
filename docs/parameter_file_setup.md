@@ -98,6 +98,17 @@ For the location of the `collective_perception_loop_functions` library, specify 
         <!-- Options: "true", "false" -->
         <legacy bool="false" />
 
+        <!-- DAC plugin usage: writes to a CSV file that acts as an interface -->
+        <!-- Options: "true", "false" -->
+        <dac_plugin activate="false">
+            <!--
+                num_bins: number of bins to partition the fill ratio; e.g., num_bins=2 means the robots choose between 2 bins, f<0.5 or f >0.5.
+                write_period: csv file writing period in seconds; use -1 if only write once at the end of each trial
+                csv_path: path to csv file
+            -->
+            <param num_bins="2" write_period="10" csv_path="/home/khaiyichin/test.csv" />
+        </dac_plugin>
+
     </collective_perception>
 
 </loop_functions>
