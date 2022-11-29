@@ -49,7 +49,7 @@ The location of the `body.*` bytecode files depends on where you execute the sim
 ```
 
 ### Loop functions
-For the location of the `collective_perception_loop_functions` library, specify them as you would the Buzz bytecode files: an absolute path for the local build, `/collective_perception/collective_perception_dynamic/build/...` for the container. The rest of the parameters are explained in the snippet below.
+For the location of the `collective_perception_loop_functions` library, specify them as you would the Buzz bytecode files: an absolute path for the local build, `/collective_perception/collective_perception_dynamic/build/...` for the container. The rest of the parameters are explained in the snippet below. For further information on the DAC plugin, see [here](dac_plugin_explained.md)
 ```xml
 <loop_functions library="/collective_perception/collective_perception_dynamic/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
 
@@ -113,7 +113,7 @@ For the location of the `collective_perception_loop_functions` library, specify 
 
 </loop_functions>
 ```
-Note: it is advised that the extensions `.pbs` and `.pbad` be used for the `stats` and `agent_data` files respectively.
+**Note: it is advised that the extensions `.pbs` and `.pbad` be used for the `stats` and `agent_data` files respectively.**
 
 ### Arena size and swarm density
 The arena size can be modified as explained in the official ARGoS documentation. The effect it has on the generated tile size is described by the equation `arena_size_*/arena_tile_count_*` for both the x and y directions.

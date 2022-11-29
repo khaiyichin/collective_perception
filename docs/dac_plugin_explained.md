@@ -1,11 +1,11 @@
 # Interacting with the DAC plugin CSV file interface
 
 ## Overview
-To collect live simulation statistics, the DAC plugin can be activated, though this will likely slow the simulation down slightly. Instructions on how to fill the `.argos` parameter file is detailed [here](docs/parameter_file_setup.md).
+To collect live simulation statistics, the DAC plugin can be activated, though this will likely slow the simulation down slightly. Instructions on how to activate it in the `.argos` parameter file is detailed [here](parameter_file_setup.md).
 
 By activating it in the `.argos` file, a `.csv` file will be created. You will be able to choose the path of the `.csv` file and how often it's being written to.
 
-The file acts as an interface/log for the ARGoS simulation that you can read from. Presently, the only statistics output are
+The file acts as an interface/log for the ARGoS simulation that you can read from. Presently, the only (running) statistics output are
 * the number of active robots at log time,
 * the number of disabled robots at log time, and
 * the fraction of correct decisions made by the active robots at log time.
@@ -50,7 +50,7 @@ An example of the `.csv` file would look like the following if opened in a text 
 112822_165858,experimentcomplete
 ```
 The same file would look like the following if you opened it in MS Excel or Google Sheets:
-| | | | | |
+||||||
 | --- | --- | --- | --- | --- |
 | 112822_165852 | experimentstats |
 |  | range | 0.700000 |
@@ -93,6 +93,6 @@ The same file would look like the following if you opened it in MS Excel or Goog
     * The row with `trialindex` marks a new trial. All trial statistics after the current row belong to the current trial, until another row with `trialindex` is printed.
     * The row with `trialstats` marks the section where the trial statistics are printed in the rows immediately following it.
     * The row with `experimentcomplete` marks the end of the entire simulated experiment.
-* The 3rd column is the place where the values for the second column (if applicable) is printed.
+* The 3rd column is the place where the values for the 2nd column (if applicable) is printed.
 * The 4th column is reserved for additional parameters related to the parameter in the 2nd column of the same row, if applicable.
 * The 5th column is the place where the values for the 4th column (if applicable) is printed.
