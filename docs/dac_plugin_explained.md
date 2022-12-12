@@ -14,78 +14,172 @@ Note that the fraction of correct decisions is affected by the `num_bins` argume
 ## Description
 An example of the `.csv` file would look like the following if opened in a text editor:
 ```
-112822_165852,experimentstats
+121222_075629,experimentstats
 ,range,0.700000
 ,speed,10.000000
 ,density,5.500000,area,3.078761
 ,robots,11
 ,fillratio,0.950000
 ,sensorprob,0.525000
-112822_165852,trialindex,0
-112822_165853,trialstats
+121222_075629,trialindex,0
+121222_075631,trialstats
+,simseconds,50
 ,active,11
 ,disabled,0
-,fractioncorrectdecisions,0.000000
-112822_165854,trialstats
+,fractioncorrectdecisions,0.636364
+121222_075632,trialstats
+,simseconds,100
+,active,6
+,disabled,5
+,fractioncorrectdecisions,0.333333
+121222_075632,trialindex,1
+121222_075633,trialstats
+,simseconds,50
+,active,11
+,disabled,0
+,fractioncorrectdecisions,0.363636
+121222_075635,trialstats
+,simseconds,100
 ,active,6
 ,disabled,5
 ,fractioncorrectdecisions,0.500000
-112822_165855,trialstats
-,active,6
-,disabled,5
-,fractioncorrectdecisions,0.166667
-112822_165855,trialindex,1
-112822_165856,trialstats
+121222_075635,trialindex,2
+121222_075636,trialstats
+,simseconds,50
 ,active,11
 ,disabled,0
-,fractioncorrectdecisions,0.454545
-112822_165857,trialstats
+,fractioncorrectdecisions,0.363636
+121222_075638,trialstats
+,simseconds,100
 ,active,6
 ,disabled,5
 ,fractioncorrectdecisions,1.000000
-112822_165858,trialstats
+121222_075638,experimentstats
+,range,0.700000
+,speed,10.000000
+,density,5.500000,area,3.078761
+,robots,11
+,fillratio,0.950000
+,sensorprob,0.975000
+121222_075638,trialindex,0
+121222_075640,trialstats
+,simseconds,50
+,active,11
+,disabled,0
+,fractioncorrectdecisions,1.000000
+121222_075642,trialstats
+,simseconds,100
 ,active,6
 ,disabled,5
 ,fractioncorrectdecisions,1.000000
-112822_165858,experimentcomplete
+121222_075642,trialindex,1
+121222_075645,trialstats
+,simseconds,50
+,active,11
+,disabled,0
+,fractioncorrectdecisions,1.000000
+121222_075646,trialstats
+,simseconds,100
+,active,6
+,disabled,5
+,fractioncorrectdecisions,1.000000
+121222_075646,trialindex,2
+121222_075648,trialstats
+,simseconds,50
+,active,11
+,disabled,0
+,fractioncorrectdecisions,1.000000
+121222_075650,trialstats
+,simseconds,100
+,active,6
+,disabled,5
+,fractioncorrectdecisions,1.000000
+121222_075650,experimentcomplete
 ```
 The same file would look like the following if you opened it in MS Excel or Google Sheets:
 ||||||
 | --- | --- | --- | --- | --- |
-| 112822_165852 | experimentstats |
+| 121222_075629 | experimentstats |
 |  | range | 0.700000 |
 |  | speed | 10.000000 |
 |  | density | 5.500000 | area | 3.078761 |
 |  | robots | 11 |
 |  | fillratio | 0.950000 |
 |  | sensorprob | 0.525000 |
-| 112822_165852 | trialindex | 0 |
-| 112822_165853 | trialstats |
+| 121222_075629 | trialindex | 0 |
+| 121222_075631 | trialstats |
+|  | simseconds | 50 |
 |  | active | 11 |
 |  | disabled | 0 |
-|  | fractioncorrectdecisions | 0.000000 |
-| 112822_165854 | trialstats |
+|  | fractioncorrectdecisions | 0.636364 |
+| 121222_075632 | trialstats |
+|  | simseconds | 100 |
+|  | active | 6 |
+|  | disabled | 5 |
+|  | fractioncorrectdecisions | 0.333333 |
+| 121222_075632 | trialindex | 1 |
+| 121222_075633 | trialstats |
+|  | simseconds | 50 |
+|  | active | 11 |
+|  | disabled | 0 |
+|  | fractioncorrectdecisions | 0.363636 |
+| 121222_075635 | trialstats |
+|  | simseconds | 100 |
 |  | active | 6 |
 |  | disabled | 5 |
 |  | fractioncorrectdecisions | 0.500000 |
-| 112822_165855 | trialstats |
-|  | active | 6 |
-|  | disabled | 5 |
-|  | fractioncorrectdecisions | 0.166667 |
-| 112822_165855 | trialindex | 1 |
-| 112822_165856 | trialstats |
+| 121222_075635 | trialindex | 2 |
+| 121222_075636 | trialstats |
+|  | simseconds | 50 |
 |  | active | 11 |
 |  | disabled | 0 |
-|  | fractioncorrectdecisions | 0.454545 |
-| 112822_165857 | trialstats |
+|  | fractioncorrectdecisions | 0.363636 |
+| 121222_075638 | trialstats |
+|  | simseconds | 100 |
 |  | active | 6 |
 |  | disabled | 5 |
 |  | fractioncorrectdecisions | 1.000000 |
-| 112822_165858 | trialstats |
+| 121222_075638 | experimentstats |
+|  | range | 0.700000 |
+|  | speed | 10.000000 |
+|  | density | 5.500000 | area | 3.078761 |
+|  | robots | 11 |
+|  | fillratio | 0.950000 |
+|  | sensorprob | 0.975000 |
+| 121222_075638 | trialindex | 0 |
+| 121222_075640 | trialstats |
+|  | simseconds | 50 |
+|  | active | 11 |
+|  | disabled | 0 |
+|  | fractioncorrectdecisions | 1.000000 |
+| 121222_075642 | trialstats |
+|  | simseconds | 100 |
 |  | active | 6 |
 |  | disabled | 5 |
 |  | fractioncorrectdecisions | 1.000000 |
-| 112822_165858 | experimentcomplete |
+| 121222_075642 | trialindex | 1 |
+| 121222_075645 | trialstats |
+|  | simseconds | 50 |
+|  | active | 11 |
+|  | disabled | 0 |
+|  | fractioncorrectdecisions | 1.000000 |
+| 121222_075646 | trialstats |
+|  | simseconds | 100 |
+|  | active | 6 |
+|  | disabled | 5 |
+|  | fractioncorrectdecisions | 1.000000 |
+| 121222_075646 | trialindex | 2 |
+| 121222_075648 | trialstats |
+|  | simseconds | 50 |
+|  | active | 11 |
+|  | disabled | 0 |
+|  | fractioncorrectdecisions | 1.000000 |
+| 121222_075650 | trialstats |
+|  | simseconds | 100 |
+|  | active | 6 |
+|  | disabled | 5 |
+|  | fractioncorrectdecisions | 1.000000 |
+| 121222_075650 | experimentcomplete |
 
 * The 1st column is reserved for the timestamp in `monthdayyear_HOURMINUTESECOND` form.
 * The 2nd column is the place where you want to keep track of:
