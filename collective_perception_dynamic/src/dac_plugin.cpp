@@ -65,7 +65,7 @@ unsigned int DACPlugin::ConvertInformedEstimateToDecision(const float &est)
     return static_cast<int>(scaled_est / divisor) / scaling_factor_;
 }
 
-void DACPlugin::WriteCurrentTrialStats(const std::string &current_time_str, const bool &initialize)
+void DACPlugin::WriteCurrentTrialStats(const std::string &current_time_str, const bool &initialize, const unsigned int &sim_time_sec)
 {
     std::string line_to_write = current_time_str;
 
@@ -77,6 +77,7 @@ void DACPlugin::WriteCurrentTrialStats(const std::string &current_time_str, cons
     {
         // Write regular stat lines
         line_to_write += ",trialstats";
+        line_to_write += "\n,simseconds," + std::to_string(sim_time_sec);
         line_to_write += "\n,active," + std::to_string(current_active_robots_);
         line_to_write += "\n,disabled," + std::to_string(current_disabled_robots_);
         line_to_write += "\n,fractioncorrectdecisions," + std::to_string(current_fraction_correct_decisions_);

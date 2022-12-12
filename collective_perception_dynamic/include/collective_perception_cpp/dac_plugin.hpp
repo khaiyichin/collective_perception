@@ -58,8 +58,9 @@ public:
      *
      * @param current_time_str Current datetime in string
      * @param initialize Flag to indicate whether to write initial trial statistics
+     * @param sim_time_sec Current simulation time in seconds
      */
-    void WriteCurrentTrialStats(const std::string &current_time_str, const bool &initialize);
+    void WriteCurrentTrialStats(const std::string &current_time_str, const bool &initialize, const unsigned int &sim_time_sec);
 
     /**
      * @brief Write current experiment statistics to the CSV file

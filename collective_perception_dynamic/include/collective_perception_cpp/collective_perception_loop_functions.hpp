@@ -274,17 +274,19 @@ private:
 
     unsigned int disabled_robot_amount_; ///< Number of robots that are/should be disabled
 
-    float arena_tile_size_;
+    float arena_tile_size_; ///< Size of an arena tile (value is length, since the tile is square)
 
-    std::string verbose_level_;
+    float ticks_per_sec_; ///< Number of ticks in one second
 
-    std::string id_prefix_;
+    std::string verbose_level_; ///< Output verbosity level
 
-    std::string output_folder_;
+    std::string id_prefix_; ///< Prefix in the robot IDs
 
-    std::pair<unsigned int, unsigned int> arena_tile_count_;
+    std::string output_folder_; ///< Folder to output data to
 
-    std::pair<float, float> arena_lower_lim_;
+    std::pair<unsigned int, unsigned int> arena_tile_count_; ///< Tile count in x and y directions
+
+    std::pair<float, float> arena_lower_lim_; ///< Coordinates to the bottom left corner of the arena
 
     std::vector<int> disabled_ids_;
 

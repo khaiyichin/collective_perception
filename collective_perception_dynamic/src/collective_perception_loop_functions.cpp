@@ -440,6 +440,10 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(disable_node, "amount", disabled_robot_amount_);
         GetNodeAttribute(disable_node, "sim_clock_time", disabled_time_in_sec);
 
+        // Grab number of ticks in a second
+        TConfigurationNode &framework_experiment_node = GetNode(GetNode(GetSimulator().GetConfigurationRoot(), "framework"), "experiment");
+        GetNodeAttribute(framework_experiment_node, "ticks_per_second", ticks_per_sec_);
+
         // Create vector of disabled robots
         if (disabled_robot_amount_ == 0) // no robots need to be disabled
         {
@@ -451,13 +455,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         }
         else
         {
-            // Compute disabled_time in ticks
-            float ticks_per_sec;
-
-            TConfigurationNode &framework_experiment_node = GetNode(GetNode(GetSimulator().GetConfigurationRoot(), "framework"), "experiment");
-            GetNodeAttribute(framework_experiment_node, "ticks_per_second", ticks_per_sec);
-
-            disabled_time_in_ticks_ = static_cast<int>(std::floor(disabled_time_in_sec * ticks_per_sec));
+            disabled_time_in_ticks_ = static_cast<int>(std::floor(disabled_time_in_sec * ticks_per_sec_));
         }
 
         // Grab legacy flag
@@ -480,7 +478,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         if (run_dac_plugin_)
         {
             unsigned int num_bins, density;
-            float area, range, speed, dac_plugin_write_period, ticks_per_sec;
+            float area, range, speed, dac_plugin_write_period;
             std::string path;
 
             TConfigurationNode &param_node = GetNode(dac_node, "param");
@@ -494,10 +492,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
                                     simulation_parameters_.comms_range_,
                                     simulation_parameters_.speed_,
                                     path);
-
-            TConfigurationNode &framework_experiment_node = GetNode(GetNode(GetSimulator().GetConfigurationRoot(), "framework"), "experiment");
-            GetNodeAttribute(framework_experiment_node, "ticks_per_second", ticks_per_sec);
-            dac_plugin_write_period_in_ticks_ = static_cast<int>(std::floor(dac_plugin_write_period * ticks_per_sec));
+            dac_plugin_write_period_in_ticks_ = static_cast<int>(std::floor(dac_plugin_write_period * ticks_per_sec_));
         }
 
         if (verbose_level_ == "full" || verbose_level_ == "reduced")
@@ -537,7 +532,9 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
 
         dac_plugin_.WriteCurrentExperimentStats(GetCurrentTimeStr(), false);
 
-        dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), true);
+        dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(),
+                                           true,
+                                           space_ptr_->GetSimulationClock() / ticks_per_sec_);
     }
 
     // Setup experiment
@@ -631,7 +628,9 @@ void CollectivePerceptionLoopFunctions::PostStep()
         {
             dac_plugin_.ComputeFractionOfCorrectDecisions(id_brain_map_ptr_);
 
-            dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), false);
+            dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(),
+                                               false,
+                                               space_ptr_->GetSimulationClock() / ticks_per_sec_);
         }
     }
 }
@@ -766,7 +765,9 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
     {
         dac_plugin_.ComputeFractionOfCorrectDecisions(id_brain_map_ptr_);
 
-        dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), false);
+        dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(),
+                                           false,
+                                           space_ptr_->GetSimulationClock() / ticks_per_sec_);
     }
 
     // Check to see if all trials are complete
@@ -801,7 +802,9 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
 
                 dac_plugin_.WriteCurrentExperimentStats(GetCurrentTimeStr(), false); // experiments are not done, so false flag
 
-                dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), true); // trials are done, so true flag
+                dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(),
+                                                   true,
+                                                   space_ptr_->GetSimulationClock() / ticks_per_sec_); // trials are done, so true flag
             }
         }
         else // no more parameter sets
@@ -833,7 +836,9 @@ void CollectivePerceptionLoopFunctions::PostExperiment()
         // Write new stats for next trial (with same parameter set)
         if (run_dac_plugin_)
         {
-            dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(), true);
+            dac_plugin_.WriteCurrentTrialStats(GetCurrentTimeStr(),
+                                               true,
+                                               space_ptr_->GetSimulationClock() / ticks_per_sec_);
         }
     }
 }
