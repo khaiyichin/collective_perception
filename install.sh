@@ -6,6 +6,7 @@ pushd collective_perception_static
 source .venv/bin/activate
 pip install .
 deactivate
+popd
 
 # Install dynamic simulator
 pushd collective_perception_dynamic
