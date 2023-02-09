@@ -2,10 +2,23 @@
 *.pyc
 data/
 .venv/
-containers/
+
+# Buzz files
 *.bo
 *.bdb
+
+# Pickle files
 *.pkl
+*.vdg
+
+# Protobuf files
+*.pbad
+*.pset
+
+# Python package files
 dist/
 build/
 *.egg-info
+
+# Apptainer containers
+*.sif
