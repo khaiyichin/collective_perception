@@ -113,7 +113,7 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
 {
     int curr_robot_id = GetNumericId(str_robot_id);
 
-    if (disability_status == RobotDisabilityStatus::executing) // check if overall disabling has begun
+    if (disability_status == SwarmDisabilityStatus::executing) // check if overall disabling has begun
     {
         // Disable robot if the current robot is in the list
         if (HasDisability(curr_robot_id))
@@ -124,7 +124,9 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
             // Activate all applicable disability types
             for (const DisabilityType &d : id_disabled_status_map[curr_robot_id].disability_types)
             {
-                BuzzPut(t_vm, GetBuzzDisabilityKeyword(d), 1);
+                BuzzPut(t_vm, GetBuzzDisabilityKeyword(d), 1); // update disability status in the body
+
+                (*id_brain_map_ptr)[str_robot_id.c_str()].Disable(d); // set disability status in the robot brain so that it can be identified without the body
             }
         }
 
@@ -134,12 +136,12 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
 
         if (activated_counter == id_disabled_status_map.size())
         {
-            disability_status = RobotDisabilityStatus::active;
+            disability_status = SwarmDisabilityStatus::active;
         }
     }
 
     // Find out if the current robot has some disability
-    if (disability_status != RobotDisabilityStatus::executing)
+    if (disability_status != SwarmDisabilityStatus::executing)
     {
         int curr_robot_id = GetNumericId(str_robot_id);
 
@@ -171,7 +173,7 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
         // Get reference to the robot brain
         auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
 
-        if (disability_status == RobotDisabilityStatus::active && HasDisability(curr_robot_id)) // current robot is disabled
+        if (disability_status == SwarmDisabilityStatus::active && HasDisability(curr_robot_id)) // current robot is disabled
         {
             std::vector<DisabilityType> dis_type_vec = id_disabled_status_map[curr_robot_id].disability_types;
 
@@ -679,10 +681,10 @@ void CollectivePerceptionLoopFunctions::PostStep()
 
     // Disable robot if needed
     if (disabled_time_in_ticks_ > 0 &&                                                   // robot disabling is desired by user
-        process_thought_functor_.disability_status == RobotDisabilityStatus::inactive && // the disable flag hasn't been activated
+        process_thought_functor_.disability_status == SwarmDisabilityStatus::inactive && // the disable flag hasn't been activated
         space_ptr_->GetSimulationClock() >= disabled_time_in_ticks_ - 1)                 // the appropriate disabling time has come (because it's post step so we need one step prior)
     {
-        process_thought_functor_.disability_status = RobotDisabilityStatus::executing;
+        process_thought_functor_.disability_status = SwarmDisabilityStatus::executing;
     }
 
     // Execute DAC plugin operations

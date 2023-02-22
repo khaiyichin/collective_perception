@@ -24,10 +24,10 @@ enum class DisabilityType
 };
 
 /**
- * @brief Enumeration class for disability status
+ * @brief Enumeration class for disability status of the entire swarm
  *
  */
-enum class RobotDisabilityStatus
+enum class SwarmDisabilityStatus
 {
     inactive = 0,
     executing,
@@ -35,14 +35,14 @@ enum class RobotDisabilityStatus
 };
 
 /**
- * @brief Get the Buzz Disability Keyword object
+ * @brief Get the Buzz keyword for a specific disability
  *
- * @param de Enum for the disability type
+ * @param dt Enum for the disability type
  * @return std::string Buzz keyword corresponding to the provided enum
  */
-inline std::string GetBuzzDisabilityKeyword(const DisabilityType &de)
+inline std::string GetBuzzDisabilityKeyword(const DisabilityType &dt)
 {
-    switch (de)
+    switch (dt)
     {
     case DisabilityType::motion:
     {

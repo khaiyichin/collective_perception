@@ -8,7 +8,8 @@ DACPlugin::DACPlugin(const unsigned int &num_bins,
                      const float &speed,
                      const std::string &csv_path)
     : num_bins_(num_bins),
-      current_active_robots_(num_robots),
+      total_num_robots_(num_robots),
+      current_healthy_robots_(num_robots),
       current_disabled_robots_(0),
       swarm_density_(density),
       arena_area_(arena_area),
@@ -19,7 +20,7 @@ DACPlugin::DACPlugin(const unsigned int &num_bins,
     // Clear the CSV file contents
     std::ofstream csv_file(csv_path, std::ofstream::out | std::ofstream::trunc);
     csv_file.close();
-    
+
     // Reserve space for informed estimates (to prevent recreating during runtime)
     decisions_.reserve(num_bins_);
 }
@@ -35,15 +36,28 @@ void DACPlugin::ComputeFractionOfCorrectDecisions(const std::shared_ptr<std::uno
 {
     // Go through each brain element in the map
     decisions_ = std::vector<unsigned int>(num_bins_, 0);
+    std::unordered_map<DisabilityType, unsigned int> disabled_robot_counter = {{DisabilityType::motion, 0}, {DisabilityType::comms, 0}, {DisabilityType::sense, 0}};
 
     for (auto &kv : *ptr)
     {
-        // Check if the brain is active
-        if (!kv.second.IsDisabled())
+        // Check if the brain is active (robot is not disabled)
+        std::vector<DisabilityType> disability_type_vec = kv.second.GetDisabilityTypes();
+
+        if (disability_type_vec.size() == 0) // no disabilities
         {
             // Increment the count for the ith bin
             unsigned int index = ConvertInformedEstimateToDecision(kv.second.GetInformedValuePair().x);
             ++decisions_[index];
+        }
+        else
+        {
+            // Update counter with the robot disabilities
+            std::vector<DisabilityType> dt_vec = kv.second.GetDisabilityTypes();
+
+            for (const auto &dt : dt_vec)
+            {
+                ++disabled_robot_counter[dt];
+            }
         }
     }
 
@@ -51,11 +65,11 @@ void DACPlugin::ComputeFractionOfCorrectDecisions(const std::shared_ptr<std::uno
     unsigned int tfr_decision = IdentifyCorrectDecision();
 
     // Identify the active and disabled robots
-    current_active_robots_ = std::reduce(decisions_.begin(), decisions_.end());
-    current_disabled_robots_ = ptr->size() - current_active_robots_;
+    current_healthy_robots_ = std::reduce(decisions_.begin(), decisions_.end());
+    current_disabled_robots_ = disabled_robot_counter;
 
     // Compute fraction of correct decisions
-    current_fraction_correct_decisions_ = static_cast<float>(decisions_[tfr_decision]) / static_cast<float>(current_active_robots_);
+    current_fraction_correct_decisions_ = static_cast<float>(decisions_[tfr_decision]) / static_cast<float>(current_healthy_robots_);
 }
 
 unsigned int DACPlugin::ConvertInformedEstimateToDecision(const float &est)
@@ -78,8 +92,10 @@ void DACPlugin::WriteCurrentTrialStats(const std::string &current_time_str, cons
         // Write regular stat lines
         line_to_write += ",trialstats";
         line_to_write += "\n,simseconds," + std::to_string(sim_time_sec);
-        line_to_write += "\n,active," + std::to_string(current_active_robots_);
-        line_to_write += "\n,disabled," + std::to_string(current_disabled_robots_);
+        line_to_write += "\n,active," + std::to_string(current_healthy_robots_);
+        line_to_write += "\n," + GetBuzzDisabilityKeyword(DisabilityType::motion) + "," + std::to_string(current_disabled_robots_[DisabilityType::motion]);
+        line_to_write += "\n," + GetBuzzDisabilityKeyword(DisabilityType::comms) + "," + std::to_string(current_disabled_robots_[DisabilityType::comms]);
+        line_to_write += "\n," + GetBuzzDisabilityKeyword(DisabilityType::sense) + "," + std::to_string(current_disabled_robots_[DisabilityType::sense]);
         line_to_write += "\n,fractioncorrectdecisions," + std::to_string(current_fraction_correct_decisions_);
     }
 
@@ -101,7 +117,7 @@ void DACPlugin::WriteCurrentExperimentStats(const std::string &current_time_str,
         line_to_write += "\n,range," + std::to_string(robot_comms_range_);
         line_to_write += "\n,speed," + std::to_string(robot_speed_);
         line_to_write += "\n,density," + std::to_string(swarm_density_) + ",area," + std::to_string(arena_area_);
-        line_to_write += "\n,robots," + std::to_string(current_active_robots_ + current_disabled_robots_);
+        line_to_write += "\n,robots," + std::to_string(total_num_robots_);
         line_to_write += "\n,fillratio," + std::to_string(current_target_fill_ratio_);
         line_to_write += "\n,sensorprob," + std::to_string(current_sensor_probability_);
     }

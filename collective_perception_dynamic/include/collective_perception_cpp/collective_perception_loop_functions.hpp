@@ -181,7 +181,7 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
 
     int base_num; ///< Base number offset for robot ID
 
-    RobotDisabilityStatus disability_status = RobotDisabilityStatus::inactive;
+    SwarmDisabilityStatus disability_status = SwarmDisabilityStatus::inactive;
 
     std::unordered_map<int, DisabilityStatusAndTypes> id_disabled_status_map; ///< Map that contains the IDs that need to be disabled and whether or not they're disabled
 };

@@ -161,9 +161,11 @@ public:
 
     /**
      * @brief Solve values for disabled robots
-     * This is used for robots so that dummy (negative) values can be filled
+     * This is used for robots so that the robot's disability can be identified without accessing the body
+     *
+     * @param dt Disability type of the robot
      */
-    void Disable();
+    inline void Disable(const DisabilityType &dt) { disability_types_.push_back(dt); }
 
     /**
      * @brief Store robot observations
@@ -171,7 +173,7 @@ public:
      * @param total_b_obs Total number of black tiles observed
      * @param total_obs Total number of observations made
      */
-    void StoreObservations(const int &total_b_obs, const int &total_obs)
+    inline void StoreObservations(const int &total_b_obs, const int &total_obs)
     {
         total_black_obs_ = total_b_obs;
         total_obs_ = total_obs;
@@ -182,20 +184,17 @@ public:
      *
      * @param value_pair_vec Vector of neighbor's ValuePair objects
      */
-    void StoreNeighborValuePairs(const std::vector<ValuePair> &value_pair_vec) { neighbors_value_pairs_ = value_pair_vec; }
+    inline void StoreNeighborValuePairs(const std::vector<ValuePair> &value_pair_vec) { neighbors_value_pairs_ = value_pair_vec; }
 
     /**
-     * @brief Check if brain instance is disabled
+     * @brief Get the disability type(s) of the robot to which this brain instance is attached to
      *
-     * @return true
-     * @return false
+     * @return std::vector<DisabilityType>
      */
-    inline bool IsDisabled() { return disabled_; }
+    inline std::vector<DisabilityType> GetDisabilityTypes() { return disability_types_; }
 
 private:
     bool legacy_; ///< legacy solver mode @todo may be removed in the future
-
-    bool disabled_ = false; ///< Flag to indicate whether current brain is disabled
 
     std::string id_; ///< Robot ID
 
@@ -208,6 +207,8 @@ private:
     float w_prob_; ///< Sensor accuracy for observing white tiles
 
     std::vector<ValuePair> neighbors_value_pairs_; ///< Vector of neighbors' values
+
+    std::vector<DisabilityType> disability_types_; ///< Indicator of the current robot's disability type
 
     Solver solver_; ///< Solver object
 };

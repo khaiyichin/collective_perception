@@ -25,34 +25,46 @@ An example of the `.csv` file would look like the following if opened in a text 
 121222_075631,trialstats
 ,simseconds,50
 ,active,11
-,disabled,0
+,motion_disabled,0
+,comms_disabled,0
+,sense_disabled,0
 ,fractioncorrectdecisions,0.636364
 121222_075632,trialstats
 ,simseconds,100
 ,active,6
-,disabled,5
+,motion_disabled,5
+,comms_disabled,0
+,sense_disabled,5
 ,fractioncorrectdecisions,0.333333
 121222_075632,trialindex,1
 121222_075633,trialstats
 ,simseconds,50
 ,active,11
-,disabled,0
+,motion_disabled,0
+,comms_disabled,0
+,sense_disabled,0
 ,fractioncorrectdecisions,0.363636
 121222_075635,trialstats
 ,simseconds,100
 ,active,6
-,disabled,5
+,motion_disabled,5
+,comms_disabled,0
+,sense_disabled,5
 ,fractioncorrectdecisions,0.500000
 121222_075635,trialindex,2
 121222_075636,trialstats
 ,simseconds,50
 ,active,11
-,disabled,0
+,motion_disabled,0
+,comms_disabled,0
+,sense_disabled,0
 ,fractioncorrectdecisions,0.363636
 121222_075638,trialstats
 ,simseconds,100
 ,active,6
-,disabled,5
+,motion_disabled,5
+,comms_disabled,0
+,sense_disabled,5
 ,fractioncorrectdecisions,1.000000
 121222_075638,experimentstats
 ,range,0.700000
@@ -65,34 +77,46 @@ An example of the `.csv` file would look like the following if opened in a text 
 121222_075640,trialstats
 ,simseconds,50
 ,active,11
-,disabled,0
+,motion_disabled,0
+,comms_disabled,0
+,sense_disabled,0
 ,fractioncorrectdecisions,1.000000
 121222_075642,trialstats
 ,simseconds,100
 ,active,6
-,disabled,5
+,motion_disabled,5
+,comms_disabled,0
+,sense_disabled,5
 ,fractioncorrectdecisions,1.000000
 121222_075642,trialindex,1
 121222_075645,trialstats
 ,simseconds,50
 ,active,11
-,disabled,0
+,motion_disabled,0
+,comms_disabled,0
+,sense_disabled,0
 ,fractioncorrectdecisions,1.000000
 121222_075646,trialstats
 ,simseconds,100
 ,active,6
-,disabled,5
+,motion_disabled,5
+,comms_disabled,0
+,sense_disabled,5
 ,fractioncorrectdecisions,1.000000
 121222_075646,trialindex,2
 121222_075648,trialstats
 ,simseconds,50
 ,active,11
-,disabled,0
+,motion_disabled,0
+,comms_disabled,0
+,sense_disabled,0
 ,fractioncorrectdecisions,1.000000
 121222_075650,trialstats
 ,simseconds,100
 ,active,6
-,disabled,5
+,motion_disabled,5
+,comms_disabled,0
+,sense_disabled,5
 ,fractioncorrectdecisions,1.000000
 121222_075650,experimentcomplete
 ```
@@ -110,34 +134,46 @@ The same file would look like the following if you opened it in MS Excel or Goog
 | 121222_075631 | trialstats |
 |  | simseconds | 50 |
 |  | active | 11 |
-|  | disabled | 0 |
+|  | motion_disabled | 0 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 0 |
 |  | fractioncorrectdecisions | 0.636364 |
 | 121222_075632 | trialstats |
 |  | simseconds | 100 |
 |  | active | 6 |
-|  | disabled | 5 |
+|  | motion_disabled | 5 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 5 |
 |  | fractioncorrectdecisions | 0.333333 |
 | 121222_075632 | trialindex | 1 |
 | 121222_075633 | trialstats |
 |  | simseconds | 50 |
 |  | active | 11 |
-|  | disabled | 0 |
+|  | motion_disabled | 0 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 0 |
 |  | fractioncorrectdecisions | 0.363636 |
 | 121222_075635 | trialstats |
 |  | simseconds | 100 |
 |  | active | 6 |
-|  | disabled | 5 |
+|  | motion_disabled | 5 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 5 |
 |  | fractioncorrectdecisions | 0.500000 |
 | 121222_075635 | trialindex | 2 |
 | 121222_075636 | trialstats |
 |  | simseconds | 50 |
 |  | active | 11 |
-|  | disabled | 0 |
+|  | motion_disabled | 0 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 0 |
 |  | fractioncorrectdecisions | 0.363636 |
 | 121222_075638 | trialstats |
 |  | simseconds | 100 |
 |  | active | 6 |
-|  | disabled | 5 |
+|  | motion_disabled | 5 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 5 |
 |  | fractioncorrectdecisions | 1.000000 |
 | 121222_075638 | experimentstats |
 |  | range | 0.700000 |
@@ -150,34 +186,46 @@ The same file would look like the following if you opened it in MS Excel or Goog
 | 121222_075640 | trialstats |
 |  | simseconds | 50 |
 |  | active | 11 |
-|  | disabled | 0 |
+|  | motion_disabled | 0 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 0 |
 |  | fractioncorrectdecisions | 1.000000 |
 | 121222_075642 | trialstats |
 |  | simseconds | 100 |
 |  | active | 6 |
-|  | disabled | 5 |
+|  | motion_disabled | 5 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 5 |
 |  | fractioncorrectdecisions | 1.000000 |
 | 121222_075642 | trialindex | 1 |
 | 121222_075645 | trialstats |
 |  | simseconds | 50 |
 |  | active | 11 |
-|  | disabled | 0 |
+|  | motion_disabled | 0 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 0 |
 |  | fractioncorrectdecisions | 1.000000 |
 | 121222_075646 | trialstats |
 |  | simseconds | 100 |
 |  | active | 6 |
-|  | disabled | 5 |
+|  | motion_disabled | 5 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 5 |
 |  | fractioncorrectdecisions | 1.000000 |
 | 121222_075646 | trialindex | 2 |
 | 121222_075648 | trialstats |
 |  | simseconds | 50 |
 |  | active | 11 |
-|  | disabled | 0 |
+|  | motion_disabled | 0 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 0 |
 |  | fractioncorrectdecisions | 1.000000 |
 | 121222_075650 | trialstats |
 |  | simseconds | 100 |
 |  | active | 6 |
-|  | disabled | 5 |
+|  | motion_disabled | 5 |
+|  | comms_disabled | 0 |
+|  | sense_disabled | 5 |
 |  | fractioncorrectdecisions | 1.000000 |
 | 121222_075650 | experimentcomplete |
 

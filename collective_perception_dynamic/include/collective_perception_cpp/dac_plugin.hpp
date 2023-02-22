@@ -9,6 +9,7 @@
 
 // Local includes
 #include "brain.hpp"
+#include "robot_disability.hpp"
 
 class DACPlugin
 {
@@ -73,7 +74,7 @@ public:
 private:
     /**
      * @brief Convert estimates to bin selections
-     * 
+     *
      * @param est Informed estimate value
      * @return unsigned int Bin number that corresponds to a decision
      */
@@ -81,23 +82,23 @@ private:
 
     /**
      * @brief Identify the correct decision based on the environment fill ratio
-     * 
+     *
      * @return unsigned int Bin number that corresponds to the correct decision
      */
     inline unsigned int IdentifyCorrectDecision() { return ConvertInformedEstimateToDecision(current_target_fill_ratio_); }
 
     /**
      * @brief Write string to CSV file
-     * 
+     *
      * @param str String to write
      */
     void WriteToCSV(const std::string &str);
 
     unsigned int num_bins_;
 
-    unsigned int current_active_robots_;
+    unsigned int total_num_robots_;
 
-    unsigned int current_disabled_robots_;
+    unsigned int current_healthy_robots_;
 
     unsigned int current_trial_number_;
 
@@ -124,6 +125,8 @@ private:
     std::string experiment_string_;
 
     std::vector<unsigned int> decisions_;
+
+    std::unordered_map<DisabilityType, unsigned int> current_disabled_robots_;
 };
 
 #endif
