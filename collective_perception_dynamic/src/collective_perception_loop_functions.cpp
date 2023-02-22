@@ -84,7 +84,8 @@ ProcessRobotThought::ProcessRobotThought(const std::shared_ptr<RobotIdBrainMap> 
                                          std::vector<AgentData> *agt_vec_ptr,
                                          const std::string &id_prefix,
                                          const int &id_base_num,
-                                         const std::vector<int> &disabled_ids)
+                                         const std::vector<int> &disabled_ids,
+                                         const std::unordered_map<DisabilityType, bool> &disability_types)
     : id_brain_map_ptr(id_brain_ptr),
       agt_data_vec_ptr(agt_vec_ptr),
       prefix(id_prefix),
@@ -93,54 +94,55 @@ ProcessRobotThought::ProcessRobotThought(const std::shared_ptr<RobotIdBrainMap> 
     // Assign (to-be) disabled robot IDs to internal map
     for (auto id : disabled_ids)
     {
-        id_disabled_status_map[id] = false;
+        DisabilityStatusAndTypes status_and_type;
+        status_and_type.disability_activated = false;
+
+        // Iterate through each disability types
+        for (const auto &[d_enum, d_bool] : disability_types)
+        {
+            if (d_bool)
+            {
+                status_and_type.disability_types.push_back(d_enum);
+            } // store the enum corresponding to the disability type associated with the current robot id
+        }
+        id_disabled_status_map[id] = status_and_type;
     }
 }
 
 void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 {
-    // Check to see if the robot body is already disabled
-    bool curr_robot_disabled;
+    int curr_robot_id = GetNumericId(str_robot_id);
 
-    buzzobj_t tDisabledFlag = BuzzGet(t_vm, "disabled");
-
-    if (!buzzobj_isint(tDisabledFlag))
+    if (disability_status == RobotDisabilityStatus::executing) // check if overall disabling has begun
     {
-        LOGERR << str_robot_id << ": variable \"disabled\" has wrong type " << buzztype_desc[tDisabledFlag->o.type] << std::endl;
-        return;
-    }
-    else
-    {
-        curr_robot_disabled = static_cast<bool>(buzzobj_getint(tDisabledFlag));
-    }
-
-    // Disable robot for the first time (if the current robot is correct)
-    if (disabled && !curr_robot_disabled)
-    {
-        // Find out if the current robot is in the list to be disabled
-        int curr_robot_id = GetNumericId(str_robot_id);
-
-        std::unordered_map<int, bool>::const_iterator found_pair = id_disabled_status_map.find(curr_robot_id);
-
-        if (found_pair != id_disabled_status_map.end() && !found_pair->second)
+        // Disable robot if the current robot is in the list
+        if (HasDisability(curr_robot_id))
         {
-            // Disable robot
-            BuzzPut(t_vm, "disabled", 1);
+            // Update disability status
+            id_disabled_status_map[curr_robot_id].disability_activated = true;
 
-            // Update status
-            id_disabled_status_map[curr_robot_id] = true;
+            // Activate all applicable disability types
+            for (const DisabilityType &d : id_disabled_status_map[curr_robot_id].disability_types)
+            {
+                BuzzPut(t_vm, GetBuzzDisabilityKeyword(d), 1);
+            }
+        }
 
-            // Get reference to the robot brain
-            auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
+        // Update overall disability status only if all robots have been disabled
+        int activated_counter = std::count_if(id_disabled_status_map.begin(), id_disabled_status_map.end(), [](const std::pair<int, DisabilityStatusAndTypes> &v)
+                                              { return v.second.disability_activated; });
 
-            // Disable robot
-            robot_brain.Disable();
+        if (activated_counter == id_disabled_status_map.size())
+        {
+            disability_status = RobotDisabilityStatus::active;
         }
     }
 
-    // Process robot thought
-    if (!curr_robot_disabled) // if robot isn't disabled
+    // Find out if the current robot has some disability
+    if (disability_status != RobotDisabilityStatus::executing)
     {
+        int curr_robot_id = GetNumericId(str_robot_id);
+
         // Collect debugging values for AgentData objects
         unsigned int encounter, observation;
 
@@ -169,87 +171,130 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
         // Get reference to the robot brain
         auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
 
-        // Collect observations
-        buzzobj_t tTotalBlackObs = BuzzGet(t_vm, "total_b_tiles_obs");
-        buzzobj_t tTotalObs = BuzzGet(t_vm, "total_obs");
-
-        int total_black_obs, total_obs;
-
-        // Verify that the types are correct
-        if (!buzzobj_isint(tTotalBlackObs))
+        if (disability_status == RobotDisabilityStatus::active && HasDisability(curr_robot_id)) // current robot is disabled
         {
-            // Temporary hack
-            if (buzzobj_isfloat(tTotalBlackObs))
+            std::vector<DisabilityType> dis_type_vec = id_disabled_status_map[curr_robot_id].disability_types;
+
+            // Perform specific processing for different disabilities
+            if (std::count(dis_type_vec.begin(), dis_type_vec.end(), DisabilityType::sense) == 0)
             {
-                total_black_obs = static_cast<int>(buzzobj_getfloat(tTotalBlackObs));
+                // Collect and store local observations
+                StoreObservations(str_robot_id, t_vm, robot_brain);
             }
-            else
+
+            if (std::count(dis_type_vec.begin(), dis_type_vec.end(), DisabilityType::comms) == 0)
             {
-                LOGERR << str_robot_id << ": variable \"total_b_tiles_obs\" has wrong type " << buzztype_desc[tTotalBlackObs->o.type] << std::endl;
-                return;
+                // Collect and store neighbors' values
+                StoreNeighborValues(str_robot_id, t_vm, robot_brain);
+            }
+
+            robot_brain.Solve(); // solve to compute local values and to
+
+            if (!std::count(dis_type_vec.begin(), dis_type_vec.end(), DisabilityType::sense) == 0)
+            {
+                // Provide updated local values back to the robot body
+                BuzzTableOpen(t_vm, "local_vals");
+
+                BuzzTablePut(t_vm, "x", robot_brain.GetLocalValuePair().x);
+                BuzzTablePut(t_vm, "conf", robot_brain.GetLocalValuePair().confidence);
             }
         }
-        else
+        else // current robot isn't disabled OR haven't been disabled yet
         {
-            total_black_obs = buzzobj_getint(tTotalBlackObs);
+            // Collect and store local observations
+            StoreObservations(str_robot_id, t_vm, robot_brain);
+
+            // Collect and store neighbors' values
+            StoreNeighborValues(str_robot_id, t_vm, robot_brain);
+
+            // Solve for values
+            robot_brain.Solve();
+
+            // Provide updated local values back to the robot body
+            BuzzTableOpen(t_vm, "local_vals");
+
+            BuzzTablePut(t_vm, "x", robot_brain.GetLocalValuePair().x);
+            BuzzTablePut(t_vm, "conf", robot_brain.GetLocalValuePair().confidence);
         }
-
-        if (!buzzobj_isint(tTotalObs))
-        {
-            LOGERR << str_robot_id << ": variable \"total_obs\" has wrong type " << buzztype_desc[tTotalObs->o.type] << std::endl;
-            return;
-        }
-        else
-        {
-            total_obs = buzzobj_getint(tTotalObs);
-        }
-
-        // Store the observation into the brain
-        robot_brain.StoreObservations(total_black_obs, total_obs);
-
-        // Collect neighbors' values
-        BuzzTableOpen(t_vm, "past_neighbor_vals");
-        buzzobj_t tNeighborVals = BuzzGet(t_vm, "past_neighbor_vals");
-
-        // Ensure the type is correct (a table)
-        if (!buzzobj_istable(tNeighborVals))
-        {
-            LOGERR << str_robot_id << ": variable \"neighbor_vals\" has wrong type " << buzztype_desc[tNeighborVals->o.type] << std::endl;
-            return;
-        }
-
-        // Extract values from the opened "neighbor_vals" table
-        size_t tNeighborValsSize = tNeighborVals->t.value->size; // ->t represents the buzzvm_u union as a table, which is a struct that contains the attribute `value` which is a buzzdict_s type
-
-        std::vector<Brain::ValuePair> value_pair_vec; // vecValuePair
-
-        for (int i = 0; i < tNeighborValsSize; ++i)
-        {
-            // Open the nested table to get the neighbor's values
-            BuzzTableOpenNested(t_vm, i);
-
-            Brain::ValuePair v(
-                buzzobj_getfloat(BuzzTableGet(t_vm, "x")),
-                buzzobj_getfloat(BuzzTableGet(t_vm, "conf")));
-
-            BuzzTableCloseNested(t_vm);
-
-            value_pair_vec.push_back(v);
-        }
-
-        BuzzTableClose(t_vm); // close the "neighbor_vals" table
-
-        robot_brain.StoreNeighborValuePairs(value_pair_vec);
-
-        // Solve for values
-        robot_brain.Solve();
-
-        // Provide updated local values back to the robot body
-        BuzzTableOpen(t_vm, "local_vals");
-
-        BuzzTablePut(t_vm, "x", robot_brain.GetLocalValuePair().x);
-        BuzzTablePut(t_vm, "conf", robot_brain.GetLocalValuePair().confidence);
     }
+}
+
+void ProcessRobotThought::StoreObservations(const std::string &str_robot_id, buzzvm_t t_vm, Brain &robot_brain)
+{
+    // Collect observations
+    buzzobj_t tTotalBlackObs = BuzzGet(t_vm, "total_b_tiles_obs");
+    buzzobj_t tTotalObs = BuzzGet(t_vm, "total_obs");
+
+    int total_black_obs, total_obs;
+
+    // Verify that the types are correct
+    if (!buzzobj_isint(tTotalBlackObs))
+    {
+        // Temporary hack
+        if (buzzobj_isfloat(tTotalBlackObs))
+        {
+            total_black_obs = static_cast<int>(buzzobj_getfloat(tTotalBlackObs));
+        }
+        else
+        {
+            LOGERR << str_robot_id << ": variable \"total_b_tiles_obs\" has wrong type " << buzztype_desc[tTotalBlackObs->o.type] << std::endl;
+            return;
+        }
+    }
+    else
+    {
+        total_black_obs = buzzobj_getint(tTotalBlackObs);
+    }
+
+    if (!buzzobj_isint(tTotalObs))
+    {
+        LOGERR << str_robot_id << ": variable \"total_obs\" has wrong type " << buzztype_desc[tTotalObs->o.type] << std::endl;
+        return;
+    }
+    else
+    {
+        total_obs = buzzobj_getint(tTotalObs);
+    }
+
+    // Store the observation into the brain
+    robot_brain.StoreObservations(total_black_obs, total_obs);
+}
+
+void ProcessRobotThought::StoreNeighborValues(const std::string &str_robot_id, buzzvm_t t_vm, Brain &robot_brain)
+{
+    // Open the Buzz table for accessing neighbors' values
+    BuzzTableOpen(t_vm, "past_neighbor_vals");
+    buzzobj_t tNeighborVals = BuzzGet(t_vm, "past_neighbor_vals");
+
+    // Ensure the type is correct (a table)
+    if (!buzzobj_istable(tNeighborVals))
+    {
+        LOGERR << str_robot_id << ": variable \"neighbor_vals\" has wrong type " << buzztype_desc[tNeighborVals->o.type] << std::endl;
+        return;
+    }
+
+    // Extract values from the opened "neighbor_vals" table
+    size_t tNeighborValsSize = tNeighborVals->t.value->size; // ->t represents the buzzvm_u union as a table, which is a struct that contains the attribute `value` which is a buzzdict_s type
+
+    std::vector<Brain::ValuePair> value_pair_vec; // vecValuePair
+
+    for (int i = 0; i < tNeighborValsSize; ++i)
+    {
+        // Open the nested table to get the neighbor's values
+        BuzzTableOpenNested(t_vm, i);
+
+        Brain::ValuePair v(
+            buzzobj_getfloat(BuzzTableGet(t_vm, "x")),
+            buzzobj_getfloat(BuzzTableGet(t_vm, "conf")));
+
+        BuzzTableCloseNested(t_vm);
+
+        value_pair_vec.push_back(v);
+    }
+
+    BuzzTableClose(t_vm); // close the "neighbor_vals" table
+
+    robot_brain.StoreNeighborValuePairs(value_pair_vec);
 }
 
 void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
@@ -432,13 +477,18 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(robot_id_node, "prefix", id_prefix_);
         GetNodeAttribute(robot_id_node, "base_num", id_base_num_);
 
-        // Grab number of robots to terminate, if any
+        // Grab number of robots to disable, if any
         float disabled_time_in_sec;
 
         TConfigurationNode &disable_node = GetNode(col_per_root_node, "robot_disabling");
 
         GetNodeAttribute(disable_node, "amount", disabled_robot_amount_);
         GetNodeAttribute(disable_node, "sim_clock_time", disabled_time_in_sec);
+
+        // Determine type of disability
+        GetNodeAttribute(GetNode(disable_node, "motion_disable"), "bool", robot_disability_types_[DisabilityType::motion]);
+        GetNodeAttribute(GetNode(disable_node, "comms_disable"), "bool", robot_disability_types_[DisabilityType::comms]);
+        GetNodeAttribute(GetNode(disable_node, "sense_disable"), "bool", robot_disability_types_[DisabilityType::sense]);
 
         // Grab number of ticks in a second
         TConfigurationNode &framework_experiment_node = GetNode(GetNode(GetSimulator().GetConfigurationRoot(), "framework"), "experiment");
@@ -502,7 +552,20 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
             LOG << "[INFO] Specifying number of robots = " << simulation_parameters_.num_agents_ << std::endl;
             LOG << "[INFO] Specifying robot speed = " << simulation_parameters_.speed_ << " cm/s" << std::endl;
             LOG << "[INFO] Specifying number of trials = " << simulation_parameters_.num_trials_ << std::endl;
-            LOG << "[INFO] Specifying number of robots to disable = " << disabled_robot_amount_ << " at " << disabled_time_in_sec << " s (" << disabled_time_in_ticks_ << " ticks)" << std::endl;
+
+            if (disabled_robot_amount_ > 0)
+            {
+                LOG << "[INFO] Specifying number of robots to disable = " << disabled_robot_amount_ << " at " << disabled_time_in_sec << " s (" << disabled_time_in_ticks_ << " ticks)" << std::endl;
+                LOG << "[INFO] Disability types = "
+                    << ((robot_disability_types_[DisabilityType::motion]) ? "motion, " : "")
+                    << ((robot_disability_types_[DisabilityType::comms]) ? "comms, " : "")
+                    << ((robot_disability_types_[DisabilityType::sense]) ? "sense" : "") << std::endl;
+            }
+            else
+            {
+                LOG << "[INFO] Not disabling robots" << std::endl;
+            }
+
             LOG << "[INFO] Specifying output folder = \"" << output_folder_ << "\"" << std::endl;
             LOG << "[INFO] Specifying output statistics filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << sim_stats_set_.proto_filepath_ << "\"" << std::endl;
             LOG << "[INFO] Specifying output agent data filepath (" << ((proto_datetime_) ? "with" : "without") << " datetime) = \"" << sim_agent_data_set_.proto_filepath_ << "\"" << std::endl;
@@ -596,7 +659,8 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
                                                    curr_agent_data_vec_ptr,
                                                    id_prefix_,
                                                    id_base_num_,
-                                                   disabled_ids_);
+                                                   disabled_ids_,
+                                                   robot_disability_types_);
 
     // Re-initialize each robot
     BuzzForeachVM(initialization_functor_);
@@ -614,11 +678,11 @@ void CollectivePerceptionLoopFunctions::PostStep()
     ComputeStats();
 
     // Disable robot if needed
-    if (disabled_time_in_ticks_ > 0 &&                                   // robot disabling is desired by user
-        !process_thought_functor_.disabled &&                            // the disable flag hasn't been activated
-        space_ptr_->GetSimulationClock() >= disabled_time_in_ticks_ - 1) // the appropriate disabling time has come (because it's post step so we need one step prior)
+    if (disabled_time_in_ticks_ > 0 &&                                                   // robot disabling is desired by user
+        process_thought_functor_.disability_status == RobotDisabilityStatus::inactive && // the disable flag hasn't been activated
+        space_ptr_->GetSimulationClock() >= disabled_time_in_ticks_ - 1)                 // the appropriate disabling time has come (because it's post step so we need one step prior)
     {
-        process_thought_functor_.disabled = true;
+        process_thought_functor_.disability_status = RobotDisabilityStatus::executing;
     }
 
     // Execute DAC plugin operations

@@ -6,6 +6,8 @@
 #include <cmath>
 #include <numeric>
 
+#include "robot_disability.hpp"
+
 /**
  * @brief Class to perform robot computation
  *

@@ -113,9 +113,23 @@
             <speed value="10.0" /> <!-- in units of cm/s -->
             <num_trials value="5" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <robot_id prefix="kiv" base_num="0" /> <!-- must match the ones in the arena configuration -->
+            <robot_disabling amount="5" sim_clock_time="50" > <!-- randomly disable n robots at specified time in seconds -->
+                <motion_disable bool="true" />
+                <comms_disable bool="true" />
+                <sense_disable bool="true" />
+            </robot_disabling>
             <path folder="data" stats="multi_agent_sim_dynamic_stats.pbs" agent_data="multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
             <verbosity level="reduced" /> <!-- "full", "reduced", "none" -->
-            <legacy bool="false" /> <!-- flag to use legacy social and informed equations -->
+            <legacy bool="false" /> <!-- flag to use legacy social equations -->
+            <dac_plugin activate="false">
+                <!-- flag to use the DAC plugin -->
+                <!--
+                    num_bins: number of bins to partition the fill ratio
+                    write_period: csv file writing period in seconds; use -1 if only write once at the end of each trial
+                    csv_path: path to csv file
+                -->
+                <param num_bins="5" write_period="50" csv_path="/home/khaiyichin/test.csv" />
+            </dac_plugin>
         </collective_perception>
     </loop_functions>
 

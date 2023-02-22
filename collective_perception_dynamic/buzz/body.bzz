@@ -30,25 +30,48 @@ function init()
 
 function step()
 {
-    # Check whether robot is disabled
-    if (not disabled)
+    # Detect any nearby obstacles
+    var obstacles = detect_obstacles()
+    if (not obstacles)
     {
-        # while not observing obstacles, move
-        var obstacles = detect_obstacles()
-        if (not obstacles)
+        # Move robot in random walk fashion
+        if (not motion_disabled)
         {
-            # Move robot in random walk fashion
             move()
+        }
+        else
+        {
+            gotop(0.0, 0.0) # stop robot
+            move_status = 0 # not moving
+        }
 
-            # Make observation
+        # Make observation
+        if (not sense_disabled)
+        {
             observe()
         }
         else
         {
-            # Avoid obstacles
+            sense_status = 0 # not sensing
+        }
+    }
+    else
+    {
+        # Avoid obstacles
+        if (not motion_disabled)
+        {
             avoid_obstacles(obstacles)
         }
+        else
+        {
+            gotop(0.0, 0.0) # stop robot
+            move_status = 0
+        }
+    }
 
+    # Communicate
+    if (not comms_disabled)
+    {
         # Broadcast values
         communicate_tx()
 
@@ -57,9 +80,9 @@ function step()
     }
     else
     {
-        gotop(0.0, 0.0) # stop robot
-        # kill listener callback function
+        # Kill listener callback function
         neighbors.ignore("local_vals")
+        comms_status = 0 # not communicating
     }
 }
 
@@ -114,7 +137,13 @@ function reset_values()
 
     debug_data = {.encounter = 0, .observation = 0} # stored for debugging; not used in actual computation
 
-    disabled = 0
+    motion_disabled = 0
+    comms_disabled = 0
+    sense_disabled = 0
+
+    move_status = 1
+    comms_status = 1
+    sense_status = 1
 }
 
 # Execute robot motion

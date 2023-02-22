@@ -110,14 +110,18 @@
                     - -2 indicates a uniform distribution with range [`min`, `max`)
                     - -3 indicates a normal distribution with mean=`min`, variance=`max`
             -->
-            <speed value="10.0" /> <!-- in units of cm/s -->
+            <speed value="14.14" /> <!-- in units of cm/s -->
             <num_trials value="3" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <robot_id prefix="kiv" base_num="0" /> <!-- must match the ones in the arena configuration -->
-            <robot_disabling amount="5" sim_clock_time="51" /> <!-- randomly disable n robots at specified time in seconds -->
+            <robot_disabling amount="2" sim_clock_time="10" > <!-- randomly disable n robots at specified time in seconds -->
+                <motion_disable bool="true" />
+                <comms_disable bool="true" />
+                <sense_disable bool="true" />
+            </robot_disabling>
             <path folder="data" stats="multi_agent_sim_dynamic_stats.pbs" agent_data="multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
             <verbosity level="full" /> <!-- "full", "reduced", "none" -->
             <legacy bool="false" /> <!-- flag to use legacy social equations -->
-            <dac_plugin activate="true">
+            <dac_plugin activate="false">
                 <!-- flag to use the DAC plugin -->
                 <!--
                     num_bins: number of bins to partition the fill ratio
@@ -186,7 +190,7 @@
             <!-- <position method="uniform" min="-1.290717695633861,-1.290717695633861,0" max="1.290717695633861,1.290717695633861,0" /> -->
             <position method="uniform" min="-0.9273198961208501,-0.9273198961208501,0" max="0.9273198961208501,0.9273198961208501,0" />
             <orientation method="uniform" min="0,0,0" max="360,0,0" />
-            <entity quantity="11" max_trials="100" base_num="0">
+            <entity quantity="5" max_trials="100" base_num="0">
                 <kheperaiv id="kiv" rab_data_size="50" rab_range="0.7">
                     <controller config="bck" />
                 </kheperaiv>

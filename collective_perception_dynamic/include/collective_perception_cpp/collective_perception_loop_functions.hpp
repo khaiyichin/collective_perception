@@ -25,6 +25,7 @@
 #include "simulation_stats_set.hpp"
 #include "simulation_agent_data_set.hpp"
 #include "dac_plugin.hpp"
+#include "robot_disability.hpp"
 
 using namespace argos;
 
@@ -109,7 +110,19 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
                         std::vector<AgentData> *agt_vec_ptr,
                         const std::string &id_prefix,
                         const int &id_base_num,
-                        const std::vector<int> &disabled_ids);
+                        const std::vector<int> &disabled_ids,
+                        const std::unordered_map<DisabilityType, bool> &disability_type_map);
+
+    /**
+     * @brief Struct to store a single robot's disability status and types
+     *
+     */
+    struct DisabilityStatusAndTypes
+    {
+        bool disability_activated;
+
+        std::vector<DisabilityType> disability_types;
+    };
 
     /**
      * @brief Overload the () operator (used to process each robot's values using BuzzForeachVM())
@@ -130,6 +143,36 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
         return std::stoi(str_robot_id.erase(0, prefix.length()));
     }
 
+    /**
+     * @brief Check whether robot is supposed to have any disability (can be used even before disability activates)
+     *
+     * @param robot_id Robot ID integer
+     * @return true
+     * @return false
+     */
+    inline bool HasDisability(const int &robot_id)
+    {
+        return id_disabled_status_map.find(robot_id) != id_disabled_status_map.end();
+    }
+
+    /**
+     * @brief Store observations into robot brain
+     *
+     * @param str_robot_id Robot ID string
+     * @param t_vm Buzz VM object
+     * @param robot_brain Robot brain instance corresponding to the current robot
+     */
+    void StoreObservations(const std::string &str_robot_id, buzzvm_t t_vm, Brain &robot_brain);
+
+    /**
+     * @brief Store the neighbor local values into robot brain
+     *
+     * @param str_robot_id Robot ID string
+     * @param t_vm Buzz VM object
+     * @param robot_brain Robot brain instance corresponding to the current robot
+     */
+    void StoreNeighborValues(const std::string &str_robot_id, buzzvm_t t_vm, Brain &robot_brain);
+
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr; ///< Pointer to unordered map containing robot IDs and corresponding Brain instances
 
     std::vector<AgentData> *agt_data_vec_ptr; ///< Pointer to vector of agent data
@@ -138,9 +181,9 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
 
     int base_num; ///< Base number offset for robot ID
 
-    bool disabled = false; ///< Flag to activate disabling of robots
+    RobotDisabilityStatus disability_status = RobotDisabilityStatus::inactive;
 
-    std::unordered_map<int, bool> id_disabled_status_map; ///< Map that contains the IDs that need to be disabled and whether or not they're disabled
+    std::unordered_map<int, DisabilityStatusAndTypes> id_disabled_status_map; ///< Map that contains the IDs that need to be disabled and whether or not they're disabled
 };
 
 /**
@@ -287,6 +330,8 @@ private:
     std::pair<unsigned int, unsigned int> arena_tile_count_; ///< Tile count in x and y directions
 
     std::pair<float, float> arena_lower_lim_; ///< Coordinates to the bottom left corner of the arena
+
+    std::unordered_map<DisabilityType, bool> robot_disability_types_; ///< Map to indicate the robots' disability type
 
     std::vector<int> disabled_ids_;
 
