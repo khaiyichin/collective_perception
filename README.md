@@ -20,10 +20,10 @@ The robots in the dynamic topology simulator move around a square arena of black
 ### Local build
 - Python 3.8+ and `pip`
 - CMake 3.15+
-- [ARGoS](https://github.com/ilpincy/argos3.git) - *version used: [da33b87](https://github.com/ilpincy/argos3/tree/da33b8786293dad40307e4182bb791add1e89172)*
-- [Buzz](https://github.com/NESTLab/Buzz) - *version used: [6a9a51f](https://github.com/NESTLab/Buzz/tree/6a9a51f9b658b76fc995152546d4b625e74abb6d)*
+- [ARGoS](https://github.com/ilpincy/argos3.git)
+- [Buzz](https://github.com/NESTLab/Buzz)
 - [Protobuf v21.1+ (`proto3`)](https://github.com/protocolbuffers/protobuf.git) - *source build recommended, although the `apt` package version may work as well*
-- [GraphTool v2.45+](https://graph-tool.skewed.de/)
+- [GraphTool v2.45+](https://graph-tool.skewed.de/) - *can be installed using the `apt` package manager*
 
 ### Container
 - [Apptainer v1.0.2+](https://github.com/apptainer/apptainer)
