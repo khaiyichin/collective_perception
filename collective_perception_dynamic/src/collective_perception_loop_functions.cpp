@@ -271,11 +271,11 @@ void ProcessRobotThought::StoreNeighborValues(const std::string &str_robot_id, b
     // Ensure the type is correct (a table)
     if (!buzzobj_istable(tNeighborVals))
     {
-        LOGERR << str_robot_id << ": variable \"neighbor_vals\" has wrong type " << buzztype_desc[tNeighborVals->o.type] << std::endl;
+        LOGERR << str_robot_id << ": variable \"past_neighbor_vals\" has wrong type " << buzztype_desc[tNeighborVals->o.type] << std::endl;
         return;
     }
 
-    // Extract values from the opened "neighbor_vals" table
+    // Extract values from the opened "past_neighbor_vals" table
     size_t tNeighborValsSize = tNeighborVals->t.value->size; // ->t represents the buzzvm_u union as a table, which is a struct that contains the attribute `value` which is a buzzdict_s type
 
     std::vector<Brain::ValuePair> value_pair_vec; // vecValuePair
@@ -294,7 +294,7 @@ void ProcessRobotThought::StoreNeighborValues(const std::string &str_robot_id, b
         value_pair_vec.push_back(v);
     }
 
-    BuzzTableClose(t_vm); // close the "neighbor_vals" table
+    BuzzTableClose(t_vm); // close the "past_neighbor_vals" table
 
     robot_brain.StoreNeighborValuePairs(value_pair_vec);
 }
@@ -985,21 +985,6 @@ void CollectivePerceptionLoopFunctions::SaveData()
     google::protobuf::ShutdownProtobufLibrary();
 }
 
-std::string CollectivePerceptionLoopFunctions::GetCurrentTimeStr()
-{
-    // Grab current local time
-    time_t curr_time;
-    time(&curr_time);
-    tm *curr_tm = localtime(&curr_time);
-
-    std::string datetime;
-    datetime.resize(100);
-
-    // Convert to string
-    strftime(&(datetime[0]), datetime.size(), "%m%d%y_%H%M%S", curr_tm);
-    return std::string(datetime.c_str());
-}
-
 void CollectivePerceptionLoopFunctions::SampleRobotsToDisable()
 {
     // Clear any old IDs
@@ -1030,24 +1015,6 @@ CColor CollectivePerceptionLoopFunctions::GetFloorColor(const CVector2 &c_positi
     unsigned int color_int = arena_.GetColor(c_position_on_plane.GetX(), c_position_on_plane.GetY());
 
     return color_int == 1 ? CColor::BLACK : CColor::WHITE;
-}
-
-template <typename T>
-std::vector<T> CollectivePerceptionLoopFunctions::GenerateLinspace(const T &min, const T &max, const size_t &steps)
-{
-    // Compute increment
-    T inc = (max - min) / static_cast<T>(steps - 1);
-
-    // Populate vector
-    std::vector<T> output(steps);
-    T val;
-
-    for (auto itr = output.begin(), val = min; itr != output.end(); ++itr, val += inc)
-    {
-        *itr = val;
-    }
-
-    return output;
 }
 
 REGISTER_LOOP_FUNCTIONS(CollectivePerceptionLoopFunctions, "collective_perception_loop_functions")

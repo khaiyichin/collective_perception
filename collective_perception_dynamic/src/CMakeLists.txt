@@ -27,7 +27,7 @@ target_include_directories(collective_perception_test_interface
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
 )
 
-# Build ARGoS loop function library
+# Build ARGoS collective perception loop function library
 add_library(collective_perception_loop_functions
     SHARED
     collective_perception_loop_functions.cpp
@@ -47,6 +47,27 @@ target_link_libraries(collective_perception_loop_functions
     argos3plugin_simulator_media
 )
 target_include_directories(collective_perception_loop_functions
+    PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
+)
+
+# Build ARGoS benchmarking loop function library
+add_library(benchmarking_loop_functions
+    SHARED
+    benchmarking_loop_functions.cpp
+    benchmark_crosscombe_2017.cpp
+)
+target_link_libraries(benchmarking_loop_functions
+    PUBLIC
+    ${BUZZ_LIBRARY}
+    ${PROTO_LIB}
+    argos3core_simulator
+    argos3plugin_simulator_dynamics2d
+    argos3plugin_simulator_entities
+    argos3plugin_simulator_genericrobot
+    argos3plugin_simulator_media
+)
+target_include_directories(benchmarking_loop_functions
     PRIVATE
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
 )

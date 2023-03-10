@@ -17,7 +17,7 @@ link_libraries(${ARGOS_LDFLAGS})
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${Buzz_DIR}")
 include_directories(${BUZZ_C_INCLUDE_DIR})
 include(UseBuzz)
-set(BUZZ_BZZ_INCLUDE_DIR ${BUZZ_BZZ_INCLUDE_DIR} ${CMAKE_SOURCE_DIR})
+set(BUZZ_BZZ_INCLUDE_DIR ${BUZZ_BZZ_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/buzz)
 
 add_subdirectory(src) # add source directory
 add_subdirectory(buzz) # add buzz directory

@@ -1,10 +1,12 @@
-ROTATION_MOTION_ENUM = 0
-STRAIGHT_MOTION_ENUM = 1
-ROTATION_MEAN_DURATION = 5 # in units of timesteps
-STRAIGHT_MEAN_DURATION = 15 # in units of timesteps
-CCW_ENUM = 0 # rotation direction enum
-CW_ENUM = 1 # rotation direction enum
-OBSTACLE_AVOIDANCE_ANG = math.pi/2 # angle range in which objects enter to activate obstacle avoidance sequence in rad
+# ROTATION_MOTION_ENUM = 0
+# STRAIGHT_MOTION_ENUM = 1
+# ROTATION_MEAN_DURATION = 5 # in units of timesteps
+# STRAIGHT_MEAN_DURATION = 15 # in units of timesteps
+# CCW_ENUM = 0 # rotation direction enum
+# CW_ENUM = 1 # rotation direction enum
+# OBSTACLE_AVOIDANCE_ANG = math.pi/2 # angle range in which objects enter to activate obstacle avoidance sequence in rad
+
+include "body_common.bzz"
 
 function init()
 {
@@ -37,7 +39,10 @@ function step()
         # Move robot in random walk fashion
         if (not motion_disabled)
         {
-            move()
+            var movement = move(move_type, move_duration, rot_direction, spd)
+            move_type = movement.type
+            move_duration = movement.duration
+            rot_direction = movement.rot_dir
         }
         else
         {
@@ -60,7 +65,10 @@ function step()
         # Avoid obstacles
         if (not motion_disabled)
         {
-            avoid_obstacles(obstacles)
+            var movement = avoid_obstacles(spd, obstacles)
+            move_type = movement.type
+            move_duration = movement.duration
+            rot_direction = movement.rot_dir
         }
         else
         {
@@ -73,10 +81,16 @@ function step()
     if (not comms_disabled)
     {
         # Broadcast values
-        communicate_tx()
+        communicate_tx("local_vals", local_vals)
 
         # Update values
-        update_received_messages()
+        var neighbor_vals = {.past = past_neighbor_vals, .curr = curr_neighbor_vals}
+
+        neighbor_vals = update_received_messages(neighbor_vals)
+
+        # Update values
+        past_neighbor_vals = neighbor_vals.past
+        curr_neighbor_vals = neighbor_vals.curr
     }
     else
     {
@@ -100,17 +114,17 @@ function destroy() {}
 ##############################
 
 # Transmit own local values
-function communicate_tx()
-{
-    neighbors.broadcast("local_vals", local_vals) # broadcast local estimate
-}
+# function communicate_tx()
+# {
+#     neighbors.broadcast("local_vals", local_vals) # broadcast local estimate
+# }
 
 # Update buffer of received messages
-function update_received_messages()
-{
-    past_neighbor_vals = curr_neighbor_vals
-    curr_neighbor_vals = {}
-}
+# function update_received_messages()
+# {
+#     past_neighbor_vals = curr_neighbor_vals
+#     curr_neighbor_vals = {}
+# }
 
 # Clear the robot values
 function reset_values()
@@ -146,74 +160,74 @@ function reset_values()
     sense_status = 1
 }
 
-# Execute robot motion
-function move()
-{
-    # Random walk based on
-    # G. Valentini, D. Brambilla, H. Hamann, and M. Dorigo, “Collective Perception of Environmental Features in a Robot Swarm”
+# # Execute robot motion
+# function move()
+# {
+#     # Random walk based on
+#     # G. Valentini, D. Brambilla, H. Hamann, and M. Dorigo, “Collective Perception of Environmental Features in a Robot Swarm”
 
-    # Assert that values are correct (only useful in ARGoS simulation)
-    if ( (move_type == nil) and (move_duration != 0) )
-    {
-        logerr("ERROR: move_duration should be 0 when no move type is decided!")
-    }
-    else if ( (move_duration == 0) and (move_type != nil) )
-    {
-        logerr("ERROR: move_duration should be 0 when no move type is decided!")
-    }
+#     # Assert that values are correct (only useful in ARGoS simulation)
+#     if ( (move_type == nil) and (move_duration != 0) )
+#     {
+#         logerr("ERROR: move_duration should be 0 when no move type is decided!")
+#     }
+#     else if ( (move_duration == 0) and (move_type != nil) )
+#     {
+#         logerr("ERROR: move_duration should be 0 when no move type is decided!")
+#     }
 
-    # Select new move and duration if no move type is specified
-    if ( (move_type == nil) and (move_duration == 0) )
-    {
-        # Pick a move type
-        move_type = math.rng.uniform(ROTATION_MOTION_ENUM, STRAIGHT_MOTION_ENUM+1) # 0 for rotate, 1 for straight line
+#     # Select new move and duration if no move type is specified
+#     if ( (move_type == nil) and (move_duration == 0) )
+#     {
+#         # Pick a move type
+#         move_type = math.rng.uniform(ROTATION_MOTION_ENUM, STRAIGHT_MOTION_ENUM+1) # 0 for rotate, 1 for straight line
 
-        # Pick the duration
-        move_duration = (1-move_type)*math.rng.uniform(0, ROTATION_MEAN_DURATION*2+1) + move_type*math.rng.exponential(STRAIGHT_MEAN_DURATION)
+#         # Pick the duration
+#         move_duration = (1-move_type)*math.rng.uniform(0, ROTATION_MEAN_DURATION*2+1) + move_type*math.rng.exponential(STRAIGHT_MEAN_DURATION)
 
-        # Convert move duration to int
-        move_duration = move_duration - (move_duration%1)
-    }
+#         # Convert move duration to int
+#         move_duration = move_duration - (move_duration%1)
+#     }
 
-    # Choose and execute motion type for remaining duration
-    if (move_type == ROTATION_MOTION_ENUM) # rotate
-    {
-        # Pick a direction rotation if not decided previously
-        if (rot_direction == nil)
-        {
-            rot_direction = math.rng.uniform(CCW_ENUM, CW_ENUM+1) # 0 for CCW and 1 for CW
-        }
-        move_rotate(rot_direction)
-    }
-    else
-    {
-        move_straight()
-    }
+#     # Choose and execute motion type for remaining duration
+#     if (move_type == ROTATION_MOTION_ENUM) # rotate
+#     {
+#         # Pick a direction rotation if not decided previously
+#         if (rot_direction == nil)
+#         {
+#             rot_direction = math.rng.uniform(CCW_ENUM, CW_ENUM+1) # 0 for CCW and 1 for CW
+#         }
+#         move_rotate(rot_direction)
+#     }
+#     else
+#     {
+#         move_straight()
+#     }
 
-    # Reduce the duration by one step
-    move_duration = move_duration - 1
+#     # Reduce the duration by one step
+#     move_duration = move_duration - 1
 
-    # Reset move values when move_duration is complete
-    if (move_duration <= 0)
-    {
-        move_type = nil
-        rot_direction = nil
-        move_duration = 0
-    }
-}
+#     # Reset move values when move_duration is complete
+#     if (move_duration <= 0)
+#     {
+#         move_type = nil
+#         rot_direction = nil
+#         move_duration = 0
+#     }
+# }
 
-# Move robot in a straight line
-function move_straight()
-{
-    gotop(spd, 0.0)
-}
+# # Move robot in a straight line
+# function move_straight()
+# {
+#     gotop(spd, 0.0)
+# }
 
-# Rotate robot in-place
-function move_rotate(dir)
-{
-    # gotop(0.0, -1.0^dir * spd) # this doesn't work for spd < 9.5 rad/s, which is too quick
-    set_wheels(-1.0^(1-dir) * spd, -1.0^dir * spd)
-}
+# # Rotate robot in-place
+# function move_rotate(dir)
+# {
+#     # gotop(0.0, -1.0^dir * spd) # this doesn't work for spd < 9.5 rad/s, which is too quick
+#     set_wheels(-1.0^(1-dir) * spd, -1.0^dir * spd)
+# }
 
 # Execute observation
 function observe()
@@ -331,65 +345,65 @@ function observe_noisy(encounter, sensor_prob)
     }
 }
 
-# Detect obstacles
-function detect_obstacles()
-{
-    # Each individual sensor is saturated (value 1.0) by objects closer than 4 cm; the maximum range of the sensor is 12 cm.
-    # Between 4 and 12 cm, the readings follow an exponential law with the distance: 4.14*exp(-33.0*distance)-.085
-    var accum = {}
-    accum.x = 0
-    accum.y = 0
+# # Detect obstacles
+# function detect_obstacles()
+# {
+#     # Each individual sensor is saturated (value 1.0) by objects closer than 4 cm; the maximum range of the sensor is 12 cm.
+#     # Between 4 and 12 cm, the readings follow an exponential law with the distance: 4.14*exp(-33.0*distance)-.085
+#     var accum = {}
+#     accum.x = 0
+#     accum.y = 0
 
-    # Read each proximity sensor
-    var i = 0
+#     # Read each proximity sensor
+#     var i = 0
 
-    while (i < size(proximity))
-    {
-        accum.x = accum.x + proximity[i].value * math.cos(proximity[i].angle)
-        accum.y = accum.y + proximity[i].value * math.sin(proximity[i].angle)
-        i = i + 1
-    }
-    accum.x = accum.x / size(proximity)
-    accum.y = accum.y / size(proximity)
+#     while (i < size(proximity))
+#     {
+#         accum.x = accum.x + proximity[i].value * math.cos(proximity[i].angle)
+#         accum.y = accum.y + proximity[i].value * math.sin(proximity[i].angle)
+#         i = i + 1
+#     }
+#     accum.x = accum.x / size(proximity)
+#     accum.y = accum.y / size(proximity)
 
-    var len = math.sqrt(accum.x * accum.x + accum.y * accum.y) # accumulated length (in arbitrary units)
-    var ang = math.atan(accum.y, accum.x) # accumulated angles
+#     var len = math.sqrt(accum.x * accum.x + accum.y * accum.y) # accumulated length (in arbitrary units)
+#     var ang = math.atan(accum.y, accum.x) # accumulated angles
 
-    # Check if obstacle is detected
-    if (len >= 0.01) # arbitrary (tuned) value for detection activation
-    {
-        if ((ang > -OBSTACLE_AVOIDANCE_ANG) and
-            (ang < OBSTACLE_AVOIDANCE_ANG)) # only activate if within angle range
-        {
-            return {.len = len, .ang = ang}
-        }
-    }
-    else
-    {
-        return nil
-    }
-}
+#     # Check if obstacle is detected
+#     if (len >= 0.01) # arbitrary (tuned) value for detection activation
+#     {
+#         if ((ang > -OBSTACLE_AVOIDANCE_ANG) and
+#             (ang < OBSTACLE_AVOIDANCE_ANG)) # only activate if within angle range
+#         {
+#             return {.len = len, .ang = ang}
+#         }
+#     }
+#     else
+#     {
+#         return nil
+#     }
+# }
 
-# Execute obstacle avoidance sequence
-function avoid_obstacles(obstacles)
-{
-    if (obstacles.ang > 0)
-    {
-        move_rotate(CW_ENUM) # rotate to the right
-    }
-    else
-    {
-        move_rotate(CCW_ENUM) # rotate to the left
-    }
+# # Execute obstacle avoidance sequence
+# function avoid_obstacles(obstacles)
+# {
+#     if (obstacles.ang > 0)
+#     {
+#         move_rotate(CW_ENUM) # rotate to the right
+#     }
+#     else
+#     {
+#         move_rotate(CCW_ENUM) # rotate to the left
+#     }
 
-    # Reset motion
-    move_type = nil
-    rot_direction = nil
-    move_duration = 0
-}
+#     # Reset motion
+#     move_type = nil
+#     rot_direction = nil
+#     move_duration = 0
+# }
 
-# Append element to table as if it's a dynamically-sized array
-function append_to_table(tab, elem)
-{
-    tab[size(tab)] = elem
-}
+# # Append element to table as if it's a dynamically-sized array
+# function append_to_table(tab, elem)
+# {
+#     tab[size(tab)] = elem
+# }

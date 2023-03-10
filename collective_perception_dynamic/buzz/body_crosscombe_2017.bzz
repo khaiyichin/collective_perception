@@ -1,0 +1,71 @@
+include "body_common.bzz"
+
+# Define macros/enum for robot state; if modified then must change at other locations (in C++ header files) 
+STATE_SIGNAL_ENUM = 0
+STATE_UPDATE_ENUM = 1
+
+function init()
+{
+    # neighbors
+
+    # Define listener callback function
+    neighbors.listen("signalled_belief",
+        function(vid, belief, rid) # each belief consists of x and conf
+        {
+            append_to_table(curr_signalled_beliefs, belief)
+        }
+    )
+}
+
+function step()
+{
+
+    # Move
+
+    # Communicate
+    communicate_tx()
+
+    # if malfunctioning, DON'T LISTEN, only transmit
+}
+
+function reset()
+{
+
+}
+
+function destroy() {}
+
+
+##############################
+### User defined functions ###
+##############################
+
+# Clear the robot values
+function reset_values()
+{
+    # Define velocity variables, modified by the ARGoS loop functions
+    spd = nil # cm/s
+
+    # Define initial values, not modified by ARGoS loop functions
+    self_belief = {}
+    past_signalled_beliefs = {}
+    curr_signalled_beliefs = {}
+
+    move_type = nil
+    move_duration = 0
+    rot_direction = nil
+
+    # Define broadcast variables
+    num_choices = 0
+    broadcast_choice = nil
+    broadcast_duration = 0
+
+    # Define default state value (will be set to 0 or 1 later)
+    state = -1
+}
+
+function update_received_messages()
+{
+    past_signalled_beliefs = curr_signalled_beliefs
+    curr_signalled_beliefs = {}
+}

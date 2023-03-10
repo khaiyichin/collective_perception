@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <unordered_map>
-#include <ctime>
 #include <cmath>
 #include <filesystem>
 #include <iomanip>
@@ -19,6 +18,7 @@
 #include <argos3/plugins/simulator/entities/box_entity.h>
 
 // Local headers
+#include "util.hpp"
 #include "arena.hpp"
 #include "brain.hpp"
 #include "simulation_set.hpp"
@@ -266,13 +266,6 @@ private:
     void SampleRobotsToDisable();
 
     /**
-     * @brief Get the current time in string
-     *
-     * @return std::string in mmddyy_HHMMSS form
-     */
-    std::string GetCurrentTimeStr();
-
-    /**
      * @brief Collect robot estimates and confidences
      *
      * @return std::array<std::vector<Brain::ValuePair>, 3> STL array of 3 vector of ValuePair objects; local, social, and informed respectively
@@ -286,18 +279,6 @@ private:
      * @return std::pair<Brain::ValuePair, Brain::ValuePair> STL pair containing sample statistics
      */
     std::pair<Brain::ValuePair, Brain::ValuePair> ComputeValuePairsSampleMeanAndStdDev(const std::vector<Brain::ValuePair> &input);
-
-    /**
-     * @brief Generate a linearly spaced range of values
-     *
-     * @tparam T Any numeric type
-     * @param min Minimum value of range
-     * @param max Maximum value of range
-     * @param steps Number of increments to take in range
-     * @return std::vector<T> STL vector containing the linearly spaced values
-     */
-    template <typename T>
-    std::vector<T> GenerateLinspace(const T &min, const T &max, const size_t &steps);
 
     bool finished_ = false; ///< Flag to indicate whether all simulation parameters have been executed
 
