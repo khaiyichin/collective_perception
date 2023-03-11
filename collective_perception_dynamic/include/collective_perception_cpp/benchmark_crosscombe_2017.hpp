@@ -1,12 +1,15 @@
 #ifndef BENCHMARK_CROSSCOMBE_2017_HPP
 #define BENCHMARK_CROSSCOMBE_2017_HPP
 
-#include "benchmark_algorithm.hpp"
+#include <set>
+#include <sstream>
 
-using namespace argos;
+#include "benchmark_algorithm.hpp"
 
 // Define benchmark algorithm identifier; if modified then must change at other locations
 #define CROSSCOMBE_2017 std::string("crosscombe_2017")
+
+using RobotIdBeliefStrMap = std::unordered_map<std::string, std::vector<std::string>>;
 
 /**
  * @brief Enumeration class for belief states
@@ -29,20 +32,23 @@ enum class RobotState
  * @brief Functor to process the robot belief
  *
  */
-struct ProcessRobotBelief : public CBuzzLoopFunctions::COperation
+struct ProcessRobotBelief : BuzzCOperationFunctorBase
 {
     ProcessRobotBelief() {}
 
     ProcessRobotBelief(const std::string &id_prefix,
                        const int &id_base_num,
                        const int &num_options,
+                       const int &num_robots,
                        const std::vector<int> &malf_robot_ids,
-                       const std::vector<unsigned int> &option_qualities)
-        : prefix(id_prefix),
-          base_num(id_base_num),
+                       const std::vector<unsigned int> &option_qualities,
+                       const std::shared_ptr<RobotIdBeliefStrMap> &id_belief_map_ptr)
+        : BuzzCOperationFunctorBase(id_prefix, id_base_num),
           num_options(num_options),
+          num_robots(num_robots),
           malf_robot_ids(malf_robot_ids),
-          option_qualities(option_qualities)
+          option_qualities(option_qualities),
+          id_belief_map_ptr(id_belief_map_ptr)
     {
         // Initialize generator
         std::random_device rd;
@@ -51,7 +57,16 @@ struct ProcessRobotBelief : public CBuzzLoopFunctions::COperation
 
     virtual void operator()(const std::string &str_robot_id, buzzvm_t t_vm);
 
-    inline void PopulateSelfBelief(buzzvm_t t_vm, const std::vector<int> self_belief)
+    inline std::string ConvertBeliefVecToString(const std::vector<int> &belief_vec)
+    {
+        std::stringstream ss;
+
+        std::copy(belief_vec.begin(), belief_vec.end(), std::ostream_iterator<int>(ss, ""));
+
+        return ss.str();
+    }
+
+    inline void PopulateSelfBeliefVecInVM(buzzvm_t t_vm, const std::vector<int> self_belief)
     {
         BuzzTableOpen(t_vm, "self_belief");
 
@@ -63,7 +78,7 @@ struct ProcessRobotBelief : public CBuzzLoopFunctions::COperation
         BuzzTableClose(t_vm);
     }
 
-    inline std::vector<int> ExtractSelfBelief(buzzvm_t t_vm)
+    inline std::vector<int> ExtractSelfBeliefVecFromVM(buzzvm_t t_vm)
     {
         std::vector<int> belief_vec;
         belief_vec.reserve(num_options);
@@ -87,10 +102,10 @@ struct ProcessRobotBelief : public CBuzzLoopFunctions::COperation
      * @param signalled_belief_vec Beliefs of the selected neighboring robot
      * @return std::vector<int> Updated beliefs of the current robot
      */
-    std::vector<int> UpdateBelief(const std::vector<int> &self_belief_vec,
-                                  const std::vector<int> &signalled_belief_vec);
+    std::vector<int> UpdateSelfBeliefVec(const std::vector<int> &self_belief_vec,
+                                         const std::vector<int> &signalled_belief_vec);
 
-    inline std::vector<int> GetBeliefFromRandomOption(const std::vector<int> options_indices)
+    inline std::vector<int> GenerateBeliefVecFromRandomOption(const std::vector<int> options_indices)
     {
         std::vector<int> selection(1);
 
@@ -124,17 +139,6 @@ struct ProcessRobotBelief : public CBuzzLoopFunctions::COperation
      */
     inline int GetBroadcastDuration(const unsigned int &option_id) { return option_qualities[option_id]; }
 
-    /**
-     * @brief Strips the string prefix in the robot ID to obtain the numeric part
-     *
-     * @param str_robot_id Robot ID
-     * @return int Numeric part of the robot ID
-     */
-    inline int GetNumericId(std::string str_robot_id)
-    {
-        return std::stoi(str_robot_id.erase(0, prefix.length()));
-    }
-
     inline bool IsMalfunctioning(const std::string &str_robot_id)
     {
         return std::find(malf_robot_ids.begin(), malf_robot_ids.end(), GetNumericId(str_robot_id)) != malf_robot_ids.end();
@@ -142,17 +146,19 @@ struct ProcessRobotBelief : public CBuzzLoopFunctions::COperation
 
     std::mt19937 generator;
 
-    std::string prefix;
-
-    int base_num;
-
     int num_options;
 
-    bool init = false;
+    int num_robots;
+
+    bool initialized = false;
+
+    std::set<std::string> initialized_robot_ids;
 
     std::vector<int> malf_robot_ids;
 
     std::vector<unsigned int> option_qualities;
+
+    std::shared_ptr<RobotIdBeliefStrMap> id_belief_map_ptr;
 };
 
 struct BenchmarkDataCrosscombe2017 : BenchmarkDataBase
@@ -169,11 +175,17 @@ struct BenchmarkDataCrosscombe2017 : BenchmarkDataBase
 class BenchmarkCrosscombe2017 : public BenchmarkAlgorithmTemplate<BenchmarkDataCrosscombe2017>
 {
 public:
-    BenchmarkCrosscombe2017(TConfigurationNode &t_tree);
+    BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_foreach_vm_func, TConfigurationNode &t_tree);
 
     void SetupExperiment(const std::pair<double, double> &curr_paired_parameters);
 
+    void PostStep();
+
+    void PostExperiment();
+
     void InitializeJson(const std::pair<double, double> &curr_paired_parameters);
+
+    void ComputeStats();
 
     void WriteToJson();
 
@@ -187,6 +199,8 @@ private:
     ProcessRobotBelief process_robot_belief_functor_;
 
     std::vector<unsigned int> curr_option_qualities_;
+
+    std::shared_ptr<RobotIdBeliefStrMap> id_belief_map_ptr_;
 };
 
 #endif

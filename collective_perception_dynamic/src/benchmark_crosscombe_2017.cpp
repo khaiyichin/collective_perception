@@ -2,22 +2,36 @@
 
 void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 {
-    if (!init)
+    if (!initialized)
     {
         // Initialize self belief states to be indeterminate
         std::vector<int> init_belief(num_options, static_cast<int>(BeliefState::indeterminate));
 
-        PopulateSelfBelief(t_vm, init_belief);
+        PopulateSelfBeliefVecInVM(t_vm, init_belief);
 
         // Update the robot state
         BuzzPut(t_vm, "state", static_cast<int>(RobotState::signalling));
 
-        init = true;
+        std::pair<std::set<std::string>::iterator, bool> insert_receipt = initialized_robot_ids.insert(str_robot_id);
+
+        if (insert_receipt.second == false)
+        {
+            THROW_ARGOSEXCEPTION("The same robot has been initialized!");
+        }
+
+        if (initialized_robot_ids.size() == num_robots)
+        {
+            initialized = true;
+        }
+
+        (*id_belief_map_ptr)[str_robot_id.c_str()] = std::vector<std::string>{};
     }
     else
     {
         // Only update beliefs if in updating state
-        if (buzzobj_getint(BuzzGet(t_vm, "state")) == static_cast<int>(RobotState::updating))
+        int state = buzzobj_getint(BuzzGet(t_vm, "state"));
+
+        if (state == static_cast<int>(RobotState::updating))
         {
             // Prevent belief updates if robot is malfunctioning
             if (IsMalfunctioning(str_robot_id))
@@ -26,9 +40,9 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                 std::vector<int> all_options_indices(num_options);
                 std::iota(all_options_indices.begin(), all_options_indices.end(), 0);
 
-                std::vector<int> self_belief = GetBeliefFromRandomOption(all_options_indices);
+                std::vector<int> self_belief = GenerateBeliefVecFromRandomOption(all_options_indices);
 
-                PopulateSelfBelief(t_vm, self_belief);
+                PopulateSelfBeliefVecInVM(t_vm, self_belief);
             }
             else
             {
@@ -63,10 +77,11 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
 
                 */
 
-                // Define vectors for storing beliefs and pre-allocate space
-
                 // Extract self belief
-                std::vector<int> self_belief = ExtractSelfBelief(t_vm);
+                std::vector<int> self_belief = ExtractSelfBeliefVecFromVM(t_vm);
+
+                // Store self belief
+                (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(self_belief));
 
                 // Pick one of the neighbors to use their beliefs
                 std::vector<int> signalled_belief;
@@ -91,7 +106,6 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                     int random_neighbor_index = dist(generator);
 
                     // Extract randomly picked neighbor's belief
-
                     BuzzTableOpenNested(t_vm, std::to_string(random_neighbor_index));
 
                     for (int i = 0; i < num_options; ++i)
@@ -105,7 +119,7 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                 BuzzTableClose(t_vm);
 
                 // Update self belief
-                self_belief = UpdateBelief(self_belief, signalled_belief);
+                self_belief = UpdateSelfBeliefVec(self_belief, signalled_belief);
 
                 // Obtain broadcast duration based on self belief
                 size_t option = std::find(self_belief.begin(),
@@ -113,18 +127,29 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                                           static_cast<int>(BeliefState::positive)) -
                                 self_belief.begin();
 
-                // Get broadcast duration based on the selected option
-                GetBroadcastDuration(option);
+                // Update broadcast duration based on the selected option
+                int duration = GetBroadcastDuration(option);
+
+                BuzzPut(t_vm, "broadcast_duration", duration);
 
                 // Populate self belief into the Buzz VM
-                PopulateSelfBelief(t_vm, self_belief);
+                PopulateSelfBeliefVecInVM(t_vm, self_belief);
             }
+        }
+        else if (!IsMalfunctioning(str_robot_id) && state == static_cast<int>(RobotState::signalling)) // non-malfunctioning and signalling
+        {
+            // Extract and store self belief
+            std::vector<int> self_belief = ExtractSelfBeliefVecFromVM(t_vm);
+
+            (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(self_belief));
         }
     }
 }
 
-std::vector<int> ProcessRobotBelief::UpdateBelief(const std::vector<int> &self_belief_vec,
-                                                  const std::vector<int> &signalled_belief_vec)
+// std::string ProcessRobotBelief::ConvertBeliefVecToString(const std::vector<int> &belief_vec)
+
+std::vector<int> ProcessRobotBelief::UpdateSelfBeliefVec(const std::vector<int> &self_belief_vec,
+                                                         const std::vector<int> &signalled_belief_vec)
 {
     /*
         The updated belief vector returned will only contain one positive belief and n-1 negative beliefs.
@@ -165,21 +190,14 @@ std::vector<int> ProcessRobotBelief::UpdateBelief(const std::vector<int> &self_b
 
             if (num_int_beliefs == 1) // only one of the beliefs is indeterminate
             {
-                std::replace(updated_belief.begin(), updated_belief.end(), static_cast<int>(BeliefState::indeterminate), static_cast<int>(BeliefState::positive));
+                std::replace(updated_belief.begin(),
+                             updated_belief.end(),
+                             static_cast<int>(BeliefState::indeterminate),
+                             static_cast<int>(BeliefState::positive));
             }
             else // multiple indeterminate beliefs
             {
-                // Randomly select one of the indeterminate beliefs
-                // std::sample(int_belief_indices.begin(),
-                //             int_belief_indices.end(),
-                //             randomly_selected_index.begin(),
-                //             1,
-                //             generator);
-
-                // updated_belief = std::vector<int>(0, num_options);
-                // updated_belief[selection] = static_cast<int>(BeliefState::positive);
-
-                updated_belief = GetBeliefFromRandomOption(int_belief_indices);
+                updated_belief = GenerateBeliefVecFromRandomOption(int_belief_indices);
             }
         }
     }
@@ -208,7 +226,8 @@ int ProcessRobotBelief::GetTruthValue(const int &self_belief,
     }
 }
 
-BenchmarkCrosscombe2017::BenchmarkCrosscombe2017(TConfigurationNode &t_tree)
+BenchmarkCrosscombe2017::BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_foreach_vm_func, TConfigurationNode &t_tree)
+    : BenchmarkAlgorithmTemplate<BenchmarkDataCrosscombe2017>(buzz_foreach_vm_func)
 {
     // Grab number of possible options
     GetNodeAttribute(GetNode(t_tree, "num_possible_options"), "int", data_.num_possible_options);
@@ -228,12 +247,6 @@ BenchmarkCrosscombe2017::BenchmarkCrosscombe2017(TConfigurationNode &t_tree)
 
 void BenchmarkCrosscombe2017::SetupExperiment(const std::pair<double, double> &curr_paired_parameters)
 {
-    // // (Re-)Sample robots to disable at random
-    // if (disabled_time_in_ticks_ > 0)
-    // {
-    //     SampleRobotsToDisable();
-    // }
-
     // Compute current option qualities
     ComputeOptionQualities(curr_paired_parameters.first);
 
@@ -245,24 +258,15 @@ void BenchmarkCrosscombe2017::SetupExperiment(const std::pair<double, double> &c
     // Setup functors
     process_robot_belief_functor_ = ProcessRobotBelief(data_.id_prefix,
                                                        data_.id_base_num,
+                                                       data_.num_possible_options,
                                                        data_.num_agents,
                                                        malf_robot_ids,
-                                                       curr_option_qualities_);
+                                                       curr_option_qualities_,
+                                                       id_belief_map_ptr_);
 
-    // Run
-
-    // std::vector<AgentData> *curr_agent_data_vec_ptr = &curr_agent_data_packet_.repeated_agent_data_vec[trial_counter_];
-
-    // initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, simulation_parameters_.speed_, legacy_);
-    // process_thought_functor_ = ProcessRobotThought(id_brain_map_ptr_,
-    //                                                curr_agent_data_vec_ptr,
-    //                                                id_prefix_,
-    //                                                id_base_num_,
-    //                                                disabled_ids_,
-    //                                                robot_disability_types_);
-
-    // // Re-initialize each robot
-    // BuzzForeachVM(initialization_functor_);
+    // Initialize each robot
+    // (*buzz_foreach_vm_func_ptr_)(process_robot_belief_functor_);
+    buzz_foreach_vm_func_(process_robot_belief_functor_);
 
     // Compute the pre-experiment statistics
     // ComputeStats();
@@ -270,19 +274,35 @@ void BenchmarkCrosscombe2017::SetupExperiment(const std::pair<double, double> &c
     return;
 }
 
+void BenchmarkCrosscombe2017::ComputeStats()
+{
+    // Store
+    // curr_json_data_itr_;
+}
+
+void BenchmarkCrosscombe2017::PostStep()
+{
+    // Iterate through robots to process their beliefs
+    buzz_foreach_vm_func_(process_robot_belief_functor_);
+
+    // ComputeStats(); ?
+}
+
+void BenchmarkCrosscombe2017::PostExperiment()
+{
+}
+
 void BenchmarkCrosscombe2017::InitializeJson(const std::pair<double, double> &curr_paired_parameters)
 {
-    curr_json_ = json::object();
-
-    curr_json_["sim_type"] = data_.simulation_type;
-    curr_json_["num_agents"] = data_.num_agents;
-    curr_json_["num_trials"] = data_.num_trials;
-    curr_json_["num_steps"] = data_.num_steps;
-    curr_json_["comms_range"] = data_.comms_range;
-    curr_json_["density"] = data_.density;
-    curr_json_["tfr"] = curr_paired_parameters.first;
-    curr_json_[data_.parameter_keyword] = curr_paired_parameters.second;
-    curr_json_["option_qualities"] = curr_option_qualities_;
+    (*curr_json_data_itr_)["sim_type"] = data_.simulation_type;
+    (*curr_json_data_itr_)["num_agents"] = data_.num_agents;
+    (*curr_json_data_itr_)["num_trials"] = data_.num_trials;
+    (*curr_json_data_itr_)["num_steps"] = data_.num_steps;
+    (*curr_json_data_itr_)["comms_range"] = data_.comms_range;
+    (*curr_json_data_itr_)["density"] = data_.density;
+    (*curr_json_data_itr_)["tfr"] = curr_paired_parameters.first;
+    (*curr_json_data_itr_)[data_.parameter_keyword] = curr_paired_parameters.second;
+    (*curr_json_data_itr_)["option_qualities"] = curr_option_qualities_;
 }
 
 void BenchmarkCrosscombe2017::WriteToJson()

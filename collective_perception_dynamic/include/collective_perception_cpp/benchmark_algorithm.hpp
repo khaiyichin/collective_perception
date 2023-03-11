@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <random>
+#include <functional>
 
 // Buzz and ARGoS headers
 #include <buzz/argos/buzz_loop_functions.h>
@@ -14,7 +15,37 @@
 #include "util.hpp"
 #include "data_common.hpp"
 
+using namespace argos;
 using namespace nlohmann;
+// using (CBuzzLoopFunctions::*BuzzForeachVM)(std::function<void(const std::string &, buzzvm_t)>) = void;
+using BuzzForeachVMFunc = std::function<void(CBuzzLoopFunctions::COperation &)>;
+
+struct BuzzCOperationFunctorBase : public CBuzzLoopFunctions::COperation
+{
+    BuzzCOperationFunctorBase() {}
+
+    BuzzCOperationFunctorBase(const std::string &id_prefix,
+                              const int &id_base_num)
+        : prefix(id_prefix),
+          base_num(id_base_num) {}
+
+    virtual ~BuzzCOperationFunctorBase() {}
+
+    /**
+     * @brief Strips the string prefix in the robot ID to obtain the numeric part
+     *
+     * @param str_robot_id Robot ID
+     * @return int Numeric part of the robot ID
+     */
+    inline int GetNumericId(std::string str_robot_id)
+    {
+        return std::stoi(str_robot_id.erase(0, prefix.length()));
+    }
+
+    std::string prefix;
+
+    int base_num;
+};
 
 struct BenchmarkDataBase
 {
@@ -45,12 +76,20 @@ struct BenchmarkDataBase
 
     std::vector<double> tfr_range;
 
-    std::vector<json> data;
+    std::vector<json> json_data;
 };
 
 class BenchmarkAlgorithmBase
 {
 public:
+    BenchmarkAlgorithmBase() {}
+
+    BenchmarkAlgorithmBase(const BuzzForeachVMFunc &buzz_foreach_vm_func)
+        // : buzz_foreach_vm_func_ptr_(std::make_shared<BuzzForeachVMFunc>(std::move(buzz_foreach_vm_func))) {}
+        : buzz_foreach_vm_func_(buzz_foreach_vm_func)
+    {
+    }
+
     virtual ~BenchmarkAlgorithmBase() {}
 
     virtual void Init();
@@ -61,6 +100,8 @@ public:
 
     virtual void SetupExperiment(const std::pair<double, double> &curr_paired_parameters);
 
+    virtual void ComputeStats();
+
     virtual void InitializeJson(const std::pair<double, double> &curr_paired_parameters) {}
 
     virtual void WriteToJson() {}
@@ -70,7 +111,10 @@ public:
     virtual std::vector<double> GetParameterRange();
 
 protected:
-    json curr_json_;
+    std::vector<json>::iterator curr_json_data_itr_;
+
+    // std::shared_ptr<BuzzForeachVMFunc> buzz_foreach_vm_func_ptr_;
+    BuzzForeachVMFunc buzz_foreach_vm_func_;
 };
 
 template <typename T>
@@ -78,6 +122,9 @@ class BenchmarkAlgorithmTemplate : public BenchmarkAlgorithmBase
 {
 public:
     BenchmarkAlgorithmTemplate() {}
+
+    BenchmarkAlgorithmTemplate(const BuzzForeachVMFunc &buzz_foreach_vm_func)
+        : BenchmarkAlgorithmBase(buzz_foreach_vm_func) {}
 
     std::string GetParameterString() { return data_.parameter_str; }
 

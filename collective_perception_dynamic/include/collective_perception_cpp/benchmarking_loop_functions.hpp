@@ -111,10 +111,6 @@ private:
 
     int id_base_num_; ///< Starting ID for robots
 
-    int disabled_time_in_ticks_; ///< Simulation time in ticks that robots are disabled
-
-    float ticks_per_sec_; ///< Number of ticks in one second
-
     std::vector<std::pair<double, double>> paired_parameter_ranges_;
 
     std::vector<std::pair<double, double>>::iterator curr_paired_parameter_range_itr_;

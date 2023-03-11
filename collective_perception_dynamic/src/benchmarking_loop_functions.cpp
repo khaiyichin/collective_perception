@@ -149,10 +149,19 @@ void BenchmarkingLoopFunctions::Init(TConfigurationNode &t_tree)
 
 void BenchmarkingLoopFunctions::InitializeBenchmarkAlgorithm(TConfigurationNode &t_tree)
 {
+    // Define a lambda function for disambiguating the BuzzForeachVM function
+    // This is needed to pass into the BenchmarkAlgorithmBase class, which otherwise wouldn't have access
+    auto buzz_foreach_vm_func = [this](CBuzzLoopFunctions::COperation &arg)
+    { CBuzzLoopFunctions::BuzzForeachVM(arg); };
+
     // Determine algorithm type
     if (algorithm_str_id_ == CROSSCOMBE_2017)
     {
-        benchmark_algo_ptr_ = std::make_shared<BenchmarkCrosscombe2017>(t_tree);
+        // benchmark_algo_ptr_ =
+        //     std::make_shared<BenchmarkCrosscombe2017>(t_tree,
+        //                                               std::bind(&CBuzzLoopFunctions::BuzzForeachVM, this, std::placeholders::_1));
+        benchmark_algo_ptr_ =
+            std::make_shared<BenchmarkCrosscombe2017>(buzz_foreach_vm_func, t_tree);
     }
     else
     {
