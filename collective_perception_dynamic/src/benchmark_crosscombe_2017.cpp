@@ -4,13 +4,16 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
 {
     if (!initialized)
     {
+        // Set robot speed
+        BuzzPut(t_vm, "spd", spd);
+
         // Initialize self belief states to be indeterminate
         std::vector<int> init_belief(num_options, static_cast<int>(BeliefState::indeterminate));
 
         PopulateSelfBeliefVecInVM(t_vm, init_belief);
 
         // Update the robot state
-        BuzzPut(t_vm, "state", static_cast<int>(RobotState::signalling));
+        BuzzPut(t_vm, "state", static_cast<int>(RobotState::updating));
 
         std::pair<std::set<std::string>::iterator, bool> insert_receipt = initialized_robot_ids.insert(str_robot_id);
 
@@ -25,22 +28,24 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
         }
 
         (*id_belief_map_ptr)[str_robot_id.c_str()] = std::vector<std::string>{};
+        (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(init_belief));
     }
     else
     {
         // Only update beliefs if in updating state
         int state = buzzobj_getint(BuzzGet(t_vm, "state"));
+        std::vector<int> self_belief;
 
         if (state == static_cast<int>(RobotState::updating))
         {
-            // Prevent belief updates if robot is malfunctioning
-            if (IsMalfunctioning(str_robot_id))
+            // Prevent belief updates if robot is flawed
+            if (IsFlawed(str_robot_id))
             {
                 // Pick random option
                 std::vector<int> all_options_indices(num_options);
                 std::iota(all_options_indices.begin(), all_options_indices.end(), 0);
 
-                std::vector<int> self_belief = GenerateBeliefVecFromRandomOption(all_options_indices);
+                self_belief = GenerateBeliefVecFromRandomOption(all_options_indices);
 
                 PopulateSelfBeliefVecInVM(t_vm, self_belief);
             }
@@ -78,10 +83,7 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                 */
 
                 // Extract self belief
-                std::vector<int> self_belief = ExtractSelfBeliefVecFromVM(t_vm);
-
-                // Store self belief
-                (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(self_belief));
+                self_belief = ExtractSelfBeliefVecFromVM(t_vm);
 
                 // Pick one of the neighbors to use their beliefs
                 std::vector<int> signalled_belief;
@@ -101,25 +103,41 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                     // Randomly draw one value from the opened `past_signalled_beliefs` table
                     size_t tSignalledBeliefsSize = tSignalledBeliefs->t.value->size; // ->t represents the buzzvm_u union as a table, which is a struct that contains the attribute `value` which is a buzzdict_s type
 
-                    std::uniform_int_distribution<int> dist(0, tSignalledBeliefsSize);
-
-                    int random_neighbor_index = dist(generator);
-
-                    // Extract randomly picked neighbor's belief
-                    BuzzTableOpenNested(t_vm, std::to_string(random_neighbor_index));
-
-                    for (int i = 0; i < num_options; ++i)
+                    // Check whether signalled beliefs have been received
+                    if (tSignalledBeliefsSize == 0)
                     {
-                        signalled_belief.push_back(buzzobj_getint(BuzzTableGet(t_vm, std::to_string(i))));
-                    }
+                        // Pick random option if there is no positive beliefs
+                        if (std::count(self_belief.begin(), self_belief.end(), static_cast<int>(BeliefState::positive)) == 0)
+                        {
+                            // Pick random option
+                            std::vector<int> all_options_indices(num_options);
+                            std::iota(all_options_indices.begin(), all_options_indices.end(), 0);
 
-                    BuzzTableCloseNested(t_vm);
+                            self_belief = GenerateBeliefVecFromRandomOption(all_options_indices);
+                        }
+                    }
+                    else // signalled beliefs have been received
+                    {
+                        std::uniform_int_distribution<int> dist(0, tSignalledBeliefsSize);
+
+                        int random_neighbor_index = dist(generator);
+
+                        // Extract randomly picked neighbor's belief
+                        BuzzTableOpenNested(t_vm, std::to_string(random_neighbor_index));
+
+                        for (int i = 0; i < num_options; ++i)
+                        {
+                            signalled_belief.push_back(buzzobj_getint(BuzzTableGet(t_vm, i)));
+                        }
+
+                        BuzzTableCloseNested(t_vm);
+
+                        // Update self belief
+                        self_belief = UpdateSelfBeliefVec(self_belief, signalled_belief);
+                    }
                 }
 
                 BuzzTableClose(t_vm);
-
-                // Update self belief
-                self_belief = UpdateSelfBeliefVec(self_belief, signalled_belief);
 
                 // Obtain broadcast duration based on self belief
                 size_t option = std::find(self_belief.begin(),
@@ -135,18 +153,19 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                 // Populate self belief into the Buzz VM
                 PopulateSelfBeliefVecInVM(t_vm, self_belief);
             }
+
+            // Update the robot state
+            BuzzPut(t_vm, "state", static_cast<int>(RobotState::signalling));
         }
-        else if (!IsMalfunctioning(str_robot_id) && state == static_cast<int>(RobotState::signalling)) // non-malfunctioning and signalling
+        else if (!IsFlawed(str_robot_id) && state == static_cast<int>(RobotState::signalling)) // non-flawed and signalling
         {
             // Extract and store self belief
-            std::vector<int> self_belief = ExtractSelfBeliefVecFromVM(t_vm);
-
-            (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(self_belief));
+            self_belief = ExtractSelfBeliefVecFromVM(t_vm);
         }
+
+        (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(self_belief));
     }
 }
-
-// std::string ProcessRobotBelief::ConvertBeliefVecToString(const std::vector<int> &belief_vec)
 
 std::vector<int> ProcessRobotBelief::UpdateSelfBeliefVec(const std::vector<int> &self_belief_vec,
                                                          const std::vector<int> &signalled_belief_vec)
@@ -158,13 +177,18 @@ std::vector<int> ProcessRobotBelief::UpdateSelfBeliefVec(const std::vector<int> 
     */
 
     // Define a lambda function to capture a reference to this object instance to call the member function
-    auto truth_func = [this](const int &a, const int &b)
+    auto truth_func = [&, this](const int &a, const int &b)
     { return GetTruthValue(a, b); };
 
     // Update self belief
     std::vector<int> updated_belief;
+    updated_belief.reserve(self_belief_vec.size());
 
-    std::transform(self_belief_vec.begin(), self_belief_vec.end(), signalled_belief_vec.begin(), updated_belief.begin(), truth_func);
+    std::transform(self_belief_vec.begin(),
+                   self_belief_vec.end(),
+                   signalled_belief_vec.begin(),
+                   std::back_inserter(updated_belief),
+                   truth_func);
 
     // Normalize the updated belief so that it consists of only one strong belief or only indeterminate & negative beliefs
     int num_pos_beliefs = std::count(updated_belief.begin(),
@@ -177,7 +201,7 @@ std::vector<int> ProcessRobotBelief::UpdateSelfBeliefVec(const std::vector<int> 
         {
             // Check the number of indeterminate belief states
             int num_int_beliefs = 0;
-            std::vector<int> int_belief_indices, randomly_selected_index(1);
+            std::vector<int> int_belief_indices;
 
             for (auto itr = updated_belief.begin(); itr != updated_belief.end(); ++itr)
             {
@@ -236,7 +260,7 @@ BenchmarkCrosscombe2017::BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_f
     double min, max;
     int steps;
 
-    TConfigurationNode &flawed_ratio_range_node = GetNode(t_tree, "flawed_ratio_range");
+    TConfigurationNode &flawed_ratio_range_node = GetNode(t_tree, CROSSCOMBE_2017_PARAM + "_range");
 
     GetNodeAttribute(flawed_ratio_range_node, "min", min);
     GetNodeAttribute(flawed_ratio_range_node, "max", max);
@@ -245,68 +269,145 @@ BenchmarkCrosscombe2017::BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_f
     data_.flawed_ratio_range = GenerateLinspace(min, max, steps);
 }
 
-void BenchmarkCrosscombe2017::SetupExperiment(const std::pair<double, double> &curr_paired_parameters)
+void BenchmarkCrosscombe2017::SetupExperiment(const int &trial_ind, const std::pair<double, double> &curr_paired_parameters)
 {
+    // Assign values to member variables
+    curr_trial_ind_ = trial_ind;
+    curr_paired_parameters_ = curr_paired_parameters;
+
     // Compute current option qualities
     ComputeOptionQualities(curr_paired_parameters.first);
 
-    // Sample robots to make unreliable (malfunctioning robots)
-    int num_malf_robots = static_cast<int>(std::round(data_.num_agents * curr_paired_parameters.second));
+    // Sample robots to make unreliable (flawed robots)
+    double num_flawed_robots_decimal = data_.num_agents * curr_paired_parameters.second;
+    curr_num_flawed_robots_ = static_cast<int>(std::round(num_flawed_robots_decimal)); // the actual number of flawed robots for the current setup
 
-    std::vector<int> malf_robot_ids = SampleRobotIdsWithoutReplacement(num_malf_robots, data_.id_base_num);
+    if (std::fmod(num_flawed_robots_decimal, 1.0) != 0)
+    {
+        LOG << "[INFO] The desired number of flawed robots = "
+            << num_flawed_robots_decimal << " is not an integer. This will be rounded to the next closest integer = "
+            << curr_num_flawed_robots_ << std::endl;
+    }
+
+    std::vector<int> flawed_robot_ids = SampleRobotIdsWithoutReplacement(curr_num_flawed_robots_, data_.id_base_num);
 
     // Setup functors
+    id_belief_map_ptr_ = std::make_shared<RobotIdBeliefStrMap>();
+
     process_robot_belief_functor_ = ProcessRobotBelief(data_.id_prefix,
                                                        data_.id_base_num,
                                                        data_.num_possible_options,
                                                        data_.num_agents,
-                                                       malf_robot_ids,
+                                                       data_.speed,
+                                                       flawed_robot_ids,
                                                        curr_option_qualities_,
                                                        id_belief_map_ptr_);
 
     // Initialize each robot
-    // (*buzz_foreach_vm_func_ptr_)(process_robot_belief_functor_);
     buzz_foreach_vm_func_(process_robot_belief_functor_);
 
-    // Compute the pre-experiment statistics
-    // ComputeStats();
+    // Initialize JSON file
+    InitializeJson();
 
     return;
-}
-
-void BenchmarkCrosscombe2017::ComputeStats()
-{
-    // Store
-    // curr_json_data_itr_;
 }
 
 void BenchmarkCrosscombe2017::PostStep()
 {
     // Iterate through robots to process their beliefs
     buzz_foreach_vm_func_(process_robot_belief_functor_);
-
-    // ComputeStats(); ?
 }
 
-void BenchmarkCrosscombe2017::PostExperiment()
+void BenchmarkCrosscombe2017::PostExperiment(const bool &final_experiment /*=false*/)
 {
+    // Store new trial result
+    std::string key = "beliefs";
+
+    // Store data into current json
+    std::vector<std::vector<std::string>> vec;
+    vec.reserve(data_.num_agents);
+
+    for (auto itr = id_belief_map_ptr_->begin(); itr != id_belief_map_ptr_->end(); ++itr)
+    {
+        vec.push_back(itr->second); // store the values from the map, which are vectors of strings
+    }
+
+    curr_json_[key] = vec;
+    data_.json_data.push_back(curr_json_);
 }
 
-void BenchmarkCrosscombe2017::InitializeJson(const std::pair<double, double> &curr_paired_parameters)
+void BenchmarkCrosscombe2017::InitializeJson()
 {
-    (*curr_json_data_itr_)["sim_type"] = data_.simulation_type;
-    (*curr_json_data_itr_)["num_agents"] = data_.num_agents;
-    (*curr_json_data_itr_)["num_trials"] = data_.num_trials;
-    (*curr_json_data_itr_)["num_steps"] = data_.num_steps;
-    (*curr_json_data_itr_)["comms_range"] = data_.comms_range;
-    (*curr_json_data_itr_)["density"] = data_.density;
-    (*curr_json_data_itr_)["tfr"] = curr_paired_parameters.first;
-    (*curr_json_data_itr_)[data_.parameter_keyword] = curr_paired_parameters.second;
-    (*curr_json_data_itr_)["option_qualities"] = curr_option_qualities_;
+    curr_json_ = ordered_json{};
+    curr_json_["sim_type"] = data_.simulation_type;
+    curr_json_["num_agents"] = data_.num_agents;
+    curr_json_["num_trials"] = data_.num_trials;
+    curr_json_["num_steps"] = data_.num_steps;
+    curr_json_["comms_range"] = data_.comms_range;
+    curr_json_["density"] = data_.density;
+    curr_json_["tfr"] = curr_paired_parameters_.first;
+    curr_json_[CROSSCOMBE_2017_PARAM_ABBR] = curr_paired_parameters_.second;
+    curr_json_["num_flawed_robots"] = curr_num_flawed_robots_;
+    curr_json_["option_qualities"] = curr_option_qualities_;
+    curr_json_["trial_ind"] = curr_trial_ind_;
 }
 
-void BenchmarkCrosscombe2017::WriteToJson()
+void BenchmarkCrosscombe2017::SaveData(const std::string &foldername_prefix /*=""*/)
 {
+    // Create high-level folder
+    std::string folder = foldername_prefix +
+                         "tfr" +
+                         Round1000DoubleToStr(data_.tfr_range.front()) +
+                         "-" +
+                         Round1000DoubleToStr(
+                             data_.tfr_range.size() > 1 ? (data_.tfr_range.back() - data_.tfr_range.front()) /
+                                                              (data_.tfr_range.size())
+                                                        : 0) +
+                         "-" +
+                         Round1000DoubleToStr(data_.tfr_range.back()) + "_" +
+                         CROSSCOMBE_2017_PARAM_ABBR +
+                         Round1000DoubleToStr(data_.flawed_ratio_range.front()) +
+                         "-" +
+                         Round1000DoubleToStr(
+                             data_.flawed_ratio_range.size() > 1 ? (data_.flawed_ratio_range.back() - data_.flawed_ratio_range.front()) /
+                                                                       (data_.flawed_ratio_range.size())
+                                                                 : 0) +
+                         "-" +
+                         Round1000DoubleToStr(data_.flawed_ratio_range.back()) + "_" +
+                         "opt" + std::to_string(data_.num_possible_options);
+
+    std::filesystem::create_directory(folder);
+
+    // Write JSON files into folder
+    std::string filepath_prefix = folder + "/";
+
+    // Strip extension from filename
+    std::pair<std::string, std::string> name_ext_pair_output;
+    std::stringstream stream_output(data_.output_filename);
+
+    getline(stream_output, name_ext_pair_output.first, '.');  // filename
+    getline(stream_output, name_ext_pair_output.second, '.'); // extension
+
+    if (name_ext_pair_output.second.empty()) // in case no extension was provided
+    {
+        name_ext_pair_output.second = "json";
+    }
+
+    // Create individual JSON files
+    for (auto itr = data_.json_data.begin(); itr != data_.json_data.end(); ++itr)
+    {
+        std::string filename =
+            "tfr" + Round1000DoubleToStr((*itr)["tfr"].get<double>()) + "_" +
+            CROSSCOMBE_2017_PARAM_ABBR + Round1000DoubleToStr((*itr)[CROSSCOMBE_2017_PARAM_ABBR]) + "_" +
+            "t" + std::to_string((*itr)["trial_ind"].get<int>());
+
+        filename = filepath_prefix + name_ext_pair_output.first + "_" + filename + "." + name_ext_pair_output.second;
+
+        // Export to single JSON file
+        std::ofstream outfile(filename);
+
+        outfile << std::setw(4) << (*itr) << std::endl; // write pretty JSON
+    }
 }
 
 void BenchmarkCrosscombe2017::ComputeOptionQualities(const double &curr_tfr)
@@ -326,6 +427,6 @@ void BenchmarkCrosscombe2017::ComputeOptionQualities(const double &curr_tfr)
     }
 
     // Normalize weights into qualities
-    std::transform(weights.begin(), weights.end(), curr_option_qualities_.begin(), [&total_weight](double w)
+    std::transform(weights.begin(), weights.end(), std::back_inserter(curr_option_qualities_), [&total_weight](double w)
                    { return static_cast<unsigned int>(std::round(100 * w / total_weight)); });
 }

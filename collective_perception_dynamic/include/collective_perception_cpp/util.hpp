@@ -38,5 +38,9 @@ inline std::string GetCurrentTimeStr()
     return std::string(datetime.c_str());
 }
 
+inline std::string Round1000DoubleToStr(const double &val)
+{
+    return std::to_string(static_cast<int>(std::round(val * 1e3)));
+}
 
 #endif

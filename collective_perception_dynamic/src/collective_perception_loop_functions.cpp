@@ -919,31 +919,31 @@ void CollectivePerceptionLoopFunctions::SaveData()
     sim_agent_data_set_.Serialize(sim_agent_data_set_proto_msg);
 
     // Create parent folder name
-    auto round_1000_int_to_str = [](const float &val)
-    { return std::to_string(static_cast<int>(std::round(val * 1e3))); }; // lambda function to inflate values by 1000 and convert to string
+    // auto round_1000_int_to_str = [](const float &val)
+    // { return std::to_string(static_cast<int>(std::round(val * 1e3))); }; // lambda function to inflate values by 1000 and convert to string
 
     std::string sim_parent_folder =
         "t" + std::to_string(simulation_parameters_.num_trials_) + "_" +
         "s" + std::to_string(simulation_parameters_.num_steps_) + "_" +
         "tfr" +
-        round_1000_int_to_str(simulation_parameters_.tfr_range_.front()) +
+        Round1000DoubleToStr(simulation_parameters_.tfr_range_.front()) +
         "-" +
-        round_1000_int_to_str(
+        Round1000DoubleToStr(
             simulation_parameters_.tfr_range_.size() > 1 ? (simulation_parameters_.tfr_range_.back() - simulation_parameters_.tfr_range_.front()) /
                                                                (simulation_parameters_.tfr_range_.size())
                                                          : 0) +
         "-" +
-        round_1000_int_to_str(simulation_parameters_.tfr_range_.back()) + "_" +
+        Round1000DoubleToStr(simulation_parameters_.tfr_range_.back()) + "_" +
         "sp" +
-        round_1000_int_to_str(
+        Round1000DoubleToStr(
             simulation_parameters_.sp_range_.size() > 1 ? simulation_parameters_.sp_range_.front() : 0.525) + ///< todo: hack to print folder name if uniform distribution is used
         "-" +
-        round_1000_int_to_str(
+        Round1000DoubleToStr(
             simulation_parameters_.sp_range_.size() > 1 ? (simulation_parameters_.sp_range_.back() - simulation_parameters_.sp_range_.front()) /
                                                               (simulation_parameters_.sp_range_.size() - 1)
                                                         : -0.002) +
         "-" +
-        round_1000_int_to_str(simulation_parameters_.sp_range_.size() > 1 ? simulation_parameters_.sp_range_.back() : 0.975);
+        Round1000DoubleToStr(simulation_parameters_.sp_range_.size() > 1 ? simulation_parameters_.sp_range_.back() : 0.975);
 
     // Create output filename
     std::string output_file_stats, output_file_agent_data;

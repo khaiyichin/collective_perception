@@ -67,7 +67,7 @@ function move(move_type, move_duration, rot_direction, spd)
 # Move robot in a straight line
 function move_straight(spd)
 {
-    gotop(spd, 0.0)
+    gotop(spd, 0.0) # kheperaiv takes in cm/s
 }
 
 # Rotate robot in-place
@@ -145,14 +145,13 @@ function communicate_tx(channel, message)
 # Update buffer of received messages
 function update_received_messages(message_table)
 {
-    message_table.past = message_table.curr
-    message_table.curr = {}
-
-    return message_table
+    return {.past = message_table.curr, .curr = {}}
 }
 
 # Append element to table as if it's a dynamically-sized array
 function append_to_table(tab, elem)
 {
     tab[size(tab)] = elem
+
+    return tab
 }

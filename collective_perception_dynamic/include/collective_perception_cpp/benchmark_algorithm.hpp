@@ -5,30 +5,49 @@
 #include <string>
 #include <random>
 #include <functional>
+#include <filesystem>
 
 // Buzz and ARGoS headers
 #include <buzz/argos/buzz_loop_functions.h>
 #include <buzz/buzzvm.h>
 #include <argos3/core/utility/configuration/argos_configuration.h>
-#include <nlohmann/json.hpp>
 
+// Local includes
+#include "json.hpp"
 #include "util.hpp"
 #include "data_common.hpp"
 
 using namespace argos;
 using namespace nlohmann;
-// using (CBuzzLoopFunctions::*BuzzForeachVM)(std::function<void(const std::string &, buzzvm_t)>) = void;
-using BuzzForeachVMFunc = std::function<void(CBuzzLoopFunctions::COperation &)>;
+using BuzzForeachVMFunc = std::function<void(CBuzzLoopFunctions::COperation &)>; // type for the CBuzzLoopFunctions::BuzzForeachVM function
 
+/**
+ * @brief Base class for the COperation functor to provide common variables and functions
+ *
+ */
 struct BuzzCOperationFunctorBase : public CBuzzLoopFunctions::COperation
 {
+    /**
+     * @brief Construct a new BuzzCOperationFunctorBase object
+     *
+     */
     BuzzCOperationFunctorBase() {}
 
+    /**
+     * @brief Construct a new BuzzCOperationFunctorBase object
+     *
+     * @param id_prefix ID prefix used to strip the robot ID integer value
+     * @param id_base_num ID base number used to offset the robot ID integer value
+     */
     BuzzCOperationFunctorBase(const std::string &id_prefix,
                               const int &id_base_num)
         : prefix(id_prefix),
           base_num(id_base_num) {}
 
+    /**
+     * @brief Destroy the BuzzCOperationFunctorBase object
+     *
+     */
     virtual ~BuzzCOperationFunctorBase() {}
 
     /**
@@ -42,95 +61,208 @@ struct BuzzCOperationFunctorBase : public CBuzzLoopFunctions::COperation
         return std::stoi(str_robot_id.erase(0, prefix.length()));
     }
 
-    std::string prefix;
+    std::string prefix; ///< Prefix to robot ID
 
-    int base_num;
+    int base_num; ///< Base number offset for robot ID
 };
 
+/**
+ * @brief Base class for the BenchmarkData struct to provide common variables
+ *
+ */
 struct BenchmarkDataBase
 {
-    BenchmarkDataBase(const std::string &sim_type, const std::string &param_str)
-        : simulation_type(sim_type), parameter_keyword(param_str) {}
+    /**
+     * @brief Construct a new BenchmarkDataBase object
+     *
+     */
+    BenchmarkDataBase() {}
 
-    std::string simulation_type;
+    /**
+     * @brief Construct a new BenchmarkDataBase object
+     *
+     * @param sim_type Identifying keyword for the simulation type (specific benchmark algorithm)
+     * @param param_str Parameter of interest based on the simulation type
+     */
+    BenchmarkDataBase(const std::string &sim_type)
+        : simulation_type(sim_type) {}
 
-    std::string parameter_keyword;
+    std::string simulation_type; ///< Keyword identifying the desired benchmark algorithm to use
 
-    unsigned int num_agents;
+    unsigned int num_agents; ///< Number of robots in the simulation
 
-    unsigned int num_trials;
+    unsigned int num_trials; ///< Number of trials per experiment (fixed paired parameters)
 
-    unsigned int num_steps;
+    unsigned int num_steps; ///< Number of steps per trial
 
-    int id_base_num;
+    int id_base_num; ///< Base number offset for robot ID
 
-    float comms_range;
+    float comms_range; ///< Communication range of robots in m
 
-    float density;
+    float density; ///< Swarm density
 
-    float speed;
+    float speed; ///< Robot maximum linear speed in cm/s (Buzz code uses cm/s)
 
-    std::string id_prefix;
+    std::string id_prefix; ///< Prefix used in robot IDs
 
-    std::string output_filepath;
+    std::string output_folder; ///< High-level output folder name
 
-    std::vector<double> tfr_range;
+    std::string output_filename; ///< Filename prefix for output JSON files
 
-    std::vector<json> json_data;
+    std::vector<double> tfr_range; ///< Range of target fill ratios
+
+    std::vector<double> benchmark_param_range; ///< Range for parameter specific to the benchmark algorithm
+
+    std::vector<ordered_json> json_data; ///< Vector of JSON objects
 };
 
+/**
+ * @brief Base class for the BenchmarkAlgorithm class
+ *
+ */
 class BenchmarkAlgorithmBase
 {
 public:
+    /**
+     * @brief Construct a new BenchmarkAlgorithmBase object
+     *
+     */
     BenchmarkAlgorithmBase() {}
 
+    /**
+     * @brief Construct a new BenchmarkAlgorithmBase object
+     *
+     * @param buzz_foreach_vm_func CBuzzLoopFunctions::BuzzForeachVM functor
+     */
     BenchmarkAlgorithmBase(const BuzzForeachVMFunc &buzz_foreach_vm_func)
-        // : buzz_foreach_vm_func_ptr_(std::make_shared<BuzzForeachVMFunc>(std::move(buzz_foreach_vm_func))) {}
         : buzz_foreach_vm_func_(buzz_foreach_vm_func)
     {
     }
 
+    /**
+     * @brief Destroy the BenchmarkAlgorithmBase object
+     *
+     */
     virtual ~BenchmarkAlgorithmBase() {}
 
-    virtual void Init();
+    /**
+     * @brief Initialize the algorithm
+     *
+     */
+    virtual void Init() = 0;
 
-    virtual void PostStep();
+    /**
+     * @brief Execute post Step() (provided in argos::CSimulator) operations
+     *
+     */
+    virtual void PostStep() = 0;
 
-    virtual void PostExperiment();
+    /**
+     * @brief Execute post experiment operations
+     *
+     * @param final_experiment Flag to indicate whether this has been the last experiment
+     */
+    virtual void PostExperiment(const bool &final_experiment = false) = 0;
 
-    virtual void SetupExperiment(const std::pair<double, double> &curr_paired_parameters);
+    /**
+     * @brief Setup the experiment
+     *
+     * @param trial_ind Current trial index
+     * @param curr_paired_parameters Current pair of parameters to simulate
+     */
+    virtual void SetupExperiment(const int &trial_ind, const std::pair<double, double> &curr_paired_parameters) = 0;
 
-    virtual void ComputeStats();
+    /**
+     * @brief Initialize JSON object
+     *
+     */
+    virtual void InitializeJson() = 0;
 
-    virtual void InitializeJson(const std::pair<double, double> &curr_paired_parameters) {}
+    /**
+     * @brief Save the JSON data
+     *
+     * @param foldername_prefix Prefix for the high-level folder
+     */
+    virtual void SaveData(const std::string &foldername_prefix = "") = 0;
 
-    virtual void WriteToJson() {}
+    /**
+     * @brief Get the benchmark data
+     *
+     * @return BenchmarkDataBase& Benchmark data struct
+     */
+    virtual BenchmarkDataBase &GetData() = 0;
 
-    virtual BenchmarkDataBase &GetData();
+    /**
+     * @brief Get the range of the benchmark-specific parameter
+     *
+     * @return std::vector<double> Range of the parameter
+     */
+    virtual std::vector<double> GetParameterRange() = 0;
 
-    virtual std::vector<double> GetParameterRange();
+    /**
+     * @brief Get the benchmark-specific parameter keyword
+     * This keyword should have been defined as a macro in the benchmark-specific class header
+     *
+     * @return std::string Parameter keyword
+     */
+    virtual std::string GetParameterKeyword() = 0;
+
+    /**
+     * @brief Get the abbreviated benchmark-specific parameter keyword
+     * This abbreviated keyword should have been defined as a macro in the benchmark-specific class header
+     *
+     * @return std::string Abbreviated parameter keyword
+     */
+    virtual std::string GetParameterKeywordAbbr() = 0;
 
 protected:
-    std::vector<json>::iterator curr_json_data_itr_;
+    ordered_json curr_json_; //< Current JSON data object
 
-    // std::shared_ptr<BuzzForeachVMFunc> buzz_foreach_vm_func_ptr_;
-    BuzzForeachVMFunc buzz_foreach_vm_func_;
+    int curr_trial_ind_; ///< Current trial index
+
+    std::pair<double, double> curr_paired_parameters_ = {-1, -1}; ///< Current paired parameters
+
+    BuzzForeachVMFunc buzz_foreach_vm_func_; ///< BuzzForeachVM functor
 };
 
+/**
+ * @brief Template for creating the BenchmarkAlgorithm class specific to the desired benchmark
+ *
+ * @tparam T BenchmarkData type
+ */
 template <typename T>
 class BenchmarkAlgorithmTemplate : public BenchmarkAlgorithmBase
 {
 public:
+    /**
+     * @brief Construct a new BenchmarkAlgorithmTemplate object
+     *
+     */
     BenchmarkAlgorithmTemplate() {}
 
+    /**
+     * @brief Construct a new BenchmarkAlgorithmTemplate object
+     *
+     * @param buzz_foreach_vm_func CBuzzLoopFunctions::BuzzForeachVM functor
+     */
     BenchmarkAlgorithmTemplate(const BuzzForeachVMFunc &buzz_foreach_vm_func)
         : BenchmarkAlgorithmBase(buzz_foreach_vm_func) {}
 
-    std::string GetParameterString() { return data_.parameter_str; }
-
+    /**
+     * @brief Get the benchmark data
+     *
+     * @return T& Benchmark data (a subclass of BenchmarkDataBase)
+     */
     T &GetData() { return data_; }
 
 protected:
+    /**
+     * @brief Draw a sample of robot IDs without replacement
+     *
+     * @param num_robots_to_sample Number of robots to sample
+     * @param starting_base_num Offset to the ID base number
+     * @return std::vector<int> Drawn robot IDs
+     */
     std::vector<int> SampleRobotIdsWithoutReplacement(const unsigned int &num_robots_to_sample, const unsigned int &starting_base_num)
     {
         // Create a vector of all IDs
@@ -144,7 +276,7 @@ protected:
         return sampled_robot_ids;
     }
 
-    T data_;
+    T data_; ///< Benchmark data (subclass of BenchmarkDataBase)
 };
 
 #endif

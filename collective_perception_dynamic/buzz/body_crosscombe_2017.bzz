@@ -6,31 +6,72 @@ STATE_UPDATE_ENUM = 1
 
 function init()
 {
-    # neighbors
+    # Initialize values
+    reset_values()
 
     # Define listener callback function
     neighbors.listen("signalled_belief",
         function(vid, belief, rid) # each belief consists of x and conf
         {
-            append_to_table(curr_signalled_beliefs, belief)
+            curr_signalled_beliefs = append_to_table(curr_signalled_beliefs, belief)
         }
     )
+
+    ### Set custom seed that depends on the clock ###
+    # This has to be done so that not all the robots are set to the same clock seed:
+    #   * Default seed (i.e., clock) causes all the robots to be seeded the same, making them behave the same
+    #   * Vanilla ID custom seed (i.e., `math.rng.setseed(id)`) causes deterministic behaviors across different trials
+    # Solution: `math.rng.uniform()` is seeded by the clock, while `id` modifies the seed for the number generator used in the motion
+    # Robots now all behave differently, across different trials.
+    math.rng.setseed(id + math.rng.uniform())
 }
 
 function step()
 {
-
-    # Move
+    # Detect any nearby obstacles
+    var obstacles = detect_obstacles()
+    if (not obstacles)
+    {
+        # Move robot in random walk fashion
+        var movement = move(move_type, move_duration, rot_direction, spd)
+        move_type = movement.type
+        move_duration = movement.duration
+        rot_direction = movement.rot_dir
+    }
+    else
+    {
+        # Avoid obstacles
+        var movement = avoid_obstacles(spd, obstacles)
+        move_type = movement.type
+        move_duration = movement.duration
+        rot_direction = movement.rot_dir
+    }
 
     # Communicate
-    communicate_tx()
+    if (state == STATE_SIGNAL_ENUM)
+    {
+        communicate_tx("signalled_belief", self_belief)
 
+        var neighbor_vals = {.past = past_signalled_beliefs, .curr = curr_signalled_beliefs}
+
+        neighbor_vals = update_received_messages(neighbor_vals)
+
+        past_signalled_beliefs = neighbor_vals.past
+        curr_signalled_beliefs = neighbor_vals.curr
+
+        broadcast_duration = broadcast_duration - 1
+
+        if (broadcast_duration == 0)
+        {
+            state = STATE_UPDATE_ENUM
+        }
+    }
     # if malfunctioning, DON'T LISTEN, only transmit
 }
 
 function reset()
 {
-
+    reset_values()
 }
 
 function destroy() {}
@@ -57,15 +98,8 @@ function reset_values()
 
     # Define broadcast variables
     num_choices = 0
-    broadcast_choice = nil
     broadcast_duration = 0
 
     # Define default state value (will be set to 0 or 1 later)
     state = -1
-}
-
-function update_received_messages()
-{
-    past_signalled_beliefs = curr_signalled_beliefs
-    curr_signalled_beliefs = {}
 }
