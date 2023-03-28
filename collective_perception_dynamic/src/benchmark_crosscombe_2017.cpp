@@ -7,13 +7,20 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
         // Set robot speed
         BuzzPut(t_vm, "spd", spd);
 
-        // Initialize self belief states to be indeterminate
-        std::vector<int> init_belief(num_options, static_cast<int>(BeliefState::indeterminate));
+        // Randomize initial robot belief
+        std::vector<int> init_belief_vec(num_options);
+        init_belief_vec = UpdateSelfBeliefVec(t_vm, std::make_pair(init_belief_vec, std::vector<int>()), true);
 
-        PopulateSelfBeliefVecInVM(t_vm, init_belief);
+        // Randomize the robot state
+        std::vector<int> states, selected_state(1);
+        states = {static_cast<int>(RobotState::signalling), static_cast<int>(RobotState::updating)};
 
-        // Update the robot state
-        BuzzPut(t_vm, "state", static_cast<int>(RobotState::updating));
+        std::sample(states.begin(),
+                    states.end(),
+                    selected_state.begin(),
+                    1,
+                    generator);
+        BuzzPut(t_vm, "state", *selected_state.begin());
 
         std::pair<std::set<std::string>::iterator, bool> insert_receipt = initialized_robot_ids.insert(str_robot_id);
 
@@ -27,14 +34,17 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
             initialized = true;
         }
 
-        (*id_belief_map_ptr)[str_robot_id.c_str()] = std::vector<std::string>{};
-        (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(init_belief));
+        if (!IsFlawed(str_robot_id))
+        {
+            (*id_belief_map_ptr)[str_robot_id.c_str()] = std::vector<std::string>{};
+            (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(init_belief_vec));
+        }
     }
     else
     {
         // Only update beliefs if in updating state
         int state = buzzobj_getint(BuzzGet(t_vm, "state"));
-        std::vector<int> self_belief;
+        std::vector<int> curr_self_belief_vec, updated_belief_vec;
 
         if (state == static_cast<int>(RobotState::updating))
         {
@@ -42,12 +52,11 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
             if (IsFlawed(str_robot_id))
             {
                 // Pick random option
-                std::vector<int> all_options_indices(num_options);
-                std::iota(all_options_indices.begin(), all_options_indices.end(), 0);
+                curr_self_belief_vec = std::vector<int>(num_options, static_cast<int>(BeliefState::indeterminate));
 
-                self_belief = GenerateBeliefVecFromRandomOption(all_options_indices);
-
-                PopulateSelfBeliefVecInVM(t_vm, self_belief);
+                updated_belief_vec = UpdateSelfBeliefVec(t_vm,
+                                                         std::make_pair(curr_self_belief_vec, std::vector<int>()),
+                                                         true);
             }
             else
             {
@@ -83,11 +92,11 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                 */
 
                 // Extract self belief
-                self_belief = ExtractSelfBeliefVecFromVM(t_vm);
+                curr_self_belief_vec = ExtractSelfBeliefVecFromVM(t_vm);
 
                 // Pick one of the neighbors to use their beliefs
-                std::vector<int> signalled_belief;
-                signalled_belief.reserve(num_options);
+                std::vector<int> signalled_belief_vec;
+                signalled_belief_vec.reserve(num_options);
 
                 BuzzTableOpen(t_vm, "past_signalled_beliefs");
                 buzzobj_t tSignalledBeliefs = BuzzGet(t_vm, "past_signalled_beliefs");
@@ -98,60 +107,34 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
                     LOGERR << str_robot_id << ": variable \"past_signalled_beliefs\" has wrong type " << buzztype_desc[tSignalledBeliefs->o.type] << std::endl;
                     return;
                 }
-                else
+
+                // Check whether signalled beliefs have been received (i.e., if there are neighbors)
+                size_t tSignalledBeliefsSize = tSignalledBeliefs->t.value->size; // ->t represents the buzzvm_u union as a table, which is a struct that contains the attribute `value` which is a buzzdict_s type
+
+                if (tSignalledBeliefsSize > 0)
                 {
                     // Randomly draw one value from the opened `past_signalled_beliefs` table
-                    size_t tSignalledBeliefsSize = tSignalledBeliefs->t.value->size; // ->t represents the buzzvm_u union as a table, which is a struct that contains the attribute `value` which is a buzzdict_s type
+                    // Pick a random neighbor's belief
+                    std::uniform_int_distribution<int> dist(0, tSignalledBeliefsSize - 1);
 
-                    // Check whether signalled beliefs have been received
-                    if (tSignalledBeliefsSize == 0)
+                    int random_neighbor_index = dist(generator);
+
+                    BuzzTableOpenNested(t_vm, random_neighbor_index);
+
+                    for (int i = 0; i < num_options; ++i)
                     {
-                        // Pick random option if there is no positive beliefs
-                        if (std::count(self_belief.begin(), self_belief.end(), static_cast<int>(BeliefState::positive)) == 0)
-                        {
-                            // Pick random option
-                            std::vector<int> all_options_indices(num_options);
-                            std::iota(all_options_indices.begin(), all_options_indices.end(), 0);
-
-                            self_belief = GenerateBeliefVecFromRandomOption(all_options_indices);
-                        }
+                        signalled_belief_vec.push_back(buzzobj_getint(BuzzTableGet(t_vm, i)));
                     }
-                    else // signalled beliefs have been received
-                    {
-                        std::uniform_int_distribution<int> dist(0, tSignalledBeliefsSize);
 
-                        int random_neighbor_index = dist(generator);
-
-                        // Extract randomly picked neighbor's belief
-                        BuzzTableOpenNested(t_vm, std::to_string(random_neighbor_index));
-
-                        for (int i = 0; i < num_options; ++i)
-                        {
-                            signalled_belief.push_back(buzzobj_getint(BuzzTableGet(t_vm, i)));
-                        }
-
-                        BuzzTableCloseNested(t_vm);
-
-                        // Update self belief
-                        self_belief = UpdateSelfBeliefVec(self_belief, signalled_belief);
-                    }
+                    BuzzTableCloseNested(t_vm);
                 }
 
+                // Update self belief
+                updated_belief_vec = UpdateSelfBeliefVec(t_vm,
+                                                         std::make_pair(curr_self_belief_vec, signalled_belief_vec),
+                                                         false);
+
                 BuzzTableClose(t_vm);
-
-                // Obtain broadcast duration based on self belief
-                size_t option = std::find(self_belief.begin(),
-                                          self_belief.end(),
-                                          static_cast<int>(BeliefState::positive)) -
-                                self_belief.begin();
-
-                // Update broadcast duration based on the selected option
-                int duration = GetBroadcastDuration(option);
-
-                BuzzPut(t_vm, "broadcast_duration", duration);
-
-                // Populate self belief into the Buzz VM
-                PopulateSelfBeliefVecInVM(t_vm, self_belief);
             }
 
             // Update the robot state
@@ -160,77 +143,191 @@ void ProcessRobotBelief::operator()(const std::string &str_robot_id, buzzvm_t t_
         else if (!IsFlawed(str_robot_id) && state == static_cast<int>(RobotState::signalling)) // non-flawed and signalling
         {
             // Extract and store self belief
-            self_belief = ExtractSelfBeliefVecFromVM(t_vm);
+            updated_belief_vec = ExtractSelfBeliefVecFromVM(t_vm);
         }
 
-        (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(self_belief));
+        // Log the current belief (to be exported) for analysis
+        if (!IsFlawed(str_robot_id))
+        {
+            (*id_belief_map_ptr)[str_robot_id.c_str()].push_back(ConvertBeliefVecToString(updated_belief_vec));
+        }
     }
 }
 
-std::vector<int> ProcessRobotBelief::UpdateSelfBeliefVec(const std::vector<int> &self_belief_vec,
-                                                         const std::vector<int> &signalled_belief_vec)
+std::vector<int> ProcessRobotBelief::UpdateSelfBeliefVec(buzzvm_t t_vm,
+                                                         const std::pair<std::vector<int>, std::vector<int>> &self_and_signalled_beliefs,
+                                                         const bool &randomize_belief /*=false*/)
 {
-    /*
-        The updated belief vector returned will only contain one positive belief and n-1 negative beliefs.
-        This is because in the case of indeterminate beliefs, we go ahead and randomly choose one of the
-        indeterminate options to become the positive belief.
-    */
+    std::vector<int> self_belief_vec = self_and_signalled_beliefs.first;
+    std::vector<int> signalled_belief_vec = self_and_signalled_beliefs.second;
+    std::vector<int> updated_belief_vec;
+    updated_belief_vec.reserve(self_belief_vec.size());
 
-    // Define a lambda function to capture a reference to this object instance to call the member function
-    auto truth_func = [&, this](const int &a, const int &b)
-    { return GetTruthValue(a, b); };
-
-    // Update self belief
-    std::vector<int> updated_belief;
-    updated_belief.reserve(self_belief_vec.size());
-
-    std::transform(self_belief_vec.begin(),
-                   self_belief_vec.end(),
-                   signalled_belief_vec.begin(),
-                   std::back_inserter(updated_belief),
-                   truth_func);
-
-    // Normalize the updated belief so that it consists of only one strong belief or only indeterminate & negative beliefs
-    int num_pos_beliefs = std::count(updated_belief.begin(),
-                                     updated_belief.end(),
-                                     static_cast<int>(BeliefState::positive));
-
-    if (num_pos_beliefs <= 1) // number of positive beliefs is within reason
+    // Check whether belief should be completely randomized (useful for flawed robots and for initial beliefs)
+    if (!randomize_belief)
     {
-        if (num_pos_beliefs == 0) // no positive beliefs
+        // Check whether a neighbor's signalled belief is available
+        if (signalled_belief_vec.empty())
         {
-            // Check the number of indeterminate belief states
-            int num_int_beliefs = 0;
-            std::vector<int> int_belief_indices;
+            updated_belief_vec = self_belief_vec;
+        }
+        else
+        {
+            // Define a lambda function to capture a reference to this object instance to call the member function
+            auto truth_func = [&, this](const int &a, const int &b)
+            { return GetTruthValue(a, b); };
 
-            for (auto itr = updated_belief.begin(); itr != updated_belief.end(); ++itr)
-            {
-                if (*itr == static_cast<int>(BeliefState::indeterminate))
-                {
-                    int_belief_indices.push_back(itr - updated_belief.begin());
-                    ++num_int_beliefs;
-                }
-            }
-
-            if (num_int_beliefs == 1) // only one of the beliefs is indeterminate
-            {
-                std::replace(updated_belief.begin(),
-                             updated_belief.end(),
-                             static_cast<int>(BeliefState::indeterminate),
-                             static_cast<int>(BeliefState::positive));
-            }
-            else // multiple indeterminate beliefs
-            {
-                updated_belief = GenerateBeliefVecFromRandomOption(int_belief_indices);
-            }
+            // Fuse the signalled belief into the self belief
+            std::transform(self_belief_vec.begin(),
+                           self_belief_vec.end(),
+                           signalled_belief_vec.begin(),
+                           std::back_inserter(updated_belief_vec),
+                           truth_func);
         }
     }
     else
     {
-        THROW_ARGOSEXCEPTION("Number of positive beliefs should only be one in belief state vector!");
+        // Pick random belief states
+        for (int i = 0; i < num_options; ++i)
+        {
+            updated_belief_vec.push_back(flawed_belief_dist(generator));
+        }
     }
 
-    return updated_belief;
+    // Populate the belief state and the duration to the VM (this takes care of the normalization)
+    return NormalizeAndPopulateSelfBeliefVec(t_vm, updated_belief_vec);
+}
+
+std::vector<int> ProcessRobotBelief::NormalizeAndPopulateSelfBeliefVec(buzzvm_t t_vm, const std::vector<int> &self_belief_vec)
+{
+    int duration;
+    std::vector<int> normalized_belief_vec = self_belief_vec;
+
+    // Count the number of positive beliefs
+    int num_pos_beliefs = std::count(normalized_belief_vec.begin(),
+                                     normalized_belief_vec.end(),
+                                     static_cast<int>(BeliefState::positive));
+
+    // Ensure that the beliefs are properly normalized and find the correct broadcast duration
+    if (num_pos_beliefs == 0) // no positive beliefs
+    {
+        // Check to see which belief states are indeterminate
+        std::vector<int> int_belief_indices = GetIndeterminateBeliefIndices(normalized_belief_vec);
+        int num_int_beliefs = int_belief_indices.size();
+
+        if (num_int_beliefs == 1) // only one of the beliefs is indeterminate (deterministic option)
+        {
+            // Normalize the belief vector by replacing the indeterminate belief with a positive one
+            std::replace(normalized_belief_vec.begin(),
+                         normalized_belief_vec.end(),
+                         static_cast<int>(BeliefState::indeterminate),
+                         static_cast<int>(BeliefState::positive));
+
+            // Calculate the broadcast duration for the option corresponding to the positive belief
+            duration = GetBroadcastDuration(GetPositiveBeliefIndex(normalized_belief_vec));
+        }
+        else // either >1 or 0 indeterminate beliefs (probabilistic outcome)
+        {
+            std::vector<int> sample_space;
+
+            if (num_int_beliefs == 0) // all negative beliefs
+            {
+                // Normalize the belief vector by replacing all negative beliefs with indeterminate beliefs
+                std::replace(normalized_belief_vec.begin(),
+                             normalized_belief_vec.end(),
+                             static_cast<int>(BeliefState::negative),
+                             static_cast<int>(BeliefState::indeterminate));
+
+                // Define the sample space as all choices
+                sample_space = std::vector<int>(num_options);
+
+                std::iota(sample_space.begin(), sample_space.end(), 0);
+            }
+            else // multiple indeterminate beliefs
+            {
+                // Define the sample space as only choices with indeterminate beliefs
+                sample_space = int_belief_indices;
+            }
+
+            // Randomly select one option
+            std::vector<int> selection(1);
+
+            std::sample(sample_space.begin(),
+                        sample_space.end(),
+                        selection.begin(),
+                        1,
+                        generator);
+
+            // Calculate the broadcast duration for the selection option
+            duration = GetBroadcastDuration(*selection.begin());
+        }
+    }
+    else if (num_pos_beliefs == 1) // exactly 1 positive belief (and all other non-positive beliefs)
+    {
+        // Normalize the belief vector by replacing all indeterminate beliefs with negative beliefs
+        std::replace(normalized_belief_vec.begin(),
+                     normalized_belief_vec.end(),
+                     static_cast<int>(BeliefState::indeterminate),
+                     static_cast<int>(BeliefState::negative));
+
+        // Calculate the broadcast duration for the option corresponding to the positive belief
+        duration = GetBroadcastDuration(GetPositiveBeliefIndex(normalized_belief_vec));
+    }
+    else if (num_pos_beliefs > 1) // more than 1 positive belief (possibly containing indeterminate beliefs too)
+    {
+        /*
+            Since there is > 1 positive belief, the robot becomes uncertain only between the positive beliefs;
+            every other non-positive beliefs is ignored.
+        */
+
+        // Replace indeterminate values so that they become negative
+        std::replace(normalized_belief_vec.begin(),
+                     normalized_belief_vec.end(),
+                     static_cast<int>(BeliefState::indeterminate),
+                     static_cast<int>(BeliefState::negative));
+
+        // Replace positive values so that they become indeterminate
+        std::replace(normalized_belief_vec.begin(),
+                     normalized_belief_vec.end(),
+                     static_cast<int>(BeliefState::positive),
+                     static_cast<int>(BeliefState::indeterminate));
+
+        // Find the indices to the indeterminate belief states
+        std::vector<int> int_belief_indices = GetIndeterminateBeliefIndices(normalized_belief_vec);
+
+        // Randomly select one option
+        std::vector<int> selection(1);
+
+        std::sample(int_belief_indices.begin(),
+                    int_belief_indices.end(),
+                    selection.begin(),
+                    1,
+                    generator);
+
+        // Calculate the broadcast duration for the selection option
+        duration = GetBroadcastDuration(*selection.begin());
+    }
+
+    // Populate the self belief and broadcast duration in the VM
+    PopulateSelfBeliefVecInVM(t_vm, normalized_belief_vec);
+    PopulateBroadcastDurationInVM(t_vm, duration);
+
+    return normalized_belief_vec;
+}
+
+std::vector<int> ProcessRobotBelief::GetIndeterminateBeliefIndices(const std::vector<int> &self_belief_vec)
+{
+    std::vector<int> int_belief_indices;
+
+    for (auto itr = self_belief_vec.begin(); itr != self_belief_vec.end(); ++itr)
+    {
+        if (*itr == static_cast<int>(BeliefState::indeterminate))
+        {
+            int_belief_indices.push_back(itr - self_belief_vec.begin());
+        }
+    }
+
+    return int_belief_indices;
 }
 
 int ProcessRobotBelief::GetTruthValue(const int &self_belief,
@@ -344,6 +441,7 @@ void BenchmarkCrosscombe2017::InitializeJson()
     curr_json_["num_trials"] = data_.num_trials;
     curr_json_["num_steps"] = data_.num_steps;
     curr_json_["comms_range"] = data_.comms_range;
+    curr_json_["speed"] = data_.speed;
     curr_json_["density"] = data_.density;
     curr_json_["tfr"] = curr_paired_parameters_.first;
     curr_json_[CROSSCOMBE_2017_PARAM_ABBR] = curr_paired_parameters_.second;
@@ -361,7 +459,7 @@ void BenchmarkCrosscombe2017::SaveData(const std::string &foldername_prefix /*="
                          "-" +
                          Round1000DoubleToStr(
                              data_.tfr_range.size() > 1 ? (data_.tfr_range.back() - data_.tfr_range.front()) /
-                                                              (data_.tfr_range.size())
+                                                              (data_.tfr_range.size() - 1)
                                                         : 0) +
                          "-" +
                          Round1000DoubleToStr(data_.tfr_range.back()) + "_" +
@@ -370,7 +468,7 @@ void BenchmarkCrosscombe2017::SaveData(const std::string &foldername_prefix /*="
                          "-" +
                          Round1000DoubleToStr(
                              data_.flawed_ratio_range.size() > 1 ? (data_.flawed_ratio_range.back() - data_.flawed_ratio_range.front()) /
-                                                                       (data_.flawed_ratio_range.size())
+                                                                       (data_.flawed_ratio_range.size() - 1)
                                                                  : 0) +
                          "-" +
                          Round1000DoubleToStr(data_.flawed_ratio_range.back()) + "_" +

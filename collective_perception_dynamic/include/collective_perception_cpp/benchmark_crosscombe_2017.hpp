@@ -77,6 +77,10 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
         // Initialize generator
         std::random_device rd;
         generator = std::mt19937(rd());
+
+        // Initialize random belief distribution (for flawed robots)
+        flawed_belief_dist = std::uniform_int_distribution(static_cast<int>(BeliefState::negative),
+                                                           static_cast<int>(BeliefState::positive));
     }
 
     /**
@@ -106,18 +110,29 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
      * @brief Populate the self belief of the robot in Buzz
      *
      * @param t_vm Buzz VM
-     * @param self_belief Belief to populate into Buzz
+     * @param self_belief_vec Belief to populate into Buzz
      */
-    inline void PopulateSelfBeliefVecInVM(buzzvm_t t_vm, const std::vector<int> self_belief)
+    inline void PopulateSelfBeliefVecInVM(buzzvm_t t_vm, const std::vector<int> &self_belief_vec)
     {
         BuzzTableOpen(t_vm, "self_belief");
 
         for (int i = 0; i < num_options; ++i)
         {
-            BuzzTablePut(t_vm, i, self_belief[i]);
+            BuzzTablePut(t_vm, i, self_belief_vec[i]);
         }
 
         BuzzTableClose(t_vm);
+    }
+
+    /**
+     * @brief Populate the broadcast duration in Buzz
+     *
+     * @param t_vm Buzz VM
+     * @param duration Duration in ticks
+     */
+    inline void PopulateBroadcastDurationInVM(buzzvm_t t_vm, const int &duration)
+    {
+        BuzzPut(t_vm, "broadcast_duration", duration);
     }
 
     /**
@@ -144,30 +159,20 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
     }
 
     /**
-     * @brief Update belief based on a signalling neighbor's belief
+     * @brief Update the self belief vector
      *
-     * @param self_belief_vec Belief of the current robot
-     * @param signalled_belief_vec Belief of the selected neighboring robot
-     * @return std::vector<int> Updated belief of the current robot
+     * If `randomize_belief` is true, the second member of `self_and_signalled_beliefs` can be empty;
+     * this method calls the `NormalizeAndPopulateSelfBeliefVec` so the self belief vector and broadcast
+     * duration will be populated.
+     *
+     * @param t_vm Buzz VM
+     * @param self_and_signalled_beliefs Pair of self belief vector and chosen signalled belief vector
+     * @param randomize_belief Flag to randomize updated self belief vector
+     * @return std::vector<int> Updated self belief
      */
-    std::vector<int> UpdateSelfBeliefVec(const std::vector<int> &self_belief_vec,
-                                         const std::vector<int> &signalled_belief_vec);
-
-    inline std::vector<int> GenerateBeliefVecFromRandomOption(const std::vector<int> options_indices)
-    {
-        std::vector<int> selection(1);
-
-        std::sample(options_indices.begin(),
-                    options_indices.end(),
-                    selection.begin(),
-                    1,
-                    generator);
-
-        std::vector<int> belief(num_options, 0);
-        belief[*selection.begin()] = static_cast<int>(BeliefState::positive);
-
-        return belief;
-    }
+    std::vector<int> UpdateSelfBeliefVec(buzzvm_t t_vm,
+                                         const std::pair<std::vector<int>, std::vector<int>> &self_and_signalled_beliefs,
+                                         const bool &randomize_belief = false);
 
     /**
      * @brief Get the truth value for a single option
@@ -186,6 +191,37 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
      * @return int Duration in units of ticks
      */
     inline int GetBroadcastDuration(const unsigned int &option_id) { return option_qualities[option_id]; }
+
+    /**
+     * @brief Normalize the self belief vector and populate into the VM
+     *
+     * @param t_vm Buzz VM
+     * @param self_belief_vec Self belief vector
+     * @return std::vector<int> Normalized self belief vector
+     */
+    std::vector<int> NormalizeAndPopulateSelfBeliefVec(buzzvm_t t_vm, const std::vector<int> &self_belief_vec);
+
+    /**
+     * @brief Get the index of the positive belief in a self belief vector
+     *
+     * @param self_belief_vec Self belief vector of a robot
+     * @return int Index of the positive belief
+     */
+    inline int GetPositiveBeliefIndex(const std::vector<int> &self_belief_vec)
+    {
+        return std::find(self_belief_vec.begin(),
+                         self_belief_vec.end(),
+                         static_cast<int>(BeliefState::positive)) -
+               self_belief_vec.begin();
+    }
+
+    /**
+     * @brief Get the indices of indeterminate beliefs in a self belief vector
+     *
+     * @param self_belief_vec Self belief vector of a robot
+     * @return std::vector<int> Indices of the indeterminate beliefs
+     */
+    std::vector<int> GetIndeterminateBeliefIndices(const std::vector<int> &self_belief_vec);
 
     /**
      * @brief Check if the robot is flawed
@@ -208,6 +244,8 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
     float spd; ///< Maximum linear robot speed in cm/s
 
     bool initialized = false; ///< Flag to indicate if robot initialization has occurred
+
+    std::uniform_int_distribution<int> flawed_belief_dist; ///< Uniform distribution for generating beliefs for flawed robots
 
     std::set<std::string> initialized_robot_ids; ///< Set of robot IDs that have been initialized
 
