@@ -510,21 +510,46 @@ void BenchmarkCrosscombe2017::SaveData(const std::string &foldername_prefix /*="
 
 void BenchmarkCrosscombe2017::ComputeOptionQualities(const double &curr_tfr)
 {
+    /*
+        The way Crosscombe et al. 2017 does this is arbitrary:
+            - n = 2, qualities = 7, 9
+            - n = 3, qualities = 5, 8, 11
+            - n = 5, qualities = 5, 10, 15, 20, 25
+
+        It seems like the key here is the difference between the qualities is exactly n. The best
+        I could do using a systematic way is by using a Gaussian PDF with the mean centered about the
+        fill ratio, which allows me to control the difference between the qualities.
+
+        One major difference between the qualities here and in Crosscombe et al. 2017 is that
+        the separation of the qualities actually has a distance metric; 0.5 and 0.6 is the same distance
+        from the fill ratio 0.55, so the quality values should reflect that.
+
+        The scale factor of 50 is a tuned value so that there's an appreciable difference with n=2. This means,
+        however, that the number of ticks (i.e., quality value) will be large. With n = 10, the value can go as
+        high as 101 (i.e., 101 ticks), so the number of simulation steps need to take that into account.
+    */
+
     curr_option_qualities_.clear();
 
     // Compute weights
-    double total_weight = 0;
+    double total_weight = 0.0;
+    double sigma = 2.0 / data_.num_possible_options; // tuned value
+    double mu = curr_tfr;
     std::vector<double> weights;
 
     for (int i = 0; i < data_.num_possible_options; ++i)
     {
-        double weight = 1 - std::abs(curr_tfr - (2.0 * i + 1) / (2.0 * data_.num_possible_options));
+        // double weight = 1 - std::abs(curr_tfr - (2.0 * i + 1) / (2.0 * data_.num_possible_options));
+        double weight = 1.0 / (std::sqrt(2.0 * M_PI) * sigma) *
+                        std::exp(-0.5 *
+                                 std::pow((((2.0 * i + 1) / (2.0 * data_.num_possible_options) - curr_tfr) / sigma), 2));
 
         weights.push_back(weight);
         total_weight += weight;
     }
 
-    // Normalize weights into qualities
-    std::transform(weights.begin(), weights.end(), std::back_inserter(curr_option_qualities_), [&total_weight](double w)
-                   { return static_cast<unsigned int>(std::round(100 * w / total_weight)); });
+    // Normalize weights into qualities (50 is a tuned value
+    std::transform(weights.begin(), weights.end(), std::back_inserter(curr_option_qualities_), [&](double w)
+                   { return static_cast<unsigned int>(
+                         std::round(50.0 * data_.num_possible_options * w / total_weight)); });
 }
