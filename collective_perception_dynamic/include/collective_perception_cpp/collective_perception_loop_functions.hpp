@@ -38,24 +38,36 @@ using RobotIdBrainMap = std::unordered_map<std::string, Brain>;
 struct InitializeRobot : public CBuzzLoopFunctions::COperation
 {
     /**
-     * @brief Construct a new InitializeRobot struct
+     * @brief Construct a new InitializeRobot functor
      *
      */
-    InitializeRobot() : id_brain_map_ptr(nullptr) {}
+    InitializeRobot() : id_brain_map_ptr(nullptr), str_int_id_map_ptr(nullptr) {}
 
     /**
-     * @brief Construct a new InitializeRobot struct
+     * @brief Construct a new InitializeRobot functor
      *
      * @param id_brain_ptr Pointer to the unordered map to be populated with robot IDs and Brain instances
+     * @param str_id_ptr Pointer to the unordered map to be populated with robot IDs and their corresponding integer indices
      * @param sensor_prob Initial sensor probability to be assigned to robots
      * @param spd Speed to be assigned to robots
+     * @param legacy Flag to use legacy equations
      */
-    inline InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr, const double &sensor_prob, const float &spd, const bool &legacy)
-        : id_brain_map_ptr(id_brain_ptr), b_prob(sensor_prob), w_prob(sensor_prob), spd(spd), legacy(legacy)
+    inline InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr,
+                           const std::shared_ptr<std::unordered_map<std::string, int>> &str_id_ptr,
+                           const double &sensor_prob,
+                           const float &spd,
+                           const bool &legacy)
+        : id_brain_map_ptr(id_brain_ptr),
+          str_int_id_map_ptr(str_id_ptr),
+          b_prob(sensor_prob),
+          w_prob(sensor_prob),
+          spd(spd),
+          legacy(legacy)
     {
         // Initialize generator
         std::random_device rd;
         generator = std::default_random_engine(rd());
+        internal_counter = 0;
     }
 
     /**
@@ -81,7 +93,11 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
 
     float spd; ///< Robot speed
 
+    int internal_counter; ///< Internal counter to assign indices based on robot string IDs
+
     std::default_random_engine generator; ///< Random number generator
+
+    std::shared_ptr<std::unordered_map<std::string, int>> str_int_id_map_ptr; ///< Pointer to unordered map of string robot IDs to indices (so that vectors can store their corresponding data)
 
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr; ///< Pointer to unordered map containing robot IDs and corresponding Brain instances
 };
@@ -93,24 +109,24 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
 struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
 {
     /**
-     * @brief Construct a new ProcessRobotThought object
+     * @brief Construct a new ProcessRobotThought functor
      *
      */
-    ProcessRobotThought() : id_brain_map_ptr(nullptr), agt_data_vec_ptr(nullptr) {}
+    ProcessRobotThought() : id_brain_map_ptr(nullptr), str_int_id_map_ptr(nullptr), agt_data_vec_ptr(nullptr) {}
 
     /**
-     * @brief Construct a new Process Robot Thought object
+     * @brief Construct a new ProcessRobotThought functor
      *
-     * @param id_brain_ptr Pointer to the unordered map to be populated with robot IDs and Brain instances
+     * @param id_brain_ptr Pointer to the unordered map connecting robot IDs and Brain instances
+     * @param str_id_ptr Pointer to the unordered map to connecting robot IDs and their corresponding integer indices
      * @param agt_vec_ptr Pointer to the vector of AgentData instances
-     * @param id_prefix ID prefix used to strip the robot ID integer value
-     * @param id_base_num ID base number used to offset the robot ID integer value
+     * @param disabled_ids Vector containing robot IDs that are meant to be disabled
+     * @param disability_type_map Unordered map connecting disability types and the activation flags
      */
     ProcessRobotThought(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr,
+                        const std::shared_ptr<std::unordered_map<std::string, int>> &str_id_ptr,
                         std::vector<AgentData> *agt_vec_ptr,
-                        const std::string &id_prefix,
-                        const int &id_base_num,
-                        const std::vector<int> &disabled_ids,
+                        const std::vector<std::pair<std::string, int>> &disabled_ids,
                         const std::unordered_map<DisabilityType, bool> &disability_type_map);
 
     /**
@@ -133,26 +149,15 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
     virtual void operator()(const std::string &str_robot_id, buzzvm_t t_vm);
 
     /**
-     * @brief Strips the string prefix in the robot ID to obtain the numeric part
-     *
-     * @param str_robot_id Robot ID
-     * @return int Numeric part of the robot ID
-     */
-    inline int GetNumericId(std::string str_robot_id)
-    {
-        return std::stoi(str_robot_id.erase(0, prefix.length()));
-    }
-
-    /**
      * @brief Check whether robot is supposed to have any disability (can be used even before disability activates)
      *
-     * @param robot_id Robot ID integer
+     * @param robot_id Robot ID string
      * @return true
      * @return false
      */
-    inline bool HasDisability(const int &robot_id)
+    inline bool HasDisability(const std::string &robot_id)
     {
-        return id_disabled_status_map.find(robot_id) != id_disabled_status_map.end();
+        return id_disabled_status_map.find(robot_id.c_str()) != id_disabled_status_map.end();
     }
 
     /**
@@ -175,15 +180,13 @@ struct ProcessRobotThought : public CBuzzLoopFunctions::COperation
 
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr; ///< Pointer to unordered map containing robot IDs and corresponding Brain instances
 
+    std::shared_ptr<std::unordered_map<std::string, int>> str_int_id_map_ptr; ///< Pointer to unordered map of string robot IDs to indices (so that vectors can store their corresponding data)
+
     std::vector<AgentData> *agt_data_vec_ptr; ///< Pointer to vector of agent data
-
-    std::string prefix; ///< Prefix to robot ID
-
-    int base_num; ///< Base number offset for robot ID
 
     SwarmDisabilityStatus disability_status = SwarmDisabilityStatus::inactive;
 
-    std::unordered_map<int, DisabilityStatusAndTypes> id_disabled_status_map; ///< Map that contains the IDs that need to be disabled and whether or not they're disabled
+    std::unordered_map<std::string, DisabilityStatusAndTypes> id_disabled_status_map; ///< Map that contains the IDs that need to be disabled and whether or not they're disabled
 };
 
 /**
@@ -282,7 +285,7 @@ private:
     /**
      * @brief Compute the sample statistics
      *
-     * @param input
+     * @param input Values to compute with
      * @return std::pair<Brain::ValuePair, Brain::ValuePair> STL pair containing sample statistics
      */
     std::pair<Brain::ValuePair, Brain::ValuePair> ComputeValuePairsSampleMeanAndStdDev(const std::vector<Brain::ValuePair> &input);
@@ -309,8 +312,6 @@ private:
 
     int trial_counter_ = 0; ///< Counter to keep track of trials
 
-    int id_base_num_;
-
     int disabled_time_in_ticks_; ///< Simulation time in ticks that robots are disabled
 
     int dac_plugin_write_period_in_ticks_; ///< Write period to DAC-SysML CSV file in ticks
@@ -323,8 +324,6 @@ private:
 
     std::string verbose_level_; ///< Output verbosity level
 
-    std::string id_prefix_; ///< Prefix in the robot IDs
-
     std::string output_folder_; ///< Folder to output data to
 
     std::pair<unsigned int, unsigned int> arena_tile_count_; ///< Tile count in x and y directions
@@ -333,13 +332,15 @@ private:
 
     std::unordered_map<DisabilityType, bool> robot_disability_types_; ///< Map to indicate the robots' disability type
 
-    std::vector<int> disabled_ids_;
+    std::vector<std::pair<std::string, int>> disabled_ids_; ///< Vector of robot IDs that are meant to be disabled; the IDs are paired with their contiguous integer indices
 
-    std::vector<std::pair<double, double>> tfr_sp_ranges_;
+    std::vector<std::pair<double, double>> tfr_sp_ranges_; ///< Target fill ratio and sensor probability pairs
 
-    std::vector<std::pair<double, double>>::iterator curr_tfr_sp_range_itr_;
+    std::vector<std::pair<double, double>>::iterator curr_tfr_sp_range_itr_; ///< Current target fill ratio and sensor probability configuration
 
     std::shared_ptr<RobotIdBrainMap> id_brain_map_ptr_ = std::make_shared<RobotIdBrainMap>(); ///< Pointer to unordered map containing robot IDs and Brain instances
+
+    std::shared_ptr<std::unordered_map<std::string, int>> str_int_id_map_ptr_ = std::make_shared<std::unordered_map<std::string, int>>(); ///< Pointer to unordered map of string robot IDs to indices (so that vectors can store their corresponding data)
 
     Arena arena_; ///< Arena object
 
@@ -349,19 +350,19 @@ private:
 
     CSpace *space_ptr_ = NULL; ///< Pointer to the space class
 
-    SimulationSet simulation_parameters_;
+    SimulationSet simulation_parameters_; ///< SimulationSet object containing simulation parameters
 
-    SimulationStatsSet sim_stats_set_;
+    SimulationStatsSet sim_stats_set_; ///< SimulationStatsSet object containing simulation statistics
 
-    SimulationAgentDataSet sim_agent_data_set_;
+    SimulationAgentDataSet sim_agent_data_set_; ///< SimulationAgentDataSet object containing individual agent data
 
-    InitializeRobot initialization_functor_;
+    InitializeRobot initialization_functor_; ///< Initialization functor to initialize Buzz controlled robots
 
-    ProcessRobotThought process_thought_functor_;
+    ProcessRobotThought process_thought_functor_; ///< ProcessRobotThought functor to process data of Buzz controlled robots
 
-    StatsPacket curr_stats_packet_;
+    StatsPacket curr_stats_packet_; ///< Current trial statistics
 
-    AgentDataPacket curr_agent_data_packet_;
+    AgentDataPacket curr_agent_data_packet_; ///< Current trial agent data
 };
 
 #endif

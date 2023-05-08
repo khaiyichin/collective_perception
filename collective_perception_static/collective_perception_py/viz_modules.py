@@ -88,8 +88,12 @@ class VisualizationData:
         for path in exp_data_obj_paths:
 
             # Check type of file to load
-            if os.path.splitext(path)[1] == ".ped": obj = self.load_pkl_file(path)
-            elif os.path.splitext(path)[1] == ".pbs": obj = self.load_proto_file(path)
+            if os.path.splitext(path)[1] == ".ped":
+                print("Loading", path)
+                obj = self.load_pkl_file(path)
+            elif os.path.splitext(path)[1] == ".pbs":
+                print("Loading", path)
+                obj = self.load_proto_file(path)
             else: raise RuntimeError("Unknown extension encountered; please provide \".ped\" or \".pbs\" files.")
 
             # Check that common simulation parameters are the same before combining
@@ -629,6 +633,7 @@ class VisualizationDataGroupBase(ABC):
                 exp_data_obj_folders.append(parent_folder)
 
         self.folders = list(set(exp_data_obj_folders)) # store the unique values for the paths
+        print("\nLooking for VDG files in", self.folders, "\n")
 
     @abstractmethod
     def get_viz_data_obj(self, args: dict) -> VisualizationData:
