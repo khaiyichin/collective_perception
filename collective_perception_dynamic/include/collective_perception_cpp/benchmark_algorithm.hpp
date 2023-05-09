@@ -22,51 +22,6 @@ using namespace nlohmann;
 using BuzzForeachVMFunc = std::function<void(CBuzzLoopFunctions::COperation &)>; // type for the CBuzzLoopFunctions::BuzzForeachVM function
 
 /**
- * @brief Base class for the COperation functor to provide common variables and functions
- *
- */
-struct BuzzCOperationFunctorBase : public CBuzzLoopFunctions::COperation
-{
-    /**
-     * @brief Construct a new BuzzCOperationFunctorBase object
-     *
-     */
-    BuzzCOperationFunctorBase() {}
-
-    /**
-     * @brief Construct a new BuzzCOperationFunctorBase object
-     *
-     * @param id_prefix ID prefix used to strip the robot ID integer value
-     * @param id_base_num ID base number used to offset the robot ID integer value
-     */
-    BuzzCOperationFunctorBase(const std::string &id_prefix,
-                              const int &id_base_num)
-        : prefix(id_prefix),
-          base_num(id_base_num) {}
-
-    /**
-     * @brief Destroy the BuzzCOperationFunctorBase object
-     *
-     */
-    virtual ~BuzzCOperationFunctorBase() {}
-
-    /**
-     * @brief Strips the string prefix in the robot ID to obtain the numeric part
-     *
-     * @param str_robot_id Robot ID
-     * @return int Numeric part of the robot ID
-     */
-    inline int GetNumericId(std::string str_robot_id)
-    {
-        return std::stoi(str_robot_id.erase(0, prefix.length()));
-    }
-
-    std::string prefix; ///< Prefix to robot ID
-
-    int base_num; ///< Base number offset for robot ID
-};
-
-/**
  * @brief Base class for the BenchmarkData struct to provide common variables
  *
  */
@@ -82,10 +37,8 @@ struct BenchmarkDataBase
      * @brief Construct a new BenchmarkDataBase object
      *
      * @param sim_type Identifying keyword for the simulation type (specific benchmark algorithm)
-     * @param param_str Parameter of interest based on the simulation type
      */
-    BenchmarkDataBase(const std::string &sim_type)
-        : simulation_type(sim_type) {}
+    BenchmarkDataBase(const std::string &sim_type) : simulation_type(sim_type) {}
 
     std::string simulation_type; ///< Keyword identifying the desired benchmark algorithm to use
 
@@ -95,15 +48,11 @@ struct BenchmarkDataBase
 
     unsigned int num_steps; ///< Number of steps per trial
 
-    int id_base_num; ///< Base number offset for robot ID
-
     float comms_range; ///< Communication range of robots in m
 
     float density; ///< Swarm density
 
     float speed; ///< Robot maximum linear speed in cm/s (Buzz code uses cm/s)
-
-    std::string id_prefix; ///< Prefix used in robot IDs
 
     std::string output_folder; ///< High-level output folder name
 
@@ -133,11 +82,13 @@ public:
      * @brief Construct a new BenchmarkAlgorithmBase object
      *
      * @param buzz_foreach_vm_func CBuzzLoopFunctions::BuzzForeachVM functor
+     * @param t_tree XML node tree with `algorithm` as the root node
+     * @param robot_id_vec Vector of all robot IDs
      */
-    BenchmarkAlgorithmBase(const BuzzForeachVMFunc &buzz_foreach_vm_func)
-        : buzz_foreach_vm_func_(buzz_foreach_vm_func)
-    {
-    }
+    BenchmarkAlgorithmBase(const BuzzForeachVMFunc &buzz_foreach_vm_func,
+                           TConfigurationNode &t_tree,
+                           const std::vector<std::string> robot_id_vec)
+        : buzz_foreach_vm_func_(buzz_foreach_vm_func), robot_id_vec_(robot_id_vec) {}
 
     /**
      * @brief Destroy the BenchmarkAlgorithmBase object
@@ -223,6 +174,8 @@ protected:
     std::pair<double, double> curr_paired_parameters_ = {-1, -1}; ///< Current paired parameters
 
     BuzzForeachVMFunc buzz_foreach_vm_func_; ///< BuzzForeachVM functor
+
+    std::vector<std::string> robot_id_vec_; ///< Vector of robot IDs (provides full list of robot IDs)
 };
 
 /**
@@ -244,9 +197,13 @@ public:
      * @brief Construct a new BenchmarkAlgorithmTemplate object
      *
      * @param buzz_foreach_vm_func CBuzzLoopFunctions::BuzzForeachVM functor
+     * @param t_tree XML node tree with `algorithm` as the root node
+     * @param robot_id_vec Vector of all robot IDs
      */
-    BenchmarkAlgorithmTemplate(const BuzzForeachVMFunc &buzz_foreach_vm_func)
-        : BenchmarkAlgorithmBase(buzz_foreach_vm_func) {}
+    BenchmarkAlgorithmTemplate(const BuzzForeachVMFunc &buzz_foreach_vm_func,
+                               TConfigurationNode &t_tree,
+                               const std::vector<std::string> &robot_id_vec)
+        : BenchmarkAlgorithmBase(buzz_foreach_vm_func, t_tree, robot_id_vec) {}
 
     /**
      * @brief Get the benchmark data
@@ -260,18 +217,18 @@ protected:
      * @brief Draw a sample of robot IDs without replacement
      *
      * @param num_robots_to_sample Number of robots to sample
-     * @param starting_base_num Offset to the ID base number
-     * @return std::vector<int> Drawn robot IDs
+     * @return std::vector<std::string> Drawn robot IDs
      */
-    std::vector<int> SampleRobotIdsWithoutReplacement(const unsigned int &num_robots_to_sample, const unsigned int &starting_base_num)
+    std::vector<std::string> SampleRobotIdsWithoutReplacement(const unsigned int &num_robots_to_sample)
     {
-        // Create a vector of all IDs
-        std::vector<int> ids(data_.num_agents);
-        std::iota(ids.begin(), ids.end(), starting_base_num);
-
         // Sample random robot IDs (without replacement)
-        std::vector<int> sampled_robot_ids;
-        std::sample(ids.begin(), ids.end(), std::back_inserter(sampled_robot_ids), num_robots_to_sample, std::mt19937{std::random_device{}()});
+        std::vector<std::string> sampled_robot_ids;
+
+        std::sample(robot_id_vec_.begin(),
+                    robot_id_vec_.end(),
+                    std::back_inserter(sampled_robot_ids),
+                    num_robots_to_sample,
+                    std::mt19937{std::random_device{}()});
 
         return sampled_robot_ids;
     }

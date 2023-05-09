@@ -103,12 +103,6 @@ void BenchmarkingLoopFunctions::Init(TConfigurationNode &t_tree)
         // Grab number of steps
         benchmark_data.num_steps = GetSimulator().GetMaxSimulationClock();
 
-        // Grab robot ID prefix and base number
-        TConfigurationNode &robot_id_node = GetNode(benchmarking_root_node, "robot_id");
-
-        GetNodeAttribute(robot_id_node, "prefix", benchmark_data.id_prefix);
-        GetNodeAttribute(robot_id_node, "base_num", benchmark_data.id_base_num);
-
         // Grab JSON file save path
         TConfigurationNode &path_node = GetNode(benchmarking_root_node, "path");
         GetNodeAttribute(path_node, "folder", benchmark_data.output_folder);
@@ -145,6 +139,16 @@ void BenchmarkingLoopFunctions::Init(TConfigurationNode &t_tree)
 
 void BenchmarkingLoopFunctions::InitializeBenchmarkAlgorithm(TConfigurationNode &t_tree)
 {
+    // Get vector of all robot IDs
+    std::vector<std::string> robot_id_vec;
+    CSpace::TMapPerType &map = GetSpace().GetEntitiesByType("controller");
+
+    for (auto itr = map.begin(); itr != map.end(); ++itr)
+    {
+        CControllableEntity &entity = *any_cast<CControllableEntity *>(itr->second);
+        robot_id_vec.push_back(entity.GetRootEntity().GetId());
+    }
+
     // Define a lambda function for disambiguating the BuzzForeachVM function
     // This is needed to pass into the BenchmarkAlgorithmBase class, which otherwise wouldn't have access
     auto buzz_foreach_vm_func = [this](CBuzzLoopFunctions::COperation &arg)
@@ -154,7 +158,7 @@ void BenchmarkingLoopFunctions::InitializeBenchmarkAlgorithm(TConfigurationNode 
     if (algorithm_str_id_ == CROSSCOMBE_2017)
     {
         benchmark_algo_ptr_ =
-            std::make_shared<BenchmarkCrosscombe2017>(buzz_foreach_vm_func, t_tree);
+            std::make_shared<BenchmarkCrosscombe2017>(buzz_foreach_vm_func, t_tree, robot_id_vec);
 
         benchmark_algo_ptr_->Init();
     }

@@ -38,7 +38,7 @@ enum class RobotState
  * @brief Functor to process the robots' belief
  *
  */
-struct ProcessRobotBelief : BuzzCOperationFunctorBase
+struct ProcessRobotBelief : public CBuzzLoopFunctions::COperation
 {
     /**
      * @brief Construct a new ProcessRobotBelief object
@@ -49,8 +49,6 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
     /**
      * @brief Construct a new ProcessRobotBelief object
      *
-     * @param id_prefix Prefix to the robot IDs
-     * @param id_base_num Base (starting) number of the robot IDs
      * @param num_options Number of options available for the robots to select from
      * @param num_robots Number of robots to simulate
      * @param speed Speed of the robot in cm/s
@@ -58,16 +56,13 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
      * @param option_qualities Qualities of options
      * @param id_belief_map_ptr Pointer to the map containing the robot IDs and their beliefs
      */
-    inline ProcessRobotBelief(const std::string &id_prefix,
-                              const int &id_base_num,
-                              const int &num_options,
+    inline ProcessRobotBelief(const int &num_options,
                               const int &num_robots,
                               const float &speed,
-                              const std::vector<int> &flawed_robot_ids,
+                              const std::vector<std::string> &flawed_robot_ids,
                               const std::vector<unsigned int> &option_qualities,
                               const std::shared_ptr<RobotIdBeliefStrMap> &id_belief_map_ptr)
-        : BuzzCOperationFunctorBase(id_prefix, id_base_num),
-          num_options(num_options),
+        : num_options(num_options),
           num_robots(num_robots),
           spd(speed),
           flawed_robot_ids(flawed_robot_ids),
@@ -232,7 +227,9 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
      */
     inline bool IsFlawed(const std::string &str_robot_id)
     {
-        return std::find(flawed_robot_ids.begin(), flawed_robot_ids.end(), GetNumericId(str_robot_id)) != flawed_robot_ids.end();
+        return std::find(flawed_robot_ids.begin(),
+                         flawed_robot_ids.end(),
+                         str_robot_id) != flawed_robot_ids.end();
     }
 
     std::mt19937 generator; ///< Random number generator
@@ -249,7 +246,7 @@ struct ProcessRobotBelief : BuzzCOperationFunctorBase
 
     std::set<std::string> initialized_robot_ids; ///< Set of robot IDs that have been initialized
 
-    std::vector<int> flawed_robot_ids; ///< IDs of flawed robots
+    std::vector<std::string> flawed_robot_ids; ///< IDs of flawed robots
 
     std::vector<unsigned int> option_qualities; ///< Qualities of options
 
@@ -287,8 +284,11 @@ public:
      *
      * @param buzz_foreach_vm_func COperation::BuzzForeachVM functor
      * @param t_tree XML node tree with `algorithm` as the root node
+     * @param robot_id_vec Vector of all robot IDs
      */
-    BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_foreach_vm_func, TConfigurationNode &t_tree);
+    BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_foreach_vm_func,
+                            TConfigurationNode &t_tree,
+                            const std::vector<std::string> &robot_id_vec);
 
     /**
      * @brief Initialize the algorithm

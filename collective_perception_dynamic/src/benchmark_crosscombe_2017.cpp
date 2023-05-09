@@ -347,8 +347,10 @@ int ProcessRobotBelief::GetTruthValue(const int &self_belief,
     }
 }
 
-BenchmarkCrosscombe2017::BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_foreach_vm_func, TConfigurationNode &t_tree)
-    : BenchmarkAlgorithmTemplate<BenchmarkDataCrosscombe2017>(buzz_foreach_vm_func)
+BenchmarkCrosscombe2017::BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_foreach_vm_func,
+                                                 TConfigurationNode &t_tree,
+                                                 const std::vector<std::string> &robot_id_vec)
+    : BenchmarkAlgorithmTemplate<BenchmarkDataCrosscombe2017>(buzz_foreach_vm_func, t_tree, robot_id_vec)
 {
     // Grab number of possible options
     GetNodeAttribute(GetNode(t_tree, "num_possible_options"), "int", data_.num_possible_options);
@@ -386,14 +388,12 @@ void BenchmarkCrosscombe2017::SetupExperiment(const int &trial_ind, const std::p
             << curr_num_flawed_robots_ << std::endl;
     }
 
-    std::vector<int> flawed_robot_ids = SampleRobotIdsWithoutReplacement(curr_num_flawed_robots_, data_.id_base_num);
+    std::vector<std::string> flawed_robot_ids = SampleRobotIdsWithoutReplacement(curr_num_flawed_robots_);
 
     // Setup functors
     id_belief_map_ptr_ = std::make_shared<RobotIdBeliefStrMap>();
 
-    process_robot_belief_functor_ = ProcessRobotBelief(data_.id_prefix,
-                                                       data_.id_base_num,
-                                                       data_.num_possible_options,
+    process_robot_belief_functor_ = ProcessRobotBelief(data_.num_possible_options,
                                                        data_.num_agents,
                                                        data_.speed,
                                                        flawed_robot_ids,
