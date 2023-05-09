@@ -212,9 +212,9 @@ class VisualizationData:
                                             np.asarray(s.x_std),
                                             np.asarray(s.conf_std) ) for s in stats_packet.rts.social_vals ]
             repeated_trial_informed_vals = [ ( np.asarray(s.x_mean),
-                                            np.asarray(s.conf_mean),
-                                            np.asarray(s.x_std),
-                                            np.asarray(s.conf_std) ) for s in stats_packet.rts.informed_vals ]
+                                               np.asarray(s.conf_mean),
+                                               np.asarray(s.x_std),
+                                               np.asarray(s.conf_std) ) for s in stats_packet.rts.informed_vals ]
 
             stats_obj.x_hat_sample_mean, stats_obj.alpha_sample_mean, stats_obj.x_hat_sample_std, stats_obj.alpha_sample_std = zip(*repeated_trial_local_vals)
             stats_obj.x_bar_sample_mean, stats_obj.rho_sample_mean, stats_obj.x_bar_sample_std, stats_obj.rho_sample_std = zip(*repeated_trial_social_vals)

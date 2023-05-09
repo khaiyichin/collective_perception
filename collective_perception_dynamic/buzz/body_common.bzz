@@ -5,12 +5,17 @@ STRAIGHT_MEAN_DURATION = 15 # in units of timesteps
 CCW_ENUM = 0 # rotation direction enum
 CW_ENUM = 1 # rotation direction enum
 OBSTACLE_AVOIDANCE_ANG = math.pi/2 # angle range in which objects enter to activate obstacle avoidance sequence in rad
+AVOIDANCE_COUNTER = 0
+AVOIDANCE_UNSTUCK_THRESHS = {.FIRST = 30, .SECOND = 60}
 
 # Execute robot motion
 function move(move_type, move_duration, rot_direction, spd)
 {
     # Random walk based on
     # G. Valentini, D. Brambilla, H. Hamann, and M. Dorigo, “Collective Perception of Environmental Features in a Robot Swarm”
+
+    # Reset avoidance counter
+    AVOIDANCE_COUNTER = 0
 
     # Assert that values are correct (only useful in ARGoS simulation)
     if ( (move_type == nil) and (move_duration != 0) )
@@ -119,13 +124,27 @@ function detect_obstacles()
 # Execute obstacle avoidance sequence
 function avoid_obstacles(spd, obstacles)
 {
-    if (obstacles.ang > 0)
+    if (AVOIDANCE_COUNTER <= AVOIDANCE_UNSTUCK_THRESHS.FIRST) # regular obstacle avoidance
     {
-        move_rotate(spd, CW_ENUM) # rotate to the right
+        if (obstacles.ang > 0)
+        {
+            move_rotate(spd, CW_ENUM) # rotate to the right
+        }
+        else
+        {
+            move_rotate(spd, CCW_ENUM) # rotate to the left
+        }
+        AVOIDANCE_COUNTER = AVOIDANCE_COUNTER + 1
     }
-    else
+    else if (AVOIDANCE_COUNTER <= AVOIDANCE_UNSTUCK_THRESHS.SECOND) # activating unstuck strategy
     {
-        move_rotate(spd, CCW_ENUM) # rotate to the left
+        move_rotate(spd, CW_ENUM) # just rotate one direction
+
+        AVOIDANCE_COUNTER = AVOIDANCE_COUNTER + 1
+    }
+    else # should (hopefully) be out of a trapping zone
+    {
+        AVOIDANCE_COUNTER = 0
     }
 
     # Reset motion

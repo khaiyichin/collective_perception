@@ -55,6 +55,7 @@ setuptools.setup(
     scripts=[
         "scripts/visualize_multi_agent_data_static.py",
         "scripts/visualize_multi_agent_data_dynamic.py",
+        "scripts/visualize_multi_agent_data_benchmark.py",
         "scripts/serial_data_info.py",
         "scripts/convert_exp_data_to_viz_data_group.py",
         "scripts/convert_sim_stats_set_to_viz_data_group.py",
