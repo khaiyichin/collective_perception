@@ -25,7 +25,9 @@ void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 
     // Initialize RobotIDBrainMap
     (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, prob, prob, legacy);
-    auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
+
+    // Assign indices to robot IDs
+    (*str_int_id_map_ptr)[str_robot_id.c_str()] = internal_counter++;
 
     // Open the local_vals table
     BuzzTableOpen(t_vm, "local_vals");
@@ -81,15 +83,13 @@ float InitializeRobot::GenerateRandomSensorProbability()
 }
 
 ProcessRobotThought::ProcessRobotThought(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr,
+                                         const std::shared_ptr<std::unordered_map<std::string, int>> &str_id_ptr,
                                          std::vector<AgentData> *agt_vec_ptr,
-                                         const std::string &id_prefix,
-                                         const int &id_base_num,
-                                         const std::vector<int> &disabled_ids,
+                                         const std::vector<std::pair<std::string, int>> &disabled_ids,
                                          const std::unordered_map<DisabilityType, bool> &disability_types)
     : id_brain_map_ptr(id_brain_ptr),
-      agt_data_vec_ptr(agt_vec_ptr),
-      prefix(id_prefix),
-      base_num(id_base_num)
+      str_int_id_map_ptr(str_id_ptr),
+      agt_data_vec_ptr(agt_vec_ptr)
 {
     // Assign (to-be) disabled robot IDs to internal map
     for (auto id : disabled_ids)
@@ -105,24 +105,22 @@ ProcessRobotThought::ProcessRobotThought(const std::shared_ptr<RobotIdBrainMap> 
                 status_and_type.disability_types.push_back(d_enum);
             } // store the enum corresponding to the disability type associated with the current robot id
         }
-        id_disabled_status_map[id] = status_and_type;
+        id_disabled_status_map[id.first] = status_and_type;
     }
 }
 
 void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
 {
-    int curr_robot_id = GetNumericId(str_robot_id);
-
     if (disability_status == SwarmDisabilityStatus::executing) // check if overall disabling has begun
     {
         // Disable robot if the current robot is in the list
-        if (HasDisability(curr_robot_id))
+        if (HasDisability(str_robot_id))
         {
             // Update disability status
-            id_disabled_status_map[curr_robot_id].disability_activated = true;
+            id_disabled_status_map[str_robot_id.c_str()].disability_activated = true;
 
             // Activate all applicable disability types
-            for (const DisabilityType &d : id_disabled_status_map[curr_robot_id].disability_types)
+            for (const DisabilityType &d : id_disabled_status_map[str_robot_id.c_str()].disability_types)
             {
                 BuzzPut(t_vm, GetBuzzDisabilityKeyword(d), 1); // update disability status in the body
 
@@ -131,7 +129,7 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
         }
 
         // Update overall disability status only if all robots have been disabled
-        int activated_counter = std::count_if(id_disabled_status_map.begin(), id_disabled_status_map.end(), [](const std::pair<int, DisabilityStatusAndTypes> &v)
+        int activated_counter = std::count_if(id_disabled_status_map.begin(), id_disabled_status_map.end(), [](const std::pair<std::string, DisabilityStatusAndTypes> &v)
                                               { return v.second.disability_activated; });
 
         if (activated_counter == id_disabled_status_map.size())
@@ -143,8 +141,6 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
     // Find out if the current robot has some disability
     if (disability_status != SwarmDisabilityStatus::executing)
     {
-        int curr_robot_id = GetNumericId(str_robot_id);
-
         // Collect debugging values for AgentData objects
         unsigned int encounter, observation;
 
@@ -160,7 +156,7 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
         {
             // Extract the integer component from the ID
             std::string dup_str_robot_id = str_robot_id;
-            int index = std::stoi(dup_str_robot_id.erase(0, prefix.length())) - base_num;
+            int index = (*str_int_id_map_ptr)[str_robot_id];
 
             // Get data
             auto &agent_data = (*agt_data_vec_ptr)[index];
@@ -173,9 +169,9 @@ void ProcessRobotThought::operator()(const std::string &str_robot_id, buzzvm_t t
         // Get reference to the robot brain
         auto &robot_brain = (*id_brain_map_ptr)[str_robot_id.c_str()];
 
-        if (disability_status == SwarmDisabilityStatus::active && HasDisability(curr_robot_id)) // current robot is disabled
+        if (disability_status == SwarmDisabilityStatus::active && HasDisability(str_robot_id)) // current robot is disabled
         {
-            std::vector<DisabilityType> dis_type_vec = id_disabled_status_map[curr_robot_id].disability_types;
+            std::vector<DisabilityType> dis_type_vec = id_disabled_status_map[str_robot_id].disability_types;
 
             // Perform specific processing for different disabilities
             if (std::count(dis_type_vec.begin(), dis_type_vec.end(), DisabilityType::sense) == 0)
@@ -473,12 +469,6 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         // Grab number of steps
         simulation_parameters_.num_steps_ = GetSimulator().GetMaxSimulationClock();
 
-        // Grab robot ID prefix and base number
-        TConfigurationNode &robot_id_node = GetNode(col_per_root_node, "robot_id");
-
-        GetNodeAttribute(robot_id_node, "prefix", id_prefix_);
-        GetNodeAttribute(robot_id_node, "base_num", id_base_num_);
-
         // Grab number of robots to disable, if any
         float disabled_time_in_sec;
 
@@ -647,25 +637,33 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
         LOG << "[INFO] Arena tile fill ratio = " << arena_.GetTrueTileDistribution() << " with " << arena_.GetTotalNumTiles() << " tiles." << std::endl;
     }
 
+    // Clear pointer contents
+    id_brain_map_ptr_ = std::make_shared<RobotIdBrainMap>();
+    str_int_id_map_ptr_ = std::make_shared<std::unordered_map<std::string, int>>();
+
+    // (Re-)Initialize robots; this will populate the shared pointer objects
+    initialization_functor_ = InitializeRobot(id_brain_map_ptr_,
+                                              str_int_id_map_ptr_,
+                                              curr_tfr_sp_range_itr_->second,
+                                              simulation_parameters_.speed_,
+                                              legacy_);
+
+    BuzzForeachVM(initialization_functor_);
+
     // (Re-)Sample robots to disable at random
     if (disabled_time_in_ticks_ > 0)
     {
         SampleRobotsToDisable();
     }
 
-    // Setup functors
+    // Setup functor to process robot thought
     std::vector<AgentData> *curr_agent_data_vec_ptr = &curr_agent_data_packet_.repeated_agent_data_vec[trial_counter_];
 
-    initialization_functor_ = InitializeRobot(id_brain_map_ptr_, curr_tfr_sp_range_itr_->second, simulation_parameters_.speed_, legacy_);
     process_thought_functor_ = ProcessRobotThought(id_brain_map_ptr_,
+                                                   str_int_id_map_ptr_,
                                                    curr_agent_data_vec_ptr,
-                                                   id_prefix_,
-                                                   id_base_num_,
                                                    disabled_ids_,
                                                    robot_disability_types_);
-
-    // Re-initialize each robot
-    BuzzForeachVM(initialization_functor_);
 
     // Compute the pre-experiment statistics
     ComputeStats();
@@ -703,7 +701,7 @@ void CollectivePerceptionLoopFunctions::PostStep()
 
 void CollectivePerceptionLoopFunctions::ComputeStats()
 {
-    // Store mean value for random sensor probabilities if assigned by distribution and if unassigned and store informed values
+    // Store mean value for random sensor probabilities if assigned by distribution and if unassigned store informed values
     if (simulation_parameters_.sp_range_[0] < 0.0 &&
         curr_stats_packet_.sp_mean_values.size() <= trial_counter_)
     {
@@ -716,7 +714,7 @@ void CollectivePerceptionLoopFunctions::ComputeStats()
 
             // Store each agent's informed values
             std::string str_robot_id = kv.first;
-            int index = std::stoi(str_robot_id.erase(0, id_prefix_.length())) - id_base_num_;
+            int index = (*str_int_id_map_ptr_)[str_robot_id];
 
             auto brain_value_pair = kv.second.GetInformedValuePair();
 
@@ -734,7 +732,7 @@ void CollectivePerceptionLoopFunctions::ComputeStats()
         {
             // Store each agent's informed values
             std::string str_robot_id = kv.first;
-            int index = std::stoi(str_robot_id.erase(0, id_prefix_.length())) - id_base_num_;
+            int index = (*str_int_id_map_ptr_)[str_robot_id];
 
             auto brain_value_pair = kv.second.GetInformedValuePair();
 
@@ -990,20 +988,16 @@ void CollectivePerceptionLoopFunctions::SampleRobotsToDisable()
     // Clear any old IDs
     disabled_ids_.clear();
 
-    // Create a vector of all IDs
-    std::vector<int> ids(simulation_parameters_.num_agents_);
-    std::iota(ids.begin(), ids.end(), id_base_num_);
-
     // Sample random robot IDs (without replacement)
-    std::sample(ids.begin(), ids.end(), std::back_inserter(disabled_ids_), disabled_robot_amount_, std::mt19937{std::random_device{}()});
+    std::sample(str_int_id_map_ptr_->begin(), str_int_id_map_ptr_->end(), std::back_inserter(disabled_ids_), disabled_robot_amount_, std::mt19937{std::random_device{}()});
 
     if (verbose_level_ == "full" || verbose_level_ == "reduced")
     {
         LOG << "[INFO] Disabling robot with IDs: ";
 
-        for (const int &id : disabled_ids_)
+        for (const auto &id : disabled_ids_)
         {
-            LOG << id << " ";
+            LOG << id.first << " ";
         }
 
         LOG << std::endl;

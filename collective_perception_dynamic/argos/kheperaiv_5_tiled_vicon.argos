@@ -23,7 +23,7 @@
           or set to zero, this value is taken from the clock and a warning
           message is displayed.
     -->
-        <experiment length="200" ticks_per_second="10" random_seed="0" />
+        <experiment length="100" ticks_per_second="10" random_seed="0" />
     </framework>
 
     <!-- *************** -->
@@ -81,7 +81,8 @@
       -->
             <sensors>
                 <kheperaiv_ground implementation="rot_z_only" />
-                <range_and_bearing implementation="medium" medium="rab" show_rays="true" noise_std_dev="0" />
+                <range_and_bearing implementation="medium" medium="rab" show_rays="true"
+                    noise_std_dev="0" />
                 <kheperaiv_proximity implementation="default" show_rays="false" />
             </sensors>
             <!--
@@ -98,38 +99,49 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
-        <collective_perception>
-            <arena_tiles tile_count_x="500" tile_count_y="500" /> <!-- number of tiles for the arena -->
-            <fill_ratio_range min="0.95" max="0.95" steps="1" /> <!-- range of target fill ratios -->
-            <sensor_probability_range min="0.525" max="0.975" steps="-2" />
-            <!--
+    <loop_functions label="MasterLoopFunctions">
+        <sub_loop_function library="build/src/libcollective_perception_loop_functions"
+            label="collective_perception_loop_functions">
+            <collective_perception>
+                <arena_tiles tile_count_x="300" tile_count_y="300" /> <!-- number of tiles for the
+                arena -->
+                <fill_ratio_range min="0.95" max="0.95" steps="1" /> <!-- range of target fill ratios -->
+                <sensor_probability_range min="0.525" max="0.975" steps="2" />
+                <!--
                 range of sensor probabilities
                 `steps` must be an integer:
                     - positive, probabilities are spread linearly from min to max
                     - -2 indicates a uniform distribution with range [`min`, `max`)
                     - -3 indicates a normal distribution with mean=`min`, variance=`max`
             -->
-            <speed value="14.14" /> <!-- in units of cm/s -->
-            <num_trials value="3" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
-            <robot_disabling amount="2" sim_clock_time="50" > <!-- randomly disable n robots at specified time in seconds -->
-                <motion_disable bool="true" />
-                <comms_disable bool="false" />
-                <sense_disable bool="true" />
-            </robot_disabling>
-            <path folder="data" stats="multi_agent_sim_dynamic_stats.pbs" agent_data="multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
-            <verbosity level="full" /> <!-- "full", "reduced", "none" -->
-            <legacy bool="false" /> <!-- flag to use legacy social equations -->
-            <dac_plugin activate="false">
-                <!-- flag to use the DAC plugin -->
-                <!--
+                <speed value="14.14" /> <!-- in units of cm/s -->
+                <num_trials value="3" /> <!-- number of trials to repeat for a specific fill ratio
+                and
+            sensor probability -->
+                <robot_disabling amount="0" sim_clock_time="0"> <!-- randomly disable n robots at
+                specified time in seconds -->
+                    <motion_disable bool="true" />
+                    <comms_disable bool="false" />
+                    <sense_disable bool="false" />
+                </robot_disabling>
+                <path folder="data" stats="multi_agent_sim_dynamic_stats.pbs"
+                    agent_data="multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!--
+            path to the output data and datetime in filename -->
+                <verbosity level="full" /> <!-- "full", "reduced", "none" -->
+                <legacy bool="false" /> <!-- flag to use legacy social equations -->
+                <dac_plugin activate="false">
+                    <!-- flag to use the DAC plugin -->
+                    <!--
                     num_bins: number of bins to partition the fill ratio
-                    write_period: csv file writing period in seconds; use -1 if only write once at the end of each trial
+                    write_period: csv file writing period in seconds; use -1 if only write once at the end of each
+                trial
                     csv_path: path to csv file
                 -->
-                <param num_bins="5" write_period="50" csv_path="/home/khaiyichin/test.csv" />
-            </dac_plugin>
-        </collective_perception>
+                    <param num_bins="5" write_period="50" csv_path="/home/khaiyichin/test.csv" />
+                </dac_plugin>
+            </collective_perception>
+        </sub_loop_function>
+        <sub_loop_function label="BaseNetworking" />
     </loop_functions>
 
     <!-- *********************** -->
@@ -150,70 +162,51 @@
  
       $ argos3 -q box
   -->
-    <arena size="5, 5, 1" center="0,0,0.5">
+    <arena size="3, 3, 1" center="0,0,0.5">
 
         <floor id="floor" source="loop_functions" pixels_per_meter="200" />
         <!-- <floor id="floor" source="image" path="img/white.png" /> -->
 
         <!-- Place four boxes in a square to delimit the arena -->
-        <!-- <box id="wall_north" size="5.25,0.1,0.5" movable="false"> -->
-        <box id="wall_north" size="10,0.1,0.5" movable="false">
-            <!-- <body position="0,2.8243291083242075,0" orientation="0,0,0" /> -->
-            <!-- <body position="0,2.011746925739275,0" orientation="0,0,0" /> -->
-            <!-- <body position="0,1.290717695633861,0" orientation="0,0,0" /> -->
-            <body position="0,0.9273198961208501,0" orientation="0,0,0" />
+        <box id="wall_north" size="3.000000, 0.100000, 0.500000" movable="false">
+            <body position="0.000000, 1.437165, 0.000000" orientation="0, 0, 0" />
         </box>
-        <box id="wall_south" size="10,0.1,0.5" movable="false">
-            <!-- <body position="0,-2.8243291083242075,0" orientation="0,0,0" /> -->
-            <!-- <body position="0,-2.011746925739275,0" orientation="0,0,0" /> -->
-            <!-- <body position="0,-1.290717695633861,0" orientation="0,0,0" /> -->
-            <body position="0,-0.9273198961208501,0" orientation="0,0,0" />
+        <box id="wall_south" size="3.000000, 0.100000, 0.500000" movable="false">
+            <body position="0.000000, -1.437165, 0.000000" orientation="0, 0, 0" />
         </box>
-        <box id="wall_east" size="0.1,10,0.5" movable="false">
-            <!-- <body position="2.8243291083242075,0,0" orientation="0,0,0" /> -->
-            <!-- <body position="2.011746925739275,0,0" orientation="0,0,0" /> -->
-            <!-- <body position="1.290717695633861,0,0" orientation="0,0,0" /> -->
-            <body position="0.9273198961208501,0,0" orientation="0,0,0" />
+        <box id="wall_east" size="0.100000, 3.000000, 0.500000" movable="false">
+            <body position="1.437165, 0.000000, 0.000000" orientation="0, 0, 0" />
         </box>
-        <box id="wall_west" size="0.1,10,0.5" movable="false">
-            <!-- <body position="-2.8243291083242075,0,0" orientation="0,0,0" /> -->
-            <!-- <body position="-2.011746925739275,0,0" orientation="0,0,0" /> -->
-            <!-- <body position="-1.290717695633861,0,0" orientation="0,0,0" /> -->
-            <body position="-0.9273198961208501,0,0" orientation="0,0,0" />
+        <box id="wall_west" size="0.100000, 3.000000, 0.500000" movable="false">
+            <body position="-1.437165, 0.000000, 0.000000" orientation="0, 0, 0" />
         </box>
 
-        <!-- Place a foot-bot in the origin and bind it to the controller -->
         <!-- <distribute>
-            <position method="uniform" min="-0.9273198961208501,-0.9273198961208501,0" max="0.9273198961208501,0.9273198961208501,0" />
-            <orientation method="uniform" min="0,0,0" max="360,0,0" />
+            <position method="uniform" min="-1.437165, -1.437165, 0" max="1.437165, 1.437165, 0" />
+            <orientation method="uniform" min="0, 0, 0" max="0, 0, 0" />
             <entity quantity="5" max_trials="100" base_num="0">
-                <kheperaiv id="kiv" rab_data_size="50" rab_range="0.7">
+                <kheperaiv id="kiv" rab_data_size="50" rab_range="0.700000">
                     <controller config="bck" />
                 </kheperaiv>
             </entity>
         </distribute> -->
 
 
-        <kheperaiv id="Khepera_4" rab_data_size="50">
-            <body position="0.5,0,0" orientation="0,0,0" />
+
+        <kheperaiv id="Khepera_3" rab_data_size="50">
+            <body position="0,0,0" orientation="0,0,0" />
             <controller config="bck" />
         </kheperaiv>
 
-
-        <kheperaiv id="Khepera_2" rab_data_size="50">
-            <body position="0,0.5,0" orientation="0,0,0" />
+        <!-- <kheperaiv id="kiv1" rab_data_size="50">
+            <body position="0,0,0" orientation="0,0,0" />
             <controller config="bck" />
         </kheperaiv>
 
-        <kheperaiv id="Khepera_5" rab_data_size="50">
-            <body position="0,-0.5,0" orientation="0,0,0" />
+        <kheperaiv id="kiv2" rab_data_size="50">
+            <body position="0,0,0" orientation="0,0,0" />
             <controller config="bck" />
-        </kheperaiv>
-
-        <kheperaiv id="Khepera_8" rab_data_size="50">
-            <body position="-0.5, 0,0" orientation="0,0,0" />
-            <controller config="bck" />
-        </kheperaiv>
+        </kheperaiv> -->
     </arena>
 
     <!-- ******************* -->
@@ -230,7 +223,19 @@
         <!--
         Use a 2D dynamics engine.
     -->
-        <dynamics2d id="dyn2d" />
+        <!-- <dynamics2d id="dyn2d" /> -->
+        <tracking>
+            <updaters>
+                <!-- <vicon_updater/> -->
+                <vicon_updater host="192.168.1.10" port="801" />
+            </updaters>
+            <assigners>
+                <Khepera default="bck"></Khepera>
+            </assigners>
+            <rab>
+                <Khepera data_size="50" range="0.7" />
+            </rab>
+        </tracking>
     </physics_engines>
 
     <!-- ********* -->
@@ -262,13 +267,14 @@
       $ argos3 -q visualizations
   -->
     <visualization>
-        <!-- <qt-opengl>
+        <qt-opengl>
             <camera>
                 <placements>
-                    <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="35" />
+                    <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0"
+                        lens_focal_length="35" />
                 </placements>
             </camera>
-        </qt-opengl> -->
+        </qt-opengl>
     </visualization>
 
 </argos-configuration>
