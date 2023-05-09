@@ -123,7 +123,7 @@ class VisualizationData:
                 self.sp_range = obj.sp_range
                 self.stats_obj_dict = obj.stats_obj_dict
                 self.agg_stats_dict = {} # to be populated later
-                
+
                 first_obj = False
 
             else:
@@ -197,7 +197,7 @@ class VisualizationData:
         setattr(simulation_set_pb2.SimulationStatsSet, "comms_range", sim_stats_set_msg.sim_set.comms_range)
         setattr(simulation_set_pb2.SimulationStatsSet, "speed", np.round(sim_stats_set_msg.sim_set.speed, 3))
         setattr(simulation_set_pb2.SimulationStatsSet, "density", np.round(sim_stats_set_msg.sim_set.density, 3))
-        setattr(simulation_set_pb2.SimulationStatsSet, "stats_obj_dict", {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.tfr_range} )
+        setattr(simulation_set_pb2.SimulationStatsSet, "stats_obj_dict", {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.tfr_range})
 
         for stats_packet in sim_stats_set_msg.stats_packets:
             stats_obj = Sim.SimStats(None)
@@ -341,7 +341,14 @@ class VisualizationData:
             self.agg_stats_dict[tfr_key] = temp_dict
 
     # @todo modify this method to compute based on input of informed curve(s), not to compute all values!
-    def detect_convergence(self, target_fill_ratio: float, sensor_prob: float, threshold=CONV_THRESH, aggregate=False, individual=False):
+    def detect_convergence(
+        self,
+        target_fill_ratio: float,
+        sensor_prob: float,
+        threshold=CONV_THRESH,
+        aggregate=False,
+        individual=False
+    ):
         """Compute the point in time when convergence is achieved.
 
         This computes the convergence timestep (# of observations) for the local, social,
@@ -358,7 +365,6 @@ class VisualizationData:
             The 3 indices at which convergence criterion is achieved. If `aggregate` == True, each of the 3
             outputs is a scalar; otherwise, they are lists of indices.
         """
-
         """
         Methodology in computing convergence:
         Anchor to one point and check all later values to see if difference exceeds threshold,
@@ -436,7 +442,14 @@ class VisualizationData:
         return output
 
     # @todo: modify this equation to compute accuracy based on input curve(s)
-    def compute_accuracy(self, target_fill_ratio: float, sensor_prob: float, conv_ind_lst=None, aggregate=False, individual=False):
+    def compute_accuracy(
+        self,
+        target_fill_ratio: float,
+        sensor_prob: float,
+        conv_ind_lst=None,
+        aggregate=False,
+        individual=False
+    ):
         """Compute the estimate accuracy with respect to the target fill ratio.
 
         If the list of convergence indices is not provided, then convergence indices will be
@@ -870,21 +883,38 @@ def plot_heatmap_vd(data_obj: VisualizationData, threshold: float, **kwargs):
     b = np.repeat( np.reshape( np.linspace(0.0, 1.0, color_leg_px_count[0]), (1, color_leg_px_count[0]) ), color_leg_px_count[1], axis=0)
 
     # Add color legend labels
-    color_leg_ax.imshow( np.moveaxis( np.array( [r, g, b] ), 0, 2) )
+    color_leg_ax.imshow(np.moveaxis(np.array([r, g, b]), 0, 2))
     color_leg_ax.set_ylabel("Convergence", fontsize=15)
     color_leg_ax.set_xlabel("Accuracy", fontsize=15)
 
     # Add label limits for convergence
-    color_leg_ax.text(-0.2*color_leg_px_count[0], color_leg_px_count[1]-0.5, "Slow", fontsize=10, rotation=90, ha="center", va="bottom")
-    color_leg_ax.text(-0.2*color_leg_px_count[0], -0.5, "Fast", fontsize=10, rotation=90, ha="center", va="top")
+    color_leg_ax.text(
+        -0.2 * color_leg_px_count[0],
+        color_leg_px_count[1] - 0.5,
+        "Slow",
+        fontsize=10,
+        rotation=90,
+        ha="center",
+        va="bottom"
+    )
+    color_leg_ax.text(
+        -0.2 * color_leg_px_count[0], -0.5, "Fast", fontsize=10, rotation=90, ha="center", va="top"
+    )
     # color_leg_ax.text(-0.1*color_leg_px_count[0], 0.995*color_leg_px_count[1], "Slow", fontsize=12, rotation=90)
     # color_leg_ax.text(-0.1*color_leg_px_count[0], 0.1*color_leg_px_count[0], "Fast", fontsize=12, rotation=90)
 
     # Add label ticks
-    color_leg_ax.set_xticks([-0.5, color_leg_px_count[0]-0.5], ["Low\n({0})".format(1- ACC_ABS_MAX), "High\n(1.0)"], fontsize=10)
+    color_leg_ax.set_xticks(
+        [-0.5, color_leg_px_count[0] - 0.5], ["Low\n({0})".format(1 - ACC_ABS_MAX), "High\n(1.0)"],
+        fontsize=10
+    )
     color_leg_ax.get_xticklabels()[0].set_ha("left")
     color_leg_ax.get_xticklabels()[-1].set_ha("right")
-    color_leg_ax.set_yticks([-0.5, color_leg_px_count[1]-0.5], ["(0)", "({0})".format(data_obj.num_steps)], rotation=90, fontsize=10)
+    color_leg_ax.set_yticks(
+        [-0.5, color_leg_px_count[1] - 0.5], ["(0)", "({0})".format(data_obj.num_steps)],
+        rotation=90,
+        fontsize=10
+    )
     color_leg_ax.get_yticklabels()[0].set_va("top")
     color_leg_ax.get_yticklabels()[-1].set_va("bottom")
 
@@ -937,7 +967,9 @@ def plot_heatmap_vdg(
             v = data_obj.get_viz_data_obj({row_arg_str: row, col_arg_str: col, "comms_prob": 1.0,}) # keep communication probabily args
 
             # Compute the convergence timestamps and save the matrix of convergence values
-            matrix = generate_combined_heatmap_data(v, threshold, order=(None, "convergence", "accuracy"))
+            matrix = generate_combined_heatmap_data(
+                v, threshold, order=(None, "convergence", "accuracy")
+            )
             heatmap_data_grid_row.append(matrix)
 
             conv_min = np.amin([conv_min, np.amin(matrix[1])])
@@ -946,7 +978,7 @@ def plot_heatmap_vdg(
             acc_max = np.amax([acc_max, np.amax(matrix[2])])
 
         heatmap_data_grid.append(heatmap_data_grid_row)
-    
+
     print("Convergence timestep minimum: {0}, maximum: {1}".format(conv_min, conv_max))
     print("Accuracy error minimum: {0}, maximum: {1}".format(acc_min, acc_max))
 
@@ -981,13 +1013,23 @@ def plot_heatmap_vdg(
     b = np.repeat( np.reshape( np.linspace(0.0, 1.0, color_leg_px_count[0]), (1, color_leg_px_count[0]) ), color_leg_px_count[1], axis=0 )
 
     # Add color legend labels
-    color_leg_ax.imshow( np.moveaxis( np.array( [r, g, b] ), 0, 2) )
+    color_leg_ax.imshow(np.moveaxis(np.array([r, g, b]), 0, 2))
     color_leg_ax.set_ylabel("Convergence\n(steps)", fontsize=13)
     color_leg_ax.set_xlabel("Accuracy\n(1 - abs. error)", fontsize=13)
 
     # Add label limits for convergence
-    color_leg_ax.text(-0.2*color_leg_px_count[0], color_leg_px_count[1]-0.5, "Slow", fontsize=10, rotation=90, ha="center", va="bottom")
-    color_leg_ax.text(-0.2*color_leg_px_count[0], -0.5, "Fast", fontsize=10, rotation=90, ha="center", va="top")
+    color_leg_ax.text(
+        -0.2 * color_leg_px_count[0],
+        color_leg_px_count[1] - 0.5,
+        "Slow",
+        fontsize=10,
+        rotation=90,
+        ha="center",
+        va="bottom"
+    )
+    color_leg_ax.text(
+        -0.2 * color_leg_px_count[0], -0.5, "Fast", fontsize=10, rotation=90, ha="center", va="top"
+    )
 
     # Add label limits for accuracy
     # color_leg_ax.text(-0.5, 1.04*color_leg_px_count[1], "({0})".format(1 - ACC_ABS_MAX), fontsize=10, ha="left")
@@ -1010,7 +1052,10 @@ def plot_heatmap_vdg(
     else: data_obj_type = "sta"
     fig.savefig("/home/khaiyichin/heatmap_"+data_obj_type+"_"+"conv{0}_s{1}_t{2}".format(int(np.round(threshold*1e3 ,3)), v.num_steps, v.num_trials)+".png", bbox_inches="tight", dpi=300)
 
-def generate_combined_heatmap_data(v: VisualizationData, threshold: float, order=(None, "convergence", "accuracy")):
+
+def generate_combined_heatmap_data(
+    v: VisualizationData, threshold: float, order=(None, "convergence", "accuracy")
+):
     """
 
     Returns:
@@ -1072,7 +1117,19 @@ def convert_to_img(heatmap_ndarr: np.ndarray, limits: list, active_channels = [0
 
     return np.moveaxis(np.array([channel_0, channel_1, channel_2]), 0, 2)
 
-def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=None, cbar_kw={}, cbarlabel="", valfmt="{x:.2f}", **kwargs):
+
+def heatmap(
+    heatmap_data,
+    row_label="",
+    col_label="",
+    xticks=[],
+    yticks=[],
+    ax=None,
+    cbar_kw={},
+    cbarlabel="",
+    valfmt="{x:.2f}",
+    **kwargs
+):
     """Create a heatmap.
 
     This function plots the heatmap, but doesn't display it. Use plt.show() to display the heatmap.
@@ -1116,8 +1173,7 @@ def heatmap(heatmap_data, row_label="", col_label="", xticks=[], yticks=[], ax=N
     ax.set_yticks(np.arange(heatmap_data.shape[0]), labels=yticks)
 
     # Rotate the tick labels and set their alignment
-    plt.setp(ax.get_xticklabels(), rotation=60, ha="right",
-             rotation_mode="anchor")
+    plt.setp(ax.get_xticklabels(), rotation=60, ha="right", rotation_mode="anchor")
 
     # Reduce the number of visible tick labels
     len_xticks = len( ax.get_xticks() )
@@ -1165,8 +1221,15 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
     sp = args["sp"]
 
     # Create figures for plotting
-    fig_size = (6,4)
-    fig, ax_lst = plt.subplots(1, 2, tight_layout=True, figsize=fig_size, dpi=175, gridspec_kw={"width_ratios": [7, 1]})
+    fig_size = (6, 4)
+    fig, ax_lst = plt.subplots(
+        1,
+        2,
+        tight_layout=True,
+        figsize=fig_size,
+        dpi=175,
+        gridspec_kw={"width_ratios": [7, 1]}
+    )
 
     # Get performance metrics for all trials
     conv_min = np.inf
@@ -1218,10 +1281,10 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         median_lst.append( (np.median(comms_steps), np.median(acc_lst)) )
         scatter(
             [comms_steps, acc_lst],
-            c=[ind + id_offset]*len(conv_lst),
+            c=[ind + id_offset] * len(conv_lst),
             ax=ax_lst[0],
             vmin=0,
-            vmax=len(manipulated_var)-1 + id_offset,
+            vmax=len(manipulated_var) - 1 + id_offset,
             edgecolors="none",
             alpha=0.2,
             s=30
@@ -1235,7 +1298,7 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
         c=range(id_offset, len(median_lst) + id_offset),
         ax=ax_lst[0],
         vmin=0,
-        vmax=len(manipulated_var)-1 + id_offset,
+        vmax=len(manipulated_var) - 1 + id_offset,
         edgecolors="black",
         alpha=1.0,
         s=65
@@ -1251,15 +1314,23 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
 
     ax_lst[0].set_xlabel("Communication Rounds", fontsize=14)
     ax_lst[0].set_ylabel("Absolute Error", fontsize=14)
-    ax_lst[0].set_xlim(-0.02*max_comms_rounds, 1.02*max_comms_rounds)
+    ax_lst[0].set_xlim(-0.02 * max_comms_rounds, 1.02 * max_comms_rounds)
     ax_lst[0].set_ylim(YMIN_SCATTER, ymax)
     ax_lst[0].xaxis.set_tick_params(labelsize=10)
     ax_lst[0].yaxis.set_tick_params(labelsize=10)
     ax_lst[0].grid()
 
     # Create color bar
-    color_bar_img = list(zip(*[list(range(id_offset, len(manipulated_var) + id_offset))])) # size of len(manipulated_var) x 1 list
-    ax_lst[1].imshow(color_bar_img, aspect=2, cmap="nipy_spectral", vmin=0, vmax=(len(manipulated_var) - 1 + id_offset))
+    color_bar_img = list(
+        zip(*[list(range(id_offset, len(manipulated_var) + id_offset))])
+    ) # size of len(manipulated_var) x 1 list
+    ax_lst[1].imshow(
+        color_bar_img,
+        aspect=2,
+        cmap="nipy_spectral",
+        vmin=0,
+        vmax=(len(manipulated_var) - 1 + id_offset)
+    )
 
     # Modify tick labels
     ax_lst[1].yaxis.set_label_position("right")
@@ -1269,26 +1340,24 @@ def plot_scatter(data_obj: VisualizationData, threshold: float, args, individual
 
     if fixed == "tfr":
         ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=14)
-        filename_param_2 = "tfr{0}".format(int(tfr*1e3))
+        filename_param_2 = "tfr{0}".format(int(tfr * 1e3))
     elif fixed == "sp":
         ax_lst[1].set_ylabel("Target fill ratios", fontsize=14)
-        filename_param_2 = "tfr{0}".format(int(sp*1e3))
+        filename_param_2 = "tfr{0}".format(int(sp * 1e3))
 
     # Save the scatter plot
     filename_param = "{0}_{1}".format(filename_param_2, filename_param_1)
 
     fig.savefig(
-        "scatter_" +
-        data_obj_type +
-        "_" +
-        "conv{0}_s{1}_t{2}_{3}".format(
-            int(np.round(threshold*1e3, 3)),
+        "scatter_" + data_obj_type + "_" + "conv{0}_s{1}_t{2}_{3}".format(
+            int(np.round(threshold * 1e3, 3)),
             int(data_obj.num_steps),
             int(data_obj.num_trials),
             filename_param
-        ) +
-        ".png",
-    bbox_inches="tight", dpi=300)
+        ) + ".png",
+        bbox_inches="tight",
+        dpi=300
+    )
 
 def scatter(scatter_data, ax=None, **kwargs):
 
@@ -1320,8 +1389,14 @@ def plot_decision(data_obj: VisualizationData, args):
         data_obj_type = "dyn"
 
     # Create the figures and axes
-    fig_size = (6,4)
-    fig, ax_lst = plt.subplots(1, 2, tight_layout=True, figsize=fig_size, dpi=175, gridspec_kw={"width_ratios": [6*len(fixed_sensor_probability_bins)/len(sp), 1]})
+    fig_size = (6, 4)
+    fig, ax_lst = plt.subplots(
+        1,
+        2,
+        tight_layout=True,
+        figsize=fig_size,
+        dpi=175,
+        gridspec_kw={"width_ratios": [6 * len(fixed_sensor_probability_bins) / len(sp), 1]})
 
     # Convert sensor probability values into IDs used for deciding marker colors (the colors are fixed for sensor probability values)
     id_lst = []
@@ -1331,7 +1406,7 @@ def plot_decision(data_obj: VisualizationData, args):
         else: id_lst.append(0) # the distributed sensor probability case uses the black marker
 
     # Define array of colors according to the nipy_spectral colormap
-    c = plt.cm.nipy_spectral(np.array(id_lst)/(len(fixed_sensor_probability_bins)-1))
+    c = plt.cm.nipy_spectral(np.array(id_lst) / (len(fixed_sensor_probability_bins) - 1))
 
     # Obtain the decision fractions
     decision_fractions = {step: data_obj.get_decision_fractions(tfr, sp, step, bins) for step in sim_steps}
@@ -1339,7 +1414,7 @@ def plot_decision(data_obj: VisualizationData, args):
     # Check the decision fraction of each sensor probability to find the ones that clutter close to 1 (using 0.9 as a threshold)
     cluttered_keys = set()
     for sp_dict in decision_fractions.values():
-        cluttered_keys.update( (k for k, v in sp_dict.items() if v > 0.9) )
+        cluttered_keys.update((k for k, v in sp_dict.items() if v > 0.9))
 
     # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
     max_comms_rounds = data_obj.num_steps/data_obj.comms_period
@@ -1352,25 +1427,25 @@ def plot_decision(data_obj: VisualizationData, args):
         points = [decision_fractions[k][s] for k in decision_fractions.keys()]
 
         line(
-            line_data=[np.array(sim_steps)/data_obj.comms_period + offset[ind], points],
+            line_data=[np.array(sim_steps) / data_obj.comms_period + offset[ind], points],
             ax=ax_lst[0],
-            ls="-",     # line style
-            lw=1,       # line width
+            ls="-", # line style
+            lw=1, # line width
             marker="d", # marker type
-            ms="15",     # marker size
+            ms="15", # marker size
             mfc=c[ind], # marker face color
-            c=c[ind]    # color
+            c=c[ind] # color
         )
 
         # Add markers to those that have 100% correct decisions
         consensus_ind = [i for i, p in enumerate(points) if p == 1.0]
         if consensus_ind:
             line(
-                line_data=[np.array(sim_steps[consensus_ind])/data_obj.comms_period + offset[ind], [1.0]*len(consensus_ind)],
+                line_data=[np.array(sim_steps[consensus_ind]) / data_obj.comms_period + offset[ind], [1.0] * len(consensus_ind)],
                 ax=ax_lst[0],
                 marker="|", # marker type
-                ms="35",    # marker size
-                c=c[ind]    # color
+                ms="35", # marker size
+                c=c[ind] # color
             )
 
     # Modify the label for the distributed case
@@ -1382,7 +1457,7 @@ def plot_decision(data_obj: VisualizationData, args):
 
     ax_lst[0].set_xlabel("Communication Rounds", fontsize=14)
     ax_lst[0].set_ylabel("Fraction of Correct Decisions", fontsize=14)
-    ax_lst[0].set_xticks(np.array(sim_steps)/data_obj.comms_period)
+    ax_lst[0].set_xticks(np.array(sim_steps) / data_obj.comms_period)
     # ax_lst[0].set_yscale("log")
     ax_lst[0].set_ylim(bottom=YMIN_DECISION, top=YMAX_DECISION)
     ax_lst[0].xaxis.set_tick_params(which="both", labelsize=10)
@@ -1394,7 +1469,13 @@ def plot_decision(data_obj: VisualizationData, args):
 
     # Create color bar
     color_bar_img = np.array(id_lst, ndmin=2).T
-    ax_lst[1].imshow(color_bar_img, aspect=2, cmap="nipy_spectral", vmin=0, vmax=len(fixed_sensor_probability_bins)-1)
+    ax_lst[1].imshow(
+        color_bar_img,
+        aspect=2,
+        cmap="nipy_spectral",
+        vmin=0,
+        vmax=len(fixed_sensor_probability_bins) - 1
+    )
 
     # Modify tick labels
     ax_lst[1].yaxis.set_label_position("right")
@@ -1403,22 +1484,18 @@ def plot_decision(data_obj: VisualizationData, args):
     ax_lst[1].set_yticks(range(len(id_lst)), sp, fontsize=8)
     ax_lst[1].set_ylabel("Sensor Accuracies", fontsize=14)
 
-    filename_param_2 = "tfr{0}".format(int(tfr*1e3))
+    filename_param_2 = "tfr{0}".format(int(tfr * 1e3))
 
     # Save the decision plot
     filename_param = "{0}_{1}".format(filename_param_2, filename_param_1)
 
     fig.savefig(
-        "decision_" +
-        data_obj_type +
-        "_" +
-        "s{0}_t{1}_{2}".format(
-            int(data_obj.num_steps),
-            int(data_obj.num_trials),
-            filename_param
-        ) +
+        "decision_" + data_obj_type + "_" +
+        "s{0}_t{1}_{2}".format(int(data_obj.num_steps), int(data_obj.num_trials), filename_param) +
         ".png",
-    bbox_inches="tight", dpi=300)
+        bbox_inches="tight",
+        dpi=300
+    )
 
 def line(line_data, ax=None, **kwargs):
     if ax is None:
@@ -1426,7 +1503,13 @@ def line(line_data, ax=None, **kwargs):
     else:
         ax.plot(line_data[0], line_data[1], **kwargs)
 
-def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, agg_data=False, convergence_thresh=CONV_THRESH):
+def plot_timeseries(
+    target_fill_ratio,
+    sensor_prob,
+    data_obj: VisualizationData,
+    agg_data=False,
+    convergence_thresh=CONV_THRESH
+):
     """Plot the time series data.
 
     Create data visualization for local, social, and informed values for a simulation with a
@@ -1441,16 +1524,18 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
 
     # Create figure and axes handles
     fig_x_hat, ax_x_hat = plt.subplots(2, sharex=True)
-    fig_x_hat.set_size_inches(8,6)
+    fig_x_hat.set_size_inches(8, 6)
 
     fig_x_bar, ax_x_bar = plt.subplots(2, sharex=True)
-    fig_x_bar.set_size_inches(8,6)
+    fig_x_bar.set_size_inches(8, 6)
 
     fig_x, ax_x = plt.subplots(2, sharex=True)
-    fig_x.set_size_inches(8,6)
+    fig_x.set_size_inches(8, 6)
 
     abscissa_values_x_hat = list(range(data_obj.num_steps + 1))
-    abscissa_values_x_bar = list(range(0, data_obj.num_steps + 1*data_obj.comms_period, data_obj.comms_period))
+    abscissa_values_x_bar = list(
+        range(0, data_obj.num_steps + 1 * data_obj.comms_period, data_obj.comms_period)
+    )
     abscissa_values_x = list(range(data_obj.num_steps + 1))
 
     # Plot for all trials
@@ -1585,7 +1670,9 @@ def plot_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData,
     adjust_subplot_legend_and_axis(fig_x_bar, ax_x_bar)
     adjust_subplot_legend_and_axis(fig_x, ax_x)
 
-def plot_individual_timeseries(target_fill_ratio, sensor_prob, data_obj: VisualizationData, convergence_thresh=CONV_THRESH):
+def plot_individual_timeseries(
+    target_fill_ratio, sensor_prob, data_obj: VisualizationData, convergence_thresh=CONV_THRESH
+):
 
     # Create figure and axes handles
     fig_lst = [None for i in range(data_obj.num_trials)]
@@ -1600,7 +1687,7 @@ def plot_individual_timeseries(target_fill_ratio, sensor_prob, data_obj: Visuali
     for i in range(data_obj.num_trials):
 
         fig_lst[i], ax_lst[i] = plt.subplots(2, sharex=True)
-        fig_lst[i].set_size_inches(8,6)
+        fig_lst[i].set_size_inches(8, 6)
 
         stats_obj = data_obj.stats_obj_dict[target_fill_ratio][sensor_prob]
 
@@ -1644,13 +1731,13 @@ def decode_sp_distribution_key(encoded_val):
 
 def normalize(arr, min_val, max_val, flip=False):
     arr_range = max_val - min_val
-    return ( arr_range - ( arr - min_val ) ) / arr_range if flip else ( arr - min_val ) / arr_range
+    return (arr_range - (arr - min_val)) / arr_range if flip else (arr - min_val) / arr_range
 
 def convert_sim_steps_to_comms_rounds(sim_steps_arr, comms_period):
     return sim_steps_arr / comms_period
 
 def compute_std_bounds(mean_val, std_val):
-    return [ np.add(mean_val, std_val),  np.subtract(mean_val, std_val) ]
+    return [np.add(mean_val, std_val), np.subtract(mean_val, std_val)]
 
 def activate_subplot_grid_lines(subplot_ax):
     for ax in subplot_ax:
@@ -1665,9 +1752,12 @@ def adjust_subplot_legend_and_axis(subplot_fig, subplot_ax):
     subplot_ax[1].set_position([box_2.x0, box_2.y0, box_2.width * 0.9, box_2.height])
 
     handles, labels = subplot_ax[1].get_legend_handles_labels()
-    subplot_fig.legend(handles, labels, loc="center right", bbox_to_anchor=(box_2.width*1.25, 0.5))
+    subplot_fig.legend(
+        handles, labels, loc="center right", bbox_to_anchor=(box_2.width * 1.25, 0.5)
+    )
 
 class Visualizer:
+
     def __init__(self, data_type):
         if data_type == "static":
             v_type_str = "ExperimentData pickle"
@@ -1747,9 +1837,10 @@ class Visualizer:
 
         end = timeit.default_timer()
 
-        print('Elapsed time:', end-start)
+        print('Elapsed time:', end - start)
 
-        if args.s: plt.show()
+        if args.s:
+            plt.show()
 
     def load_data(self, args):
 
@@ -1847,7 +1938,8 @@ class Visualizer:
             # Check whether to plot single or gridded heatmap
             if isinstance(self.data, VisualizationData): plot_heatmap_vd(self.data, args.CONV)
             else:
-                plot_heatmap_vdg(self.data,
+                plot_heatmap_vdg(
+                    self.data,
                     self.u_types_lst[0],
                     [float(i) for i in args.row] if len(args.row) > 1 else float(*args.row),
                     self.u_types_lst[-1],
@@ -1996,7 +2088,11 @@ class Visualizer:
                     # Check to see if there's a third level (only applicable for static topologies)
                     if isinstance(v2, dict):
                         for k3, v3 in v2.items():
-                            self.data.viz_data_obj_dict[k1][k2][k3] = truncate_vd_steps(self.data.viz_data_obj_dict[k1][k2][k3])
+                            self.data.viz_data_obj_dict[k1][k2][k3] = truncate_vd_steps(
+                                self.data.viz_data_obj_dict[k1][k2][k3]
+                            )
 
                     else:
-                        self.data.viz_data_obj_dict[k1][k2] = truncate_vd_steps(self.data.viz_data_obj_dict[k1][k2])
+                        self.data.viz_data_obj_dict[k1][k2] = truncate_vd_steps(
+                            self.data.viz_data_obj_dict[k1][k2]
+                        )
