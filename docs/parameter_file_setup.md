@@ -26,7 +26,7 @@ legacy: <BOOL>        # flag to use legacy equations
 Save the file with the name `param_multi_agent_sim_static.yaml` at the directory where you will be executing the simulation.
 
 ## Dynamic topology simulation
-The parameter file used for the dynamic simulation is the same as the configuration file used by ARGoS, which is described in their [official documentation](https://www.argos-sim.info/user_manual.php). Here, only parameters specifically related to the simulated experiments will be discussed. You can find the template from `examples/param/param_multi_agent_sim_dynamic.argos`.
+The parameter file used for the dynamic simulation is the same as the configuration file used by ARGoS, which is described in their [official documentation](https://www.argos-sim.info/user_manual.php). Here, only parameters specifically related to the simulated experiments will be discussed. You can find the template from `examples/param/param_multi_agent_sim_dynamic.argos`. *For information on benchmark algorithms (how to run, implement, and analyze), see [here](./benchmark_algo_explained.md).*
 
 ### Number of steps
 An ARGoS "experiment" that is repeated `m` times means that it has `m` trials. Thus `length * ticks_per_second` of an `experiment` becomes the number of steps for a single trial.
@@ -73,15 +73,15 @@ For the location of the `collective_perception_loop_functions` library, specify 
         <speed value="10.0" />
 
         <!-- Number of trials for a specific fill ratio and sensor probability -->
-        <num_trials value="5" /> 
-
-        <!-- Robot ID and base number; must match the ones in the arena configuration -->
-        <!-- NO MODIFICATION NEEDED -->
-        <robot_id prefix="kiv" base_num="0" />
+        <num_trials value="5" />
 
         <!-- Disable n random robots at specified time in seconds; disabled robots would stop completely and retain its last values -->
         <!-- Note: `amount` = 0 to prevent any disabling of robots -->
-        <robot_disabling amount="5" sim_clock_time="10" />
+        <robot_disabling amount="5" sim_clock_time="50" >
+            <motion_disable bool="true" />
+            <comms_disable bool="true" />
+            <sense_disable bool="true" />
+        </robot_disabling>
 
         <!-- Path to the output data and datetime in filename -->
         <!-- Note: the extensions ".pbs" and ".pbad" must be retained -->

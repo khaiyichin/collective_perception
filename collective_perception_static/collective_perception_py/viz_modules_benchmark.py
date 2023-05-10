@@ -8,10 +8,13 @@ from matplotlib.ticker import FuncFormatter
 from abc import ABC, abstractmethod
 
 # Local modules
-from .viz_modules import line, YMIN_DECISION, YMAX_DECISION
+from .viz_modules import line, \
+                         YMIN_DECISION, \
+                         YMAX_DECISION, \
+                         activate_subplot_grid_lines
 
 
-def plot_time_series(time_arr, data, args):
+def plot_timeseries(time_arr, data, args):
     """Plot the time-series data.
 
     Args:
@@ -21,26 +24,13 @@ def plot_time_series(time_arr, data, args):
 
     tfr = args["tfr"]
     benchmark_param_range = args["benchmark_param_range"]
-    bins = args["bins"]
-    speed = args["speed"]
-    density = args["density"]
+    # bins = args["bins"]
+    # speed = args["speed"]
+    # density = args["density"]
     num_options = args["num_options"]
-    # filename_param_1 = "spd{0}_den{1}_bins{2}".format(int(speed), int(density), bins)
+    labels = args["leg_labels"]
 
     fig, ax = plt.subplots()
-
-    # Convert options into IDs used for deciding marker colors
-    id_lst = []
-
-    for bp in range(num_options):
-        id_lst.append(
-            np.digitize(bp, range(num_options)) # may not be the correct variable to use
-        )
-
-    # Define array of colors according to the nipy_spectral colormap
-    # c = plt.cm.nipy_spectral(np.array(id_lst) / (num_options - 1))
-
-    # print("debug", data.shape)
 
     for ind, d in enumerate(data):
         # plot single line
@@ -49,12 +39,25 @@ def plot_time_series(time_arr, data, args):
             ax=ax,
             ls="-",     # line style
             lw=1,       # line width
+            label=args["leg_labels"][ind] if "leg_labels" in args else "",   # legend labels
             # marker="d", # marker type
             # ms="15",     # marker size
             # mfc=c[ind], # marker face color
             # c=c[ind]    # color
         )
 
+    # Activate grid lines
+    activate_subplot_grid_lines([ax])
+
+    # Create legend
+    ax.legend(title=args["leg_title"] if "leg_title" in args else "")
+
+    # Create title
+    ax.set_title(args["ax_title"] if "ax_title" in args else "")
+
+    # Create axes labels
+    ax.set_xlabel(args["ax_labels"][0] if "ax_labels" in args else "")
+    ax.set_ylabel(args["ax_labels"][1] if "ax_labels" in args else "")
 
 def plot_decision(decision_data, args):
     """
@@ -62,9 +65,11 @@ def plot_decision(decision_data, args):
         decision_data: Dict (benchmark parameter value: decision fractions list)
     """
 
+    benchmark_str = args["benchmark_str"]
     tfr = args["tfr"]
     benchmark_param_range = args["benchmark_param_range"]
     bins = args["bins"]
+    num_trials = args["num_trials"]
     sim_steps = args["sim_steps"]
     speed = args["speed"]
     density = args["density"]
@@ -101,13 +106,14 @@ def plot_decision(decision_data, args):
 
     # # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
     max_comms_rounds = max(sim_steps)
-    offset = (
-        np.linspace(
-            0,
-            1,
-            len(decision_data.keys())) * max_comms_rounds / 10 - max_comms_rounds / 20
-    ).tolist()
+    # offset = (
+    #     np.linspace(
+    #         0,
+    #         1,
+    #         len(decision_data.keys())) * max_comms_rounds / 10 - max_comms_rounds / 20
+    # ).tolist()
     # offset = [offset.pop(0) if bp in decision_data.keys() else 0.0 for _, bp in enumerate(benchmark_param_range)]
+    offset = [0] # @todo: unsure if staggering is needed
 
     # Plot the lines for each sensor probability
     for ind, s in enumerate(benchmark_param_range):
@@ -168,14 +174,14 @@ def plot_decision(decision_data, args):
     # Save the decision plot
     filename_param = "{0}_{1}".format(filename_param_2, filename_param_1)
 
-    # fig.savefig(
-    #     "decision_" + data_obj_type + "_" +
-    #     "s{0}_t{1}_{2}".format(int(data_obj.num_steps),
-    #                            int(data_obj.num_trials),
-    #                            filename_param) + ".png",
-    #     bbox_inches="tight",
-    #     dpi=300
-    # )
+    fig.savefig(
+        "decision_" + benchmark_str + "_" +
+        "s{0}_t{1}_{2}".format(int(max(sim_steps)),
+                               int(num_trials),
+                               filename_param) + ".png",
+        bbox_inches="tight",
+        dpi=300
+    )
 
 
 class BenchmarkVisualizerBase(ABC):
@@ -343,9 +349,11 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
             decision_data = self.get_decision_data(plotted_sim_steps)
 
             args_plot_decision = {
+                "benchmark_str": self.BENCHMARK_STR,
                 "tfr": self.tfr,
                 "benchmark_param_range": self.benchmark_param_range, # this is so that the plot functions can use a generic value
                 "bins": self.num_options,
+                "num_trials": self.num_trials,
                 "sim_steps": plotted_sim_steps,
                 "speed": self.speed,
                 "density": self.density,
@@ -365,12 +373,14 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
                 "bins": self.num_options,
                 "speed": self.speed,
                 "density": self.density,
-                "num_options": self.num_options
+                "num_options": self.num_options,
+                "leg_labels": range(1, len(time_series_data)+1),
+                "leg_title": "Options",
+                "ax_title": "Average belief of different options with $f$={0}, $\lambda$={1}".format(self.tfr, self.frr[0]),
+                "ax_labels": ["Time steps", "Average belief"]
             }
 
-            print("debug", time_series_data.shape, time_series_data.sum(axis=0))
-
-            plot_time_series(
+            plot_timeseries(
                 np.asarray([i for i in range(self.num_steps + 1)]),
                 time_series_data,
                 args_plot_series
@@ -459,7 +469,6 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
         # belief_str_vec is a num_agents x num_steps list of lists
         return np.asarray([[list(map(int, elem)) for elem in row] for row in belief_str_vec])
 
-    # def convert_belief_to_decision(self, sim_steps):
     def convert_belief_to_decision(self):
         """Convert the belief state of the robots into a bin selection (index of the max belief).
         

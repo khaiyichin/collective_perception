@@ -1,5 +1,5 @@
 # Utility scripts
-This page describes scripts provided in this repository besides those that execute simulated experiments.
+This page describes scripts provided in this repository besides those that execute simulated experiments. *For information on benchmark algorithms (how to run, implement, and analyze), see [here](./benchmark_algo_explained.md).*
 
 ## Python Scripts (built in `collective_perception_static`)
 The Python scripts are used for data processing, analysis, and visualization. To use them you will need `collective_perception_static` installed.

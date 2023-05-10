@@ -22,6 +22,7 @@ The robots in the dynamic topology simulator move around a square arena of black
 - CMake 3.15+
 - [ARGoS](https://github.com/ilpincy/argos3.git)
 - [Buzz](https://github.com/NESTLab/Buzz)
+- [ARGoS-KheperaIV plugin](https://github.com/ilpincy/argos3-kheperaiv) - *in this repository Khepera IVs are used, but with some modification to the experiment files you could potentially use other robot types*
 - [Protobuf v21.1+ (`proto3`)](https://github.com/protocolbuffers/protobuf.git) - *source build recommended, although the `apt` package version may work as well*
 - [GraphTool v2.45+](https://graph-tool.skewed.de/) - *can be installed using the `apt` package manager*
 

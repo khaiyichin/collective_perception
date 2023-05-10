@@ -23,7 +23,7 @@
           or set to zero, this value is taken from the clock and a warning
           message is displayed.
     -->
-        <experiment length="500" ticks_per_second="10" random_seed="0" />
+        <experiment length="10" ticks_per_second="10" random_seed="0" />
     </framework>
 
     <!-- *************** -->
@@ -68,6 +68,7 @@
           ...
       -->
             <actuators>
+                <kheperaiv_ground implementation="rot_z_only" />
                 <differential_steering implementation="default" />
                 <range_and_bearing implementation="default" />
             </actuators>
@@ -80,8 +81,7 @@
           $ argos3 -q sensors
       -->
             <sensors>
-                <kheperaiv_ground implementation="rot_z_only" />
-                <range_and_bearing implementation="medium" medium="rab" show_rays="false" noise_std_dev="0" />
+                <range_and_bearing implementation="medium" medium="rab" show_rays="true" noise_std_dev="0" />
                 <kheperaiv_proximity implementation="default" show_rays="false" />
             </sensors>
             <!--
@@ -89,7 +89,7 @@
           function.
           The user, writing the controller, defines how it is organized.
       -->
-            <params bytecode_file="/collective_perception/collective_perception_dynamic/build/buzz/body.bo" debug_file="/collective_perception/collective_perception_dynamic/build/buzz/body.bdb" />
+            <params bytecode_file="collective_perception/collective_perception_dynamic/build/buzz/body_crosscombe_2017.bo" debug_file="collective_perception/collective_perception_dynamic/build/buzz/body_crosscombe_2017.bdb" />
         </buzz_controller_kheperaiv>
 
     </controllers>
@@ -98,38 +98,18 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="/collective_perception/collective_perception_dynamic/build/src/libcollective_perception_loop_functions" label="collective_perception_loop_functions">
-        <collective_perception>
-            <arena_tiles tile_count_x="1000" tile_count_y="1000" /> <!-- number of tiles for the arena -->
-            <fill_ratio_range min="0.05" max="0.95" steps="19" /> <!-- range of target fill ratios -->
-            <sensor_probability_range min="0.525" max="0.975" steps="19" />
-            <!--
-                range of sensor probabilities
-                `steps` must be an integer:
-                    - positive, probabilities are spread linearly from min to max
-                    - -2 indicates a uniform distribution with range [`min`, `max`)
-                    - -3 indicates a normal distribution with mean=`min`, variance=`max`
-            -->
-            <speed value="10.0" /> <!-- in units of cm/s -->
+    <loop_functions library="collective_perception/collective_perception_dynamic/build/src/libbenchmarking_loop_functions" label="benchmarking_loop_functions">
+        <benchmarking>
+            <algorithm type="crosscombe_2017">
+                <num_possible_options int="10" />
+                <flawed_robot_ratio_range min="0.1" max="0.5" steps="2" />
+            </algorithm>
+            <fill_ratio_range min="0.55" max="0.95" steps="2" /> <!-- range of target fill ratios -->
             <num_trials value="5" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
-            <robot_disabling amount="5" sim_clock_time="50" > <!-- randomly disable n robots at specified time in seconds -->
-                <motion_disable bool="true" />
-                <comms_disable bool="true" />
-                <sense_disable bool="true" />
-            </robot_disabling>
-            <path folder="data" stats="multi_agent_sim_dynamic_stats.pbs" agent_data="multi_agent_sim_dynamic_agent_data.pbad" include_datetime="true" /> <!-- path to the output data and datetime in filename -->
+            <speed value="14.14" /> <!-- in units of cm/s -->
+            <path folder="data" name="data.json" include_datetime="true" /> <!-- path to the output data and datetime in foldername -->
             <verbosity level="reduced" /> <!-- "full", "reduced", "none" -->
-            <legacy bool="false" /> <!-- flag to use legacy social equations -->
-            <dac_plugin activate="false">
-                <!-- flag to use the DAC plugin -->
-                <!--
-                    num_bins: number of bins to partition the fill ratio
-                    write_period: csv file writing period in seconds; use -1 if only write once at the end of each trial
-                    csv_path: path to csv file
-                -->
-                <param num_bins="5" write_period="50" csv_path="/home/khaiyichin/test.csv" />
-            </dac_plugin>
-        </collective_perception>
+        </benchmarking>
     </loop_functions>
 
     <!-- *********************** -->
@@ -173,7 +153,7 @@
             <position method="uniform" min="-4.436599480604251,-4.436599480604251,0" max="4.436599480604251,4.436599480604251,0" />
             <orientation method="uniform" min="0,0,0" max="360,0,0" />
             <entity quantity="50" max_trials="100" base_num="0">
-                <kheperaiv id="kiv" rab_data_size="50" rab_range="0.7">
+                <kheperaiv id="kiv" rab_data_size="200" rab_range="0.7">
                     <controller config="bck" />
                 </kheperaiv>
             </entity>
