@@ -23,7 +23,7 @@
           or set to zero, this value is taken from the clock and a warning
           message is displayed.
     -->
-        <experiment length="100" ticks_per_second="10" random_seed="0" />
+        <experiment length="1000" ticks_per_second="10" random_seed="0" realtime="true" />
     </framework>
 
     <!-- *************** -->
@@ -103,10 +103,10 @@
         <sub_loop_function library="build/src/libcollective_perception_loop_functions"
             label="collective_perception_loop_functions">
             <collective_perception>
-                <arena_tiles tile_count_x="300" tile_count_y="300" /> <!-- number of tiles for the
+                <arena_tiles tile_count_x="800" tile_count_y="800" /> <!-- number of tiles for the
                 arena -->
                 <fill_ratio_range min="0.95" max="0.95" steps="1" /> <!-- range of target fill ratios -->
-                <sensor_probability_range min="0.525" max="0.975" steps="2" />
+                <sensor_probability_range min="0.525" max="0.525" steps="1" />
                 <!--
                 range of sensor probabilities
                 `steps` must be an integer:
@@ -114,13 +114,13 @@
                     - -2 indicates a uniform distribution with range [`min`, `max`)
                     - -3 indicates a normal distribution with mean=`min`, variance=`max`
             -->
-                <speed value="14.14" /> <!-- in units of cm/s -->
-                <num_trials value="3" /> <!-- number of trials to repeat for a specific fill ratio
+                <speed value="7.071" /> <!-- in units of cm/s -->
+                <num_trials value="1" /> <!-- number of trials to repeat for a specific fill ratio
                 and
             sensor probability -->
                 <robot_disabling amount="0" sim_clock_time="0"> <!-- randomly disable n robots at
                 specified time in seconds -->
-                    <motion_disable bool="true" />
+                    <motion_disable bool="false" />
                     <comms_disable bool="false" />
                     <sense_disable bool="false" />
                 </robot_disabling>
@@ -162,12 +162,10 @@
  
       $ argos3 -q box
   -->
-    <arena size="3, 3, 1" center="0,0,0.5">
+    <arena size="4, 4, 1" center="0,0,0.5">
 
         <floor id="floor" source="loop_functions" pixels_per_meter="200" />
-        <!-- <floor id="floor" source="image" path="img/white.png" /> -->
 
-        <!-- Place four boxes in a square to delimit the arena -->
         <box id="wall_north" size="3.000000, 0.100000, 0.500000" movable="false">
             <body position="0.000000, 1.437165, 0.000000" orientation="0, 0, 0" />
         </box>
@@ -181,32 +179,27 @@
             <body position="-1.437165, 0.000000, 0.000000" orientation="0, 0, 0" />
         </box>
 
-        <!-- <distribute>
-            <position method="uniform" min="-1.437165, -1.437165, 0" max="1.437165, 1.437165, 0" />
-            <orientation method="uniform" min="0, 0, 0" max="0, 0, 0" />
-            <entity quantity="5" max_trials="100" base_num="0">
-                <kheperaiv id="kiv" rab_data_size="50" rab_range="0.700000">
-                    <controller config="bck" />
-                </kheperaiv>
-            </entity>
-        </distribute> -->
-
-
-
-        <kheperaiv id="Khepera_3" rab_data_size="50">
+        <!-- <kheperaiv id="Khepera_2" rab_data_size="50" rab_range="0.7">
             <body position="0,0,0" orientation="0,0,0" />
             <controller config="bck" />
         </kheperaiv>
-
-        <!-- <kheperaiv id="kiv1" rab_data_size="50">
+        <kheperaiv id="Khepera_3" rab_data_size="50" rab_range="0.7">
             <body position="0,0,0" orientation="0,0,0" />
             <controller config="bck" />
         </kheperaiv>
-
-        <kheperaiv id="kiv2" rab_data_size="50">
+        <kheperaiv id="Khepera_6" rab_data_size="50" rab_range="0.7">
             <body position="0,0,0" orientation="0,0,0" />
             <controller config="bck" />
         </kheperaiv> -->
+        <kheperaiv id="Khepera_10" rab_data_size="50" rab_range="0.7">
+            <body position="0,0,0" orientation="0,0,0" />
+            <controller config="bck" />
+        </kheperaiv>
+        <!-- <kheperaiv id="Khepera_9" rab_data_size="50" rab_range="0.7">
+            <body position="0,0,0" orientation="0,0,0" />
+            <controller config="bck" />
+        </kheperaiv> -->
+
     </arena>
 
     <!-- ******************* -->
@@ -274,6 +267,12 @@
                         lens_focal_length="35" />
                 </placements>
             </camera>
+            <frame_grabbing directory="data/frames"
+                format="png"
+                quality="100"
+                headless_grabbing="true"
+                headless_frame_size="1600x1200"
+                headless_frame_rate="1" />
         </qt-opengl>
     </visualization>
 

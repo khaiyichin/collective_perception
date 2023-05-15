@@ -4,7 +4,7 @@ ROTATION_MEAN_DURATION = 5 # in units of timesteps
 STRAIGHT_MEAN_DURATION = 15 # in units of timesteps
 CCW_ENUM = 0 # rotation direction enum
 CW_ENUM = 1 # rotation direction enum
-OBSTACLE_AVOIDANCE_ANG = math.pi/2 # angle range in which objects enter to activate obstacle avoidance sequence in rad
+OBSTACLE_AVOIDANCE_ANG = (5*math.pi)/9 # angle range in which objects enter to activate obstacle avoidance sequence in rad; 100 degrees
 AVOIDANCE_COUNTER = 0
 AVOIDANCE_UNSTUCK_THRESHS = {.FIRST = 30, .SECOND = 60}
 
