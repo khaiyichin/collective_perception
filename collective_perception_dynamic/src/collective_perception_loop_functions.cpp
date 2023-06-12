@@ -455,11 +455,33 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(GetNode(col_per_root_node, "speed"), "value", simulation_parameters_.speed_);
 
         // Grab number of agents and communications range
-        auto &rab_map = space_ptr_->GetEntitiesByType("rab");
-        CRABEquippedEntity &random_rab = *any_cast<CRABEquippedEntity *>(rab_map.begin()->second);
+        int size;
+        float range;
 
-        simulation_parameters_.num_agents_ = rab_map.size();         // the number of range and bearing sensors is the same as the number of robots
-        simulation_parameters_.comms_range_ = random_rab.GetRange(); // all the range and bearing sensors have the same range
+        try
+        {
+            auto &rab_map = space_ptr_->GetEntitiesByType("rab");
+            CRABEquippedEntity &random_rab = *any_cast<CRABEquippedEntity *>(rab_map.begin()->second);
+            size = rab_map.size();
+            range = random_rab.GetRange();
+        }
+        catch (CARGoSException& ex1)
+        {
+            try
+            {
+                auto &emane_map = space_ptr_->GetEntitiesByType("emane");
+                CEMANEEquippedEntity &random_emane = *any_cast<CEMANEEquippedEntity *>(emane_map.begin()->second);
+                size = emane_map.size();
+                range = random_emane.GetRange();
+            }
+            catch (CARGoSException& ex2)
+            {
+                THROW_ARGOSEXCEPTION_NESTED("Cannot find the correct entities for range and bearing actuators/sensors.", ex2);
+            }
+        }
+
+        simulation_parameters_.num_agents_ = size;         // the number of range and bearing sensors is the same as the number of robots
+        simulation_parameters_.comms_range_ = range; // all the range and bearing sensors have the same range
         simulation_parameters_.density_ = simulation_parameters_.num_agents_ * M_PI * std::pow(simulation_parameters_.comms_range_, 2) /
                                           constrained_area; // the density is the ratio of swarm communication area to total walkable area
 
