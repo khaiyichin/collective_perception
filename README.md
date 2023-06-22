@@ -7,7 +7,7 @@ Two simulators are provided here:
 2. ARGoS-based dynamic topology simulator `collection_perception_dynamic`.
 
 ### Static topology simulation
-The robots in the static topology simulator do not move in the normal sense and have fixed communication channels with its neighbors (the communication network is specified by the user). In each simulated experiment, a fixed number of robots would traverse their own black and white tile-track and communicate periodically with their neighbors. The figure below illustrates what it would look like for 4 robots in a ring topology.
+The robots in the static topology simulator *do not move in the normal sense* and have fixed communication channels with its neighbors (the communication network is specified by the user). In each simulated experiment, a fixed number of robots would traverse their own black and white tile-track and communicate periodically with their neighbors. The figure below illustrates what it would look like for 4 robots in a ring topology.
 
 <img src="static_sim_graphic.png" alt="Static simulated experiment visualized" width="450"/>
 
@@ -90,6 +90,8 @@ In general, simulation executions are controlled by two groups of parameters: an
 The inner parameter group has two parameters: *target fill ratios* and *sensor probabilities*, and is the same for both simulation types. That is, a pair of target fill ratio and sensor probability values are used in one experiment. When the experiment (including the repeated trials) completes, a different pair of target fill ratio and sensor probability values is used in the next experiment.
 
 The outer parameter group differs between the static and dynamic simulation types. For the static topology simulator, the parameters are *communication period* and *number of agents*; for the dynamic topology simulator, the parameters are *robot speed* and *swarm density*.
+
+Ulitmately, a single simulation execution allows you to run different experiments (each with the amount of repeated trials that you desire) with different inner parameters. That is, by setting up a experiment configuration file once --- and then running a single simulation execution --- you get data from experiments with varying inner parameter values but with common outer parameter values.
 
 The following instructions apply directly for the local build; for the container simulator simply prepend `apptainer exec multi_agent_sim_full_no_qt.sif` to the commands ([see the Apptainer documentation for more info](https://apptainer.org/docs/)).
 

@@ -13,9 +13,9 @@ During the updating phase, if the non-flawed robots cannot decide option -- they
 </details>
 
 ## Execution
-The concepts used in executing simulated experiments is the same as described in the [README](../README.md): a single simulation execution contains multiple experiments, each with multiple trials.
+The concepts used in executing simulated experiments is the same as described in the [README](../README.md): a single simulation execution contains multiple experiments, each with multiple trials. The only distinction here is that the inner parameter group is slightly different: instead of *target fill ratios* and *sensor probabilities*, the benchmark algorithms may use different parameter combinations (could be more than just a pair of parameters). The outer parameter group remains the same.
 
-The following subsections describe how to set up the `.argos` experiment files.
+The following subsections describe how to set up the `.argos` configuration files.
 
 ### Buzz controller
 The location of the `body*` bytecode files depends on where you execute the simulation. For the locally built simulator, it is recommended that you use absolute paths so that the execution location is flexible. For the containerized simulator use the path `/collective_perception/collective_perception_dynamic/build/buzz/body*`.
