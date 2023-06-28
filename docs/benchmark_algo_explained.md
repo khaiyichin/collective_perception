@@ -1,19 +1,32 @@
 # Benchmarking algorithms
-This page describes how one would execute and implement benchmark algorithms to evaluate collective perception performance.
+This page describes how one would execute and implement benchmark algorithms to evaluate collective perception performance. Only dynamic experiments are implemented.
 
 ## Description of algorithms
 The complete inner workings of the respective algorithms can be found in their cited work. Here, only information related to the implementation in this repository is discussed.
 
 <details><summary><a href="https://ieeexplore.ieee.org/document/8206297">Crosscombe <i>et al.</i> (2017) </a></summary>
 
-All robots start with a random belief state. That is, flawed and non-flawed robots have completely random belief state vectors. For example, in the case of 5 options, robot 1 can have <0, 1, 1, 0, 0> while robot 2 can have <0, 2, 2, 0, 1>. Note that robot 2's belief will be normalized before being populated and communicated, i.e., robot 2's normalized belief is <0, 1, 1, 0, 0>.
+All robots start with a random belief state. That is, flawed and non-flawed robots have completely random belief state vectors, where `0` indicate `negative` (falsy), `1` indicate `indeterminate`, and `2` indicate `positive` (truthy). For example, in the case of 5 options, robot 1 can have <0, 1, 1, 0, 0> while robot 2 can have <0, 2, 2, 0, 1>. Note that robot 2's belief will be normalized before being populated and communicated, i.e., robot 2's normalized belief is <0, 1, 1, 0, 0>.
 
 During the updating phase, if the non-flawed robots cannot decide option -- they have multiple indeterminate beliefs, e.g., <1, 1, 0, 1, 0> -- they will randomly pick an option from one of the indeterminate beliefs, while broadcasting the belief. This makes sense because just because a robot randomly picks from options it is uncertain about, it doesn't mean that the robot now is certain about the choice.
 
 </details>
 
+<details><summary><a href="https://ieeexplore.ieee.org/document/9196584">Ebert <i>et al.</i> (2020) </a></summary>
+
+LOREM IPSUM
+
+</details>
+
 ## Execution
-The concepts used in executing simulated experiments is the same as described in the [README](../README.md): a single simulation execution contains multiple experiments, each with multiple trials. The only distinction here is that the inner parameter group is slightly different: instead of *target fill ratios* and *sensor probabilities*, the benchmark algorithms may use different parameter combinations (could be more than just a pair of parameters). The outer parameter group remains the same.
+The concepts used in executing simulated experiments is the same as described in the [README](../README.md): a single simulation execution contains multiple experiments, each with multiple trials.
+
+There are, however, differences in running the benchmark experiments.
+
+1. The inner parameter group may be different (although it will always be a pair of parameters). Instead of *target fill ratios* and *sensor probabilities*, the benchmark algorithms may have different pairings.
+2. The outer parameter group may be different. Instead of just *robot speed* and *swarm density*, the benchmark algorithms may have additional parameters.
+
+See the dropdowns for specific information related to the benchmark algorithm of interest.
 
 The following subsections describe how to set up the `.argos` configuration files.
 
@@ -29,6 +42,21 @@ The location of the `body*` bytecode files depends on where you execute the simu
     <params
         bytecode_file="/collective_perception/collective_perception_dynamic/build/buzz/body_crosscombe_2017.bo"
         debug_file="/collective_perception/collective_perception_dynamic/build/buzz/body_crosscombe_2017.bdb" />
+
+</buzz_controller_kheperaiv>
+```
+
+</details>
+
+<details><summary><a href="https://ieeexplore.ieee.org/document/9196584">Ebert <i>et al.</i> (2020) </a></summary>
+
+```xml
+<buzz_controller_kheperaiv id="bck">
+
+    <!-- Locations of Buzz bytecode files -->
+    <params
+        bytecode_file="/collective_perception/collective_perception_dynamic/build/buzz/body_ebert_2020.bo"
+        debug_file="/collective_perception/collective_perception_dynamic/build/buzz/body_ebert_2020.bdb" />
 
 </buzz_controller_kheperaiv>
 ```
@@ -76,10 +104,37 @@ For the location of the `benchmarking_loop_functions` library, specify them as y
 <algorithm type="crosscombe_2017"> <!-- the value to `type` is provided as a macro in the benchmark algorithm `.hpp` file -->
 
     <!-- Number of options for robots to choose from -->
-    <num_possible_options int="10" />
+    <num_possible_options value="10" />
 
     <!-- Range of flawed robot ratios to simulate in each experiment -->
     <flawed_robot_ratio_range min="0.1" max="0.5" steps="2" />
+</algorithm>
+```
+
+</details>
+
+<details><summary><a href="https://ieeexplore.ieee.org/document/9196584">Ebert <i>et al.</i> (2020) </a></summary>
+
+```xml
+<algorithm type="ebert_2020"> <!-- the value to `type` is provided as a macro in the benchmark algorithm `.hpp` file -->
+
+    <!--
+        range of sensor probabilities
+        `steps` must be an integer:
+            - positive, probabilities are spread linearly from min to max
+            - -2 indicates a uniform distribution with range [`min`, `max`)
+            - -3 indicates a normal distribution with mean=`min`, variance=`max`
+    -->
+    <sensor_probability_range min="0.525" max="0.975" steps="-2" />
+
+    <!-- Flag to activate positive feedback -->
+    <positive_feedback bool="true" />
+
+    <!-- Beta prior distribution parameters (float value a initializes both parameters ==> Beta(a, a) -->
+    <prior value="1" />
+
+    <!-- Credible threshold for robots to make a decision -->
+    <credible_threshold value="0.9" />
 </algorithm>
 ```
 
@@ -231,7 +286,7 @@ This subsection describes the main action items -- *should be exhaustive, but so
         ```
     - `src/benchmark_<BENCHMARK-AUTHOR>_<BENCHMARK-YEAR>.cpp`
 
-2. Create a structure `BenchmarkData<BENCHMARK-AUTHOR><BENCHMARK-YEAR>` to store benchmark algorithm data that is derived from `BenchmarkDataBase` and a class `Benchmark<BENCHMARK-AUTHOR><BENCHMARK-YEAR>` that is derived from `BenchmarkAlgorithmTemplate<BenchmarkData<BENCHMARK-AUTHOR><BENCHMARK-YEAR>>`. For example, if the author and year are `Dummy` and `2016`, then the structure and class would look like:
+2. In the `.hpp` file, create a structure `BenchmarkData<BENCHMARK-AUTHOR><BENCHMARK-YEAR>` to store benchmark algorithm data that is derived from `BenchmarkDataBase` and a class `Benchmark<BENCHMARK-AUTHOR><BENCHMARK-YEAR>` that is derived from `BenchmarkAlgorithmTemplate<BenchmarkData<BENCHMARK-AUTHOR><BENCHMARK-YEAR>>`. For example, if the author and year are `Dummy` and `2016`, then the structure and class would look like:
     ```cpp
     struct BenchmarkDataDummy2016 : BenchmarkDataBase
     {
@@ -263,20 +318,18 @@ This subsection describes the main action items -- *should be exhaustive, but so
     {
         benchmark_algo_ptr_ =
             std::make_shared<BenchmarkCrosscombe2017>(buzz_foreach_vm_func, t_tree, robot_id_vec);
-
-        benchmark_algo_ptr_->Init();
     }
-    else if (algorithm_str_id == DUMMY_2016)
+    else if (algorithm_str_id_ == DUMMY_2016)
     {
         benchmark_algo_ptr_ =
             std::make_shared<BenchmarkDummy2016>(buzz_foreach_vm_func, t_tree, robot_id_vec);
-
-        benchmark_algo_ptr_->Init();
     }
     else
     {
         THROW_ARGOSEXCEPTION("Unknown benchmark algorithm!");
     }
+
+    benchmark_algo_ptr_->Init();
     ```
 6. Ensure that you are writing JSON data files. The `nlohmann::json` library has been incorporated in this repository, see `benchmark_crosscombe_2017.*pp` as examples.
 7. Create the Buzz controller bytecode file `body_<BENCHMARK-AUTHOR>_<BENCHMARK-YEAR>.bzz` (*e.g.,* `body_dummy_2016.bzz`). You can include `body_common.bzz` to use the common body functions. See `body_crosscombe_2017.bzz` as an example. Then add the line `buzz_make(body_<BENCHMARK-AUTHOR>_<BENCHMARK-YEAR>.BZZ INCLUDES body_common.bzz)` to `buzz/CMakeLists.txt`.

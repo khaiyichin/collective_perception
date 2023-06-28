@@ -28,3 +28,18 @@ add_test(
     NAME ${TEST_TARGET_NAME}
     COMMAND ${TEST_TARGET_NAME} -r xml -o test_report.xml
 )
+
+# Build test for customized Beta CDF function ported from GSL
+add_executable(test_custom_beta_cdf_gsl
+    test_custom_beta_cdf_gsl.cpp
+)
+
+target_link_libraries(test_custom_beta_cdf_gsl
+    PRIVATE
+    collective_perception_test_interface
+)
+
+target_include_directories(test_custom_beta_cdf_gsl
+    PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}> # include directory during build; which is "../include" from this directory
+)
