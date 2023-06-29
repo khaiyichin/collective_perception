@@ -117,6 +117,8 @@ For the location of the `benchmarking_loop_functions` library, specify them as y
 </algorithm>
 ```
 
+For this benchmark algorithm, the outer parameter group is unchanged (robot speed and swarm density). The inner group parameters are `fill_ratio_range` and `sensor_probability_range`.
+
 *Note: while arena floor has tile colors, this benchmark algorithm doesn't actually detect tile colors. What the arena floor look like does not actually affect the robot performance; it is however a reflection of the fill ratio.*
 
 </details>
@@ -138,13 +140,15 @@ For the location of the `benchmarking_loop_functions` library, specify them as y
     <!-- Flag to activate positive feedback -->
     <positive_feedback bool="true" />
 
-    <!-- Beta prior distribution parameters (float value a initializes both parameters ==> Beta(a, a) -->
+    <!-- Beta prior distribution parameters (float value a that initializes both parameters ==> Beta(a, a) -->
     <prior value="1" />
 
     <!-- Credible threshold for robots to make a decision -->
     <credible_threshold value="0.9" />
 </algorithm>
 ```
+
+For this benchmark algorithm, the additional parameters in the outer parameter group are `positive_feedback`, `prior`, and `credible_threshold`. `sensor_probability_range` remains a parameter in the inner parameter group.
 
 </details>
 

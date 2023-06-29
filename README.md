@@ -16,13 +16,16 @@ The robots in the dynamic topology simulator move around a square arena of black
 
 <img src="dynamic_sim_graphic.png" alt="Dynamic simulated experiment visualized" width="450"/>
 
+### Benchmark algorithms
+In addition to our collective perception algorithm, benchmark algorithms are also provided in this repository to provide performance comparison. They are simulated in a similar fashion to the dynamic topology simulator. See the [benchmark algorithm documentation](docs/benchmark_algo_explained.md) for more information.
+
 ## Requirements
 ### Local build
 - Python 3.8+ and `pip`
 - CMake 3.15+
 - [ARGoS](https://github.com/ilpincy/argos3.git)
 - [Buzz](https://github.com/NESTLab/Buzz)
-- [ARGoS-KheperaIV plugin](https://github.com/NESTLab/argos3-kheperaiv) - *in this repository Khepera IVs are used, but with some modification to the experiment files you could potentially use other robot types*
+- [ARGoS-KheperaIV plugin](https://github.com/ilpincy/argos3-kheperaiv) - *in this repository Khepera IVs are used, but with some modification to the experiment files you could potentially use other robot types*
 - [Protobuf v21.1+ (`proto3`)](https://github.com/protocolbuffers/protobuf.git) - *source build recommended, although the `apt` package version may work as well*
 - [GraphTool v2.45+](https://graph-tool.skewed.de/) - *can be installed using the `apt` package manager*
 
@@ -172,4 +175,10 @@ $ gdb tests/tests # or gdb --args tests/tests <ARGS> if you have arguments, e.g.
 
 # Run with valgrind
 $ valgrind tests/tests <ARGS-IF-ANY>
+```
+
+### Additional testing notes
+To provide the ability to compute Beta CDF values required by one of the benchmark algorithms, the `custom_beta_cdf_gsl.*pp` implmentation is provided, ported from GSL. Subsequently, a test script has been created to ensure that the porting process was correct, which can be executed by doing the following.
+```
+$ tests/test_custom_beta_cdf_gsl
 ```
