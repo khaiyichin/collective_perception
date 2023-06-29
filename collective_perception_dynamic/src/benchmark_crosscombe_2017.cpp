@@ -353,7 +353,7 @@ BenchmarkCrosscombe2017::BenchmarkCrosscombe2017(const BuzzForeachVMFunc &buzz_f
     : BenchmarkAlgorithmTemplate<BenchmarkDataCrosscombe2017>(buzz_foreach_vm_func, t_tree, robot_id_vec)
 {
     // Grab number of possible options
-    GetNodeAttribute(GetNode(t_tree, "num_possible_options"), "int", data_.num_possible_options);
+    GetNodeAttribute(GetNode(t_tree, "num_possible_options"), "value", data_.num_possible_options);
 
     // Grab flawed robot ratio range
     double min, max;
@@ -388,7 +388,7 @@ void BenchmarkCrosscombe2017::SetupExperiment(const int &trial_ind, const std::p
             << curr_num_flawed_robots_ << std::endl;
     }
 
-    std::vector<std::string> flawed_robot_ids = SampleRobotIdsWithoutReplacement(curr_num_flawed_robots_);
+    std::vector<std::string> flawed_robot_ids = SampleRobotIdsWithoutReplacement(curr_num_flawed_robots_, robot_id_vec_);
 
     // Setup functors
     id_belief_map_ptr_ = std::make_shared<RobotIdBeliefStrMap>();

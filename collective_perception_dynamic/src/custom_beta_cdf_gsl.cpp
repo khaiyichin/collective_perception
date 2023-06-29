@@ -517,7 +517,7 @@ namespace CustomBetaCdfGSL
     /* log.c */
     /****************************************/
 
-    /*-*-*-*-*-*-*-*-*-*-*-* Private Section *-*-*-*-*-*-*-*-*-*-*-*/
+    /*-*-*-*-*-*-*-*-*-*-*-* Functions with Error Codes *-*-*-*-*-*-*-*-*-*-*-*/
 
     int gsl_sf_log_1plusx_e(const double x, gsl_sf_result *result)
     {
@@ -768,23 +768,6 @@ namespace CustomBetaCdfGSL
 
     /*-*-*-*-*-*-*-*-*-*-*-* Private Section *-*-*-*-*-*-*-*-*-*-*-*/
 
-    int gsl_sf_lnfact_e(const unsigned int n, gsl_sf_result *result)
-    {
-        /* CHECK_POINTER(result) */
-
-        if (n <= GSL_SF_FACT_NMAX)
-        {
-            result->val = log(fact_table[n].f);
-            result->err = 2.0 * GSL_DBL_EPSILON * fabs(result->val);
-            return GSL_SUCCESS;
-        }
-        else
-        {
-            gsl_sf_lngamma_e(n + 1.0, result);
-            return GSL_SUCCESS;
-        }
-    }
-
     /* x near a negative integer
      * Calculates sign as well as log(|gamma(x)|).
      * x = -N + eps
@@ -1002,6 +985,33 @@ namespace CustomBetaCdfGSL
         return GSL_SUCCESS;
     }
 
+    /* series for gammastar(x)
+     * double-precision for x > 10.0
+     */
+    static int
+    gammastar_ser(const double x, gsl_sf_result *result)
+    {
+        /* Use the Stirling series for the correction to Log(Gamma(x)),
+         * which is better behaved and easier to compute than the
+         * regular Stirling series for Gamma(x).
+         */
+        const double y = 1.0 / (x * x);
+        const double c0 = 1.0 / 12.0;
+        const double c1 = -1.0 / 360.0;
+        const double c2 = 1.0 / 1260.0;
+        const double c3 = -1.0 / 1680.0;
+        const double c4 = 1.0 / 1188.0;
+        const double c5 = -691.0 / 360360.0;
+        const double c6 = 1.0 / 156.0;
+        const double c7 = -3617.0 / 122400.0;
+        const double ser = c0 + y * (c1 + y * (c2 + y * (c3 + y * (c4 + y * (c5 + y * (c6 + y * c7))))));
+        result->val = exp(ser / x);
+        result->err = 2.0 * GSL_DBL_EPSILON * result->val * GSL_MAX_DBL(1.0, ser / x);
+        return GSL_SUCCESS;
+    }
+
+    /*-*-*-*-*-*-*-*-*-*-*-* Functions with Error Codes *-*-*-*-*-*-*-*-*-*-*-*/
+
     int gsl_sf_gammastar_e(const double x, gsl_sf_result *result)
     {
         /* CHECK_POINTER(result) */
@@ -1057,32 +1067,22 @@ namespace CustomBetaCdfGSL
         }
     }
 
-    /* series for gammastar(x)
-     * double-precision for x > 10.0
-     */
-    static int
-    gammastar_ser(const double x, gsl_sf_result *result)
+    int gsl_sf_lnfact_e(const unsigned int n, gsl_sf_result *result)
     {
-        /* Use the Stirling series for the correction to Log(Gamma(x)),
-         * which is better behaved and easier to compute than the
-         * regular Stirling series for Gamma(x).
-         */
-        const double y = 1.0 / (x * x);
-        const double c0 = 1.0 / 12.0;
-        const double c1 = -1.0 / 360.0;
-        const double c2 = 1.0 / 1260.0;
-        const double c3 = -1.0 / 1680.0;
-        const double c4 = 1.0 / 1188.0;
-        const double c5 = -691.0 / 360360.0;
-        const double c6 = 1.0 / 156.0;
-        const double c7 = -3617.0 / 122400.0;
-        const double ser = c0 + y * (c1 + y * (c2 + y * (c3 + y * (c4 + y * (c5 + y * (c6 + y * c7))))));
-        result->val = exp(ser / x);
-        result->err = 2.0 * GSL_DBL_EPSILON * result->val * GSL_MAX_DBL(1.0, ser / x);
-        return GSL_SUCCESS;
-    }
+        /* CHECK_POINTER(result) */
 
-    /*-*-*-*-*-*-*-*-*-*-*-* Functions with Error Codes *-*-*-*-*-*-*-*-*-*-*-*/
+        if (n <= GSL_SF_FACT_NMAX)
+        {
+            result->val = log(fact_table[n].f);
+            result->err = 2.0 * GSL_DBL_EPSILON * fabs(result->val);
+            return GSL_SUCCESS;
+        }
+        else
+        {
+            gsl_sf_lngamma_e(n + 1.0, result);
+            return GSL_SUCCESS;
+        }
+    }
 
     int gsl_sf_lngamma_e(double x, gsl_sf_result *result)
     {

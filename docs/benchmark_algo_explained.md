@@ -14,7 +14,9 @@ During the updating phase, if the non-flawed robots cannot decide option -- they
 
 <details><summary><a href="https://ieeexplore.ieee.org/document/9196584">Ebert <i>et al.</i> (2020) </a></summary>
 
-LOREM IPSUM
+The robots move around in a random walk fashion communicating their observations (or decisions, if positive feedback enabled) to each other. These communicated values are used to adjust the parameters of a Beta distribution, which is the posterior distribution of the tile fill ratio. The robots' decisions states are: `-1` (undecided), `0` (white), and `1` (black). *Note that the black and white decisions are flipped from the original paper to maintain uniformity with our collective perception work.* 
+
+Once each robot has come to their decision, the simulation will be terminated. Otherwise, it will run up until a specified duration in the `.argos` file.
 
 </details>
 
@@ -64,7 +66,7 @@ The location of the `body*` bytecode files depends on where you execute the simu
 </details>
 
 ### Loop functions
-For the location of the `benchmarking_loop_functions` library, specify them as you would the Buzz bytecode files: an absolute path for the local build, `/collective_perception/collective_perception_dynamic/build/...` for the container. The rest of the parameters are explained in the snippet below. The general `<benchmarking />` parameters are filled as the following, with specific benchmark algorithm parameters described further below.
+For the location of the `benchmarking_loop_functions` library, specify them as you would the Buzz bytecode files: an absolute path for the local build or `/collective_perception/collective_perception_dynamic/build/...` for the container. The rest of the parameters are explained in the snippet below. The general `<benchmarking />` parameters are filled as the following, with specific benchmark algorithm parameters described further below.
 
 ```xml
 <loop_functions library="/collective_perception/collective_perception_dynamic/build/src/libbenchmarking_loop_functions" label="benchmarking_loop_functions">
@@ -72,6 +74,10 @@ For the location of the `benchmarking_loop_functions` library, specify them as y
     <benchmarking>
         <!-- Specific benchmarking algorithm parameters -->
         <algorithm ... />
+
+        <!-- Number of tiles for the arena in the x and y direction -->
+        <!-- NOTE: must have equal number of tile counts -->
+        <arena_tiles tile_count_x="1000" tile_count_y="1000" />
 
         <!-- Range of target fill ratios between `min` and `max` of `steps` increments -->
         <!-- NOTE: must be between 0.0 to 1.0 -->
@@ -110,6 +116,8 @@ For the location of the `benchmarking_loop_functions` library, specify them as y
     <flawed_robot_ratio_range min="0.1" max="0.5" steps="2" />
 </algorithm>
 ```
+
+*Note: while arena floor has tile colors, this benchmark algorithm doesn't actually detect tile colors. What the arena floor look like does not actually affect the robot performance; it is however a reflection of the fill ratio.*
 
 </details>
 
@@ -269,6 +277,63 @@ optional arguments:
     optional arguments:
     -h, --help  show this help message and exit
     ```
+</details>
+
+<details><summary><a href="https://ieeexplore.ieee.org/document/9196584">Ebert <i>et al.</i> (2017) </a></summary>
+
+JSON data:
+```json
+{
+    "sim_type": "ebert_2020",       // benchmark algorithm identifier (string)
+    /* 
+    ...                             // common data output
+    */
+    "sp": 0.675,                    // sensor probability in this trial (float)
+    "prior_param": 10,              // prior distribution parameters, i.e., BetaDist(alpha=prior_param, beta=prior_param) (int)
+    "credible_threshold": 0.99,     // credible threshold (float)
+    "positive_feedback": false,     // positive feedback flag (bool)
+    "collectively_decided": false,  // flag that indicates whether the robots have each made a decision (bool)
+    "data_str": [                   // data string array of arrays; data string has the form "<A>,<B>,<P>,<D>" where
+                                    //      <A> = alpha parameter of Beta distribution
+                                    //      <B> = beta parameter of Beta distribution
+                                    //      <P> = P(X < 0.5) where X ~ BetaDist(alpha=<A>, beta=<B>)
+                                    //      <D> = decision made by the robot
+        [                           // data string of robot 0 (array of string)
+            "10,11,0.588099,-1",    // data string of robot 0 at time = 0 (string)
+            "13,12,0.419410,-1",    // data string of robot 0 at time = 1 (string)
+            "15,14,0.425277,-1",
+            "16,17,0.569975,-1",
+            "18,19,0.566030,-1",
+        ],
+        [                           // data string of robot 1
+            "11,10,0.411901,-1",    // data string of robot 1 at time step = 0 (string)
+            "12,12,0.500000,-1",
+            "15,12,0.278599,-1",
+            "15,15,0.500000,-1",
+            "16,17,0.569975,-1",
+        ],
+        [
+            "11,10,0.411901,-1",
+            "12,13,0.580590,-1",
+            "12,17,0.827536,-1",
+            "15,18,0.701693,-1",
+            "16,21,0.797484,-1",
+        ],
+        [
+            "10,11,0.588099,-1",
+            "11,13,0.661180,-1",
+            "11,16,0.836530,-1",    // data string of robot 3 at time step = 2 (string)
+            "12,18,0.867535,-1",
+            "14,19,0.811457,-1",
+        ]
+    ]
+}
+```
+
+Visualization script:
+```
+lorem ipsum
+```
 </details>
 
 ## Development

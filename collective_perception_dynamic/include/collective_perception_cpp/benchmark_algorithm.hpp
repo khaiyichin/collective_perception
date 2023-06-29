@@ -213,26 +213,6 @@ public:
     T &GetData() { return data_; }
 
 protected:
-    /**
-     * @brief Draw a sample of robot IDs without replacement
-     *
-     * @param num_robots_to_sample Number of robots to sample
-     * @return std::vector<std::string> Drawn robot IDs
-     */
-    std::vector<std::string> SampleRobotIdsWithoutReplacement(const unsigned int &num_robots_to_sample)
-    {
-        // Sample random robot IDs (without replacement)
-        std::vector<std::string> sampled_robot_ids;
-
-        std::sample(robot_id_vec_.begin(),
-                    robot_id_vec_.end(),
-                    std::back_inserter(sampled_robot_ids),
-                    num_robots_to_sample,
-                    std::mt19937{std::random_device{}()});
-
-        return sampled_robot_ids;
-    }
-
     T data_; ///< Benchmark data (subclass of BenchmarkDataBase)
 };
 

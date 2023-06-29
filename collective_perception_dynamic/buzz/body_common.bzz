@@ -155,13 +155,126 @@ function avoid_obstacles(spd, obstacles)
     return {.type = move_type, .duration = move_duration, .rot_dir = rot_direction}
 }
 
+# Execute observation (assumes Khepera IV robot)
+function observe(b_prob, w_prob)
+{
+    # * The ground sensors are located on the bottom of the robot, and can
+    # * be used to perform line following.
+    # *
+    # * The readings are in the following order (seeing the robot from TOP,
+    # * battery socket is the BACK):
+    # *
+    # *      front
+    # *
+    # *      0   3    r
+    # * l             i
+    # * e  1       2  g
+    # * f             h
+    # * t             t
+    # *
+    # *       back
+    # *
+
+    ######################################################################################
+    ##### The following snippet is commented out (for now?) due to the size of tile used
+    ##### (1cm, constrained by movement speed)
+
+    # # Use both front sensors (0 and 3) to only record observation if they match
+    # # This is acceptable for now since the distance between them is < 3cm.
+    # # See http://ftp.k-team.com/KheperaIV/software/Gumstix%20COM%20Y/UserManual/Khepera%20IV%20User%20Manual%204.x.pdf
+
+    # # The 'ground' keyword is a table provided to query the ground sensor readings
+
+    # # Check if both sensors see the same color (only using front sensors, not side)
+    # var left_front_color = ground[0].value
+    # var right_front_color = ground[3].value
+
+    # if (left_front_color == right_front_color)
+    # {
+    #     # Make observation using artificial noise (probability)
+    #     # The actual sensor is set to have no noise
+    #     var encounter = int(left_front_color)
+    #     var prob = 0.0
+
+    #     if (encounter == 1) # white
+    #     {
+    #         prob = w_prob
+    #     }
+    #     else if (encounter == 0) # black
+    #     {
+    #         prob = b_prob
+    #     }
+    #     else
+    #     {
+    #         return nil # invalid observation
+    #     }
+
+    #     var noisy_observation = int(1-observe_noisy(encounter, prob)) # this is because black and white are flipped
+
+    #     debug_data["encounter"] = encounter
+    #     debug_data["observation"] = noisy_observation
+
+    #     total_b_tiles_obs = total_b_tiles_obs + noisy_observation
+    #     total_obs = total_obs + 1
+    # }
+    # else
+    # {
+    #     return nil
+    # }
+    ######################################################################################
+
+
+    # Use left sensor to detect ground value
+    # See http://ftp.k-team.com/KheperaIV/software/Gumstix%20COM%20Y/UserManual/Khepera%20IV%20User%20Manual%204.x.pdf
+
+    # The 'ground' keyword is a table provided to query the ground sensor readings
+    var left_front_color = ground[0].value
+
+    # Make observation using artificial noise (probability)
+    # The actual sensor is set to have no noise
+    var encounter = int(left_front_color)
+    var prob = 0.0
+
+    if (encounter == 1) # white
+    {
+        prob = w_prob
+    }
+    else if (encounter == 0) # black
+    {
+        prob = b_prob
+    }
+    else
+    {
+        logerr("Invalid encounter observed!")
+        return nil # invalid observation
+    }
+
+    var corrected_encounter = 1 - encounter # this is because black and white are flipped
+    var noisy_observation = int(observe_noisy(corrected_encounter, prob))
+
+    return {.encounter = corrected_encounter, .observation = noisy_observation}
+}
+
+# Provide noisy observation
+function observe_noisy(encounter, sensor_prob)
+{
+    if (math.rng.uniform(1.0) < sensor_prob)
+    {
+        return encounter # observation matches encounter
+    }
+    else
+    {
+        return int(1 - encounter) # observation doesn't match encounter
+    }
+}
+
 # Transmit messages
 function communicate_tx(channel, message)
 {
     neighbors.broadcast(channel, message) # broadcast local estimate
 }
 
-# Update buffer of received messages
+# Update buffer of received messages (move current messages to past)
 function update_received_messages(message_table)
 {
     return {.past = message_table.curr, .curr = {}}

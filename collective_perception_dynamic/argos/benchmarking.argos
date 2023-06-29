@@ -23,7 +23,7 @@
           or set to zero, this value is taken from the clock and a warning
           message is displayed.
     -->
-        <experiment length="10" ticks_per_second="10" random_seed="0" />
+        <experiment length="50" ticks_per_second="10" random_seed="0" />
     </framework>
 
     <!-- *************** -->
@@ -80,6 +80,7 @@
           $ argos3 -q sensors
       -->
             <sensors>
+                <kheperaiv_ground implementation="rot_z_only" />
                 <range_and_bearing implementation="medium" medium="rab" show_rays="true" noise_std_dev="0" />
                 <kheperaiv_proximity implementation="default" show_rays="false" />
             </sensors>
@@ -88,7 +89,8 @@
           function.
           The user, writing the controller, defines how it is organized.
       -->
-            <params bytecode_file="build/buzz/body_crosscombe_2017.bo" debug_file="build/buzz/body_crosscombe_2017.bdb" />
+            <!-- <params bytecode_file="build/buzz/body_crosscombe_2017.bo" debug_file="build/buzz/body_crosscombe_2017.bdb" /> -->
+            <params bytecode_file="build/buzz/body_ebert_2020.bo" debug_file="build/buzz/body_ebert_2020.bdb" />
         </buzz_controller_kheperaiv>
 
     </controllers>
@@ -99,14 +101,24 @@
 
     <loop_functions library="build/src/libbenchmarking_loop_functions" label="benchmarking_loop_functions">
         <benchmarking>
-            <algorithm type="crosscombe_2017">
-                <num_possible_options int="10" />
+            <!-- <algorithm type="crosscombe_2017">
+                <num_possible_options value="10" />
                 <flawed_robot_ratio_range min="0.1" max="0.5" steps="2" />
+            </algorithm> -->
+            <algorithm type="ebert_2020">
+                <sensor_probability_range min="0.675" max="0.675" steps="1" />
+                <positive_feedback bool="false" />
+                <prior value="10" />
+                <credible_threshold value="0.99" />
             </algorithm>
-            <fill_ratio_range min="0.95" max="0.95" steps="1" /> <!-- range of target fill ratios -->
+            <arena_tiles tile_count_x="500" tile_count_y="500" /> <!-- number of tiles for the arena -->
+            <fill_ratio_range min="0.55" max="0.55" steps="1" /> <!-- range of target fill ratios -->
             <num_trials value="2" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <speed value="14.14" /> <!-- in units of cm/s -->
-            <path folder="bm_crosscombe" name="data.json" include_datetime="true" /> <!-- path to the output data and datetime in foldername -->
+            
+            <!-- path to the output data and datetime in foldername -->
+            <!-- <path folder="bm_crosscombe_2017" name="data.json" include_datetime="true" /> -->
+            <path folder="bm_ebert_2020" name="data.json" include_datetime="true" />
             <verbosity level="full" /> <!-- "full", "reduced", "none" -->
         </benchmarking>
     </loop_functions>
@@ -130,6 +142,8 @@
       $ argos3 -q box
   -->
     <arena size="5, 5, 1" center="0,0,0.5">
+        <!-- floor node required for ebert_2020 -->
+        <floor id="floor" source="loop_functions" pixels_per_meter="200" />
 
         <!-- Place four boxes in a square to delimit the arena -->
         <box id="wall_north" size="3.000000, 0.100000, 0.500000" movable="false">
@@ -148,7 +162,7 @@
         <distribute>
             <position method="uniform" min="-1.030873, -1.030873, 0" max="1.030873, 1.030873, 0" />
             <orientation method="uniform" min="0, 0, 0" max="0, 0, 0" />
-            <entity quantity="25" max_trials="100" base_num="0">
+            <entity quantity="5" max_trials="100" base_num="0">
                 <kheperaiv id="kiv" rab_data_size="200" rab_range="0.700000">
                     <controller config="bck" />
                 </kheperaiv>

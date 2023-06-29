@@ -11,7 +11,9 @@
 
 // Local headers
 #include "util.hpp"
+#include "arena.hpp"
 #include "benchmark_crosscombe_2017.hpp"
+#include "benchmark_ebert_2020.hpp"
 
 using namespace argos;
 
@@ -55,6 +57,14 @@ public:
      */
     inline bool IsExperimentFinished() { return finished_; }
 
+    /**
+     * @brief Get the floor color
+     *
+     * @param c_position_on_plane Coordinates of the floor
+     * @return CColor Color at the specified coordinates
+     */
+    virtual CColor GetFloorColor(const CVector2 &c_position_on_plane);
+
 private:
     /**
      * @brief Setup experiment
@@ -81,6 +91,12 @@ private:
 
     int curr_trial_ind_ = 0; ///< Counter to keep track of trials
 
+    double arena_tile_size_;
+
+    std::pair<unsigned int, unsigned int> arena_tile_count_;
+
+    std::pair<double, double> arena_lower_lim_;
+
     std::vector<std::pair<double, double>> paired_parameter_ranges_; ///< Paired parameter ranges to be simulated
 
     std::vector<std::pair<double, double>>::iterator curr_paired_parameter_range_itr_; ///< Current pair of parameters to be simulated
@@ -94,6 +110,8 @@ private:
     std::string output_filename_; ///< Filename of output data
 
     std::shared_ptr<BenchmarkAlgorithmBase> benchmark_algo_ptr_; ///< Pointer to benchmark algorithm object
+
+    Arena arena_; ///< Arena object
 };
 
 #endif

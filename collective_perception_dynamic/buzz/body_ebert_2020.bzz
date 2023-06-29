@@ -1,0 +1,145 @@
+include "body_common.bzz"
+
+# Define macros/enum for robot decisions and states; if modified then must change at other locations (in C++ header files) 
+WHITE_OBS = 0
+BLACK_OBS = 1
+DECISION_UNDECIDED_ENUM = -1
+DECISION_WHITE_ENUM = WHITE_OBS
+DECISION_BLACK_ENUM = BLACK_OBS
+
+function init()
+{
+    # Initialize values
+    reset_values()
+
+    # Define listener callback function
+    neighbors.listen("obs_or_decision",
+        function(vid, val, rid) # val is either the neighbor's decision or observation
+        {
+            received_vals = append_to_table(received_vals, val)
+        }
+    )
+
+    ### Set custom seed that depends on the clock ###
+    # This has to be done so that not all the robots are set to the same clock seed:
+    #   * Default seed (i.e., clock) causes all the robots to be seeded the same, making them behave the same
+    #   * Vanilla ID custom seed (i.e., `math.rng.setseed(id)`) causes deterministic behaviors across different trials
+    # Solution: `math.rng.uniform()` is seeded by the clock, while `id` modifies the seed for the number generator used in the motion
+    # Robots now all behave differently, across different trials.
+    math.rng.setseed(id + math.rng.uniform())
+}
+
+function step()
+{
+    # Detect any nearby obstacles
+    var obstacles = detect_obstacles()
+    if (not obstacles)
+    {
+        # Move robot in random walk fashion
+        var movement = move(move_type, move_duration, rot_direction, spd)
+        move_type = movement.type
+        move_duration = movement.duration
+        rot_direction = movement.rot_dir
+    }
+    else
+    {
+        # Avoid obstacles
+        var movement = avoid_obstacles(spd, obstacles)
+        move_type = movement.type
+        move_duration = movement.duration
+        rot_direction = movement.rot_dir
+    }
+
+    # Make observation and update Beta posterior parameters
+    encounter_observation_table = observe(b_prob, w_prob)
+
+    if (encounter_observation_table.observation == WHITE_OBS) # white observation or decision
+    {
+        alpha = alpha + 1
+    }
+    else if (encounter_observation_table.observation == BLACK_OBS) # black observation or decision
+    {
+        beta = beta + 1
+    }
+
+    # Communicate TX
+    if (positive_feedback)
+    {
+        if (decision_state == DECISION_UNDECIDED_ENUM) # communicate observation
+        {
+            communicate_tx("obs_or_decision", encounter_observation_table.observation)
+        }
+        else if (decision_state == DECISION_WHITE_ENUM) # communicate decision = white
+        {
+            communicate_tx("obs_or_decision", DECISION_WHITE_ENUM)
+        }
+        else if (decision_state == DECISION_BLACK_ENUM) # communicate decision = black
+        {
+            communicate_tx("obs_or_decision", DECISION_BLACK_ENUM)
+        }
+        else
+        {
+            logerr("Invalid decision state.")
+        }
+    }
+    else
+    {
+        communicate_tx("obs_or_decision", encounter_observation_table.observation)
+    }
+
+    # Update beta posterior parameters
+    foreach(received_vals,
+        function(key, value)
+        {
+            if (value == WHITE_OBS) # white observation or decision
+            {
+                alpha = alpha + 1
+            }
+            else if (value == BLACK_OBS) # black observation or decision
+            {
+                beta = beta + 1
+            }
+        }
+    )
+
+    received_vals = {} # clear the received values
+}
+
+function reset()
+{
+    reset_values()
+}
+
+function destroy() {}
+
+
+##############################
+### User defined functions ###
+##############################
+
+# Clear the robot values
+function reset_values()
+{
+    # Define sensor accuracy variables, modified by the ARGoS loop functions
+    b_prob = nil
+    w_prob = nil
+
+    # Define velocity variables, modified by the ARGoS loop functions
+    spd = nil # cm/s
+
+    # Define Beta prior parameters, modified by the ARGoS loop functions
+    alpha = nil
+    beta = nil
+
+    # Define flag to use positive feedback
+    positive_feedback = nil
+
+    # Define initial values, not modified by ARGoS loop functions
+    move_type = nil
+    move_duration = 0
+    rot_direction = nil
+    received_vals = {}
+
+    # Initialize decision state
+    decision_state = DECISION_UNDECIDED_ENUM
+}
