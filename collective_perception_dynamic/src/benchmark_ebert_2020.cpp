@@ -43,6 +43,13 @@ void ProcessRobotPosteriorProb::operator()(const std::string &str_robot_id, buzz
         {
             initialized = true;
         }
+
+        // Log the robot's initial values
+        int a = buzzobj_getint(BuzzGet(t_vm, "alpha"));
+        int b = buzzobj_getint(BuzzGet(t_vm, "beta"));
+        int decision_state_int = buzzobj_getint(BuzzGet(t_vm, "decision_state"));
+
+        (*id_data_str_map_ptr)[str_robot_id.c_str()].push_back(ConvertParamPosteriorDecisionToString(a, b, 0.5, decision_state_int));
     }
     else
     {

@@ -62,6 +62,7 @@ setuptools.setup(
         "scripts/multi_agent_sim_static.py",
         "scripts/extract_local_values_to_viz_data.py",
         "scripts/extract_vd_from_vdg.py",
-        "scripts/combine_vd_static.py"
+        "scripts/combine_vd_static.py",
+        "scripts/export_decision_data.py"
     ]
 )

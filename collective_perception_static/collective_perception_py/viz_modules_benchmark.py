@@ -6,6 +6,7 @@ import timeit
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from abc import ABC, abstractmethod
+import warnings
 
 # Local modules
 from .viz_modules import line, \
@@ -24,7 +25,6 @@ def plot_timeseries(time_arr, data, args):
 
     tfr = args["tfr"]
     benchmark_param_range = args["benchmark_param_range"]
-    # bins = args["bins"]
     # speed = args["speed"]
     # density = args["density"]
     num_options = args["num_options"]
@@ -68,14 +68,13 @@ def plot_decision(decision_data, args):
     benchmark_str = args["benchmark_str"]
     tfr = args["tfr"]
     benchmark_param_range = args["benchmark_param_range"]
-    bins = args["bins"]
     num_trials = args["num_trials"]
     sim_steps = args["sim_steps"]
     speed = args["speed"]
     density = args["density"]
     num_options = args["num_options"]
     cbar_label = args["colorbar_label"]
-    filename_param_1 = "spd{0}_den{1}_bins{2}".format(int(speed), int(density), bins)
+    filename_param_1 = "spd{0}_den{1}_bins{2}".format(int(speed), int(density), num_options)
 
     # Create the figures and axes
     fig_size = (6, 4)
@@ -118,7 +117,7 @@ def plot_decision(decision_data, args):
     # Plot the lines for each sensor probability
     for ind, s in enumerate(benchmark_param_range):
 
-        points = decision_data[s]
+        points = [decision_data[s][step] for step in sim_steps]
 
         line(
             # line_data=[np.array(sim_steps)/data_obj.comms_period + offset[ind], points],
@@ -193,6 +192,7 @@ class BenchmarkVisualizerBase(ABC):
     benchmark_param_range = 0.0
     decision_fraction = {}
     correct_decision = 0
+    tfr = 0.0
 
     def __init__(self):
         # parser = argparse.ArgumentParser(description="Visualize {0} data".format(benchmark_str))
@@ -248,13 +248,13 @@ class BenchmarkVisualizerBase(ABC):
     ):
         raise NotImplementedError("get_decision_data method not implemented.")
 
-    def get_tfr_range(self):
-        pass
+    def get_tfr(self):
+        return self.tfr
 
-    def get_param_range(self):
+    def get_benchmark_param_range(self):
         """Get the parameter range of the benchmark specific parameter
         """
-        pass
+        return self.benchmark_param_range
 
 
 class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
@@ -277,17 +277,6 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
         self.initial_pass = {key: True for key in self.frr}
 
         self.load_data(args.FOLDER)
-
-        start = timeit.default_timer()
-
-        self.generate_plot(args)
-
-        end = timeit.default_timer()
-
-        print('Elapsed time:', end - start)
-
-        if args.s:
-            plt.show()
 
     def load_data(self, data_folder: str):
         """Load the JSON data from a given folder.
@@ -352,7 +341,6 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
                 "benchmark_str": self.BENCHMARK_STR,
                 "tfr": self.tfr,
                 "benchmark_param_range": self.benchmark_param_range, # this is so that the plot functions can use a generic value
-                "bins": self.num_options,
                 "num_trials": self.num_trials,
                 "sim_steps": plotted_sim_steps,
                 "speed": self.speed,
@@ -370,7 +358,6 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
             args_plot_series = {
                 "tfr": self.tfr,
                 "benchmark_param_range": self.benchmark_param_range, # this is so that the plot functions can use a generic value
-                "bins": self.num_options,
                 "speed": self.speed,
                 "density": self.density,
                 "num_options": self.num_options,
@@ -440,7 +427,10 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
             sim_steps: Time step instances to get decision data from.
 
         Returns:
-            A dict in the form {frr_1: decision_lst_1, frr_2: decision_lst_2, ...}
+            A dict in the form {frr_1: {ss_11: decision_11, ss_12: decision_12, ...},
+                                frr_2: {ss_21: decision_21, ss_22: decision_22, ...},
+                                frr_3: {ss_31: decision_31, ss_32: decision_32, ...},
+                                ...}
         """
 
         # Convert the beliefs into decisions
@@ -449,8 +439,8 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
             self.convert_belief_to_decision()
 
         return {
-            bp: [self.decision_fraction[bp][ss] for ss in sim_steps
-                ] for bp in self.benchmark_param_range
+            bp: {ss: self.decision_fraction[bp][ss] for ss in sim_steps
+                } for bp in self.benchmark_param_range
         }
 
     def compute_correct_decision(self):
@@ -463,7 +453,7 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
             belief_str_vec: List of lists of beliefs for all robots (across all time steps) in a single trial
 
         Returns:
-            Numpy array of belief indices for the robot across all time steps
+            Numpy array of belief indices for the robots across all time steps
         """
 
         # belief_str_vec is a num_agents x num_steps list of lists
@@ -501,6 +491,193 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
                 ]
             ) # this is 1-D with num_steps length
 
+
+class Ebert2020Visualizer(BenchmarkVisualizerBase):
+    BENCHMARK_STR = "ebert_2020"
+    BENCHMARK_PARAM_ABBR = "sp" # sensor probability
+
+    def __init__(self, args, gen_plot=True):
+        # Initialize parameters to visualize
+        self.tfr = float(args.TFR)
+        self.benchmark_param_range = \
+            [float(i) for i in args.SP] if isinstance(args.SP, list) else [args.SP]
+        self.sp = self.benchmark_param_range
+        self.prior_param = \
+            {key: 0 for key in args.SP} if isinstance(args.SP, list) else {args.SP: 0}
+        self.credible_threshold = \
+            {key: 0 for key in args.SP} if isinstance(args.SP, list) else {args.SP: 0}
+        self.positive_feedback = \
+            {key: 0 for key in args.SP} if isinstance(args.SP, list) else {args.SP: 0}
+        self.collectively_decided = \
+            {key: 0 for key in args.SP} if isinstance(args.SP, list) else {args.SP: 0}
+
+        self.initial_pass = {key: True for key in self.sp}
+
+        self.load_data(args.FOLDER)
+
+    def load_data(self, data_folder: str):
+        """Load the JSON data from a given folder.
+
+        Args:
+            data_folder: Path to the folder containing all the JSON data files.
+        """
+        self.data = {key: None for key in self.sp}
+
+        # Receive folder path
+        for root, _, files in os.walk(data_folder):
+            for f in files:
+
+                if os.path.splitext(f)[1] == ".json":
+
+                    # Load the JSON file
+                    with open(os.path.join(root, f), "r") as file:
+                        json_dict = json.load(file)
+
+                    # Store only the data that matches the desired tfr and benchmark param
+                    if (json_dict["tfr"] != self.tfr or json_dict[self.BENCHMARK_PARAM_ABBR] not in self.sp):
+                        continue
+
+                    # Initialize data
+                    if self.initial_pass[json_dict["sp"]]:
+
+                        # Store common parameters only for the first pass
+                        if all(val_bool for val_bool in self.initial_pass.values()):
+                            self.num_trials = json_dict["num_trials"]
+                            self.num_agents = json_dict["num_agents"]
+                            self.num_steps = json_dict["num_steps"]
+                            self.comms_range = round(json_dict["comms_range"], 3)
+                            self.speed = round(json_dict["speed"], 3)
+                            self.density = round(json_dict["density"], 3)
+                            self.prior_param = json_dict["prior_param"]
+                            self.credible_threshold = json_dict["credible_threshold"]
+                            self.positive_feedback = json_dict["positive_feedback"]
+                            self.collectively_decided[json_dict["sp"]] = json_dict["collectively_decided"]
+
+                        self.data[json_dict["sp"]] = np.empty(
+                            (
+                                self.num_trials,
+                                self.num_agents,
+                                self.num_steps + 1,
+                                1 # decision of robot
+                            )
+                        )
+
+                        self.initial_pass[json_dict["sp"]] = False
+
+                    # Warn if the data contains undecided robots
+                    self.collectively_decided = json_dict["collectively_decided"]
+                    if not self.collectively_decided:
+                        warnings.warn("Not all robots have collectively made a decision for this file: {0}".format(f))
+
+                    # Decode json file into data
+                    self.data[json_dict["sp"]][json_dict["trial_ind"]] = \
+                        self.decode_data_str(json_dict["data_str"])
+
+    def generate_plot(self, args=None):
+
+        if args.viz_type == "decision":
+            if self.num_steps < args.step_inc: raise Exception("Step increments is too large for number of timesteps available.")
+
+            plotted_sim_steps = [i for i in range(0, self.num_steps + 1, args.step_inc)]
+            decision_data = self.get_decision_data(plotted_sim_steps)
+
+            args_plot_decision = {
+                "benchmark_str": self.BENCHMARK_STR,
+                "tfr": self.tfr,
+                "benchmark_param_range": self.benchmark_param_range, # this is so that the plot functions can use a generic value
+                "num_trials": self.num_trials,
+                "sim_steps": plotted_sim_steps,
+                "speed": self.speed,
+                "density": self.density,
+                "num_options": 2,
+                "colorbar_label": "Sensor Accuracies"
+            }
+
+            print("debugg", plotted_sim_steps, "\n", decision_data)
+
+            plot_decision(decision_data, args_plot_decision)
+
+    def get_decision_data(self, sim_steps: list):
+        """Get the decision data of all the robots.
+
+        Args:
+            sim_steps: Time step instances to get decision data from.
+
+        Returns:
+            A dict in the form {sp_1: {ss_11: decision_11, ss_12: decision_12, ...},
+                                sp_2: {ss_21: decision_21, ss_22: decision_22, ...},
+                                sp_3: {ss_31: decision_31, ss_32: decision_32, ...},
+                                ...}
+        """
+
+        # Convert the beliefs into decisions
+        if not self.decision_fraction:
+            self.compute_correct_decision()
+            self.compute_decision_fraction()
+
+        return {
+            bp: {ss: self.decision_fraction[bp][ss] for ss in sim_steps
+                } for bp in self.benchmark_param_range
+        }
+
+    def compute_correct_decision(self):
+        self.correct_decision = 0 if self.tfr < 0.5 else 1
+
+    def compute_decision_fraction(self):
+        # self.data is a dict of sp: trials: num_agents
+
+        # Calculate the fractions by each sp value
+        total_agents = self.num_agents * self.num_trials
+
+        for sp, np_array_data in self.data.items(): # np_array_data is num_trials x num_agents x num_steps x 1
+
+            self.decision_fraction[sp] = np.asarray(
+                [
+                    np.count_nonzero(np_array_data[:,:,i] == self.correct_decision) / total_agents
+                    for i in range(self.num_steps + 1)
+                ]
+            )
+
+            """ Commenting the following (for now?) because we can just `ask' the robots what their decisions
+            are at specific time steps. If they haven't come to a decision yet, we consider that as an `incorrect'
+            decision.
+            """
+
+            # # Find the time step when each agent makes their decision
+            # first_decision_indices = np.argmax(np_array_data[0] != -1, axis = 1) # this returns an index of 0 if not found any 0s or 1s
+
+            # # Get the latest timestep where everyone has made their decision
+            # last_decision_ind = max(first_decision_indices)
+
+            # if not self.collectively_decided: # that means not all have decided
+            #     last_decision_ind = self.num_steps # set to the last timestep
+
+            # # Get the decisions of everyone at that timestep
+            # decisions = np_array_data[0][:,last_decision_ind]
+            # print("debug??!?!",first_decision_indices, last_decision_ind, decisions)
+
+            # first_decision_indices = np.argmax(np_array_data[1] != -1, axis = 1) # this returns an index of 0 if not found any 0s or 1s
+            # last_decision_ind = max(first_decision_indices)
+
+            # if not self.collectively_decided: # that means not all have decided
+            #     last_decision_ind = self.num_steps # set to the last timestep
+
+            # # Get the decisions of everyone at that timestep
+            # decisions = np_array_data[1][:,last_decision_ind]
+            # print("debug??!?!",first_decision_indices, last_decision_ind, decisions)
+
+
+    def decode_data_str(self, data_str_vec):
+        """Decodes the array of data string.
+
+        Args:
+            data_str_vec: List of lists of data string for all robots (across all time steps) in a single trial
+
+        Returns:
+            Numpy array of decisions for the robots across all time steps (num_agents x num_timesteps x 1)
+        """
+        # data_str_vec is a num_agents x num_steps list of lists
+        return np.asarray([[[int(elem.split(",")[3])] for elem in row] for row in data_str_vec]) # the 4th element is the decision
 
 class Visualizer:
 
@@ -559,7 +736,7 @@ class Visualizer:
             Crosscombe2017Visualizer.BENCHMARK_PARAM_ABBR.upper(),
             nargs="+",
             type=float,
-            help="flawed robot ratio (space-delimited array) to use in plotting collective decision data"
+            help="flawed robot ratios (space-delimited array) to use in plotting collective decision data"
         )
 
         crosscombe_2017_viz_type_series_subparser.add_argument( # might want to provide this from the derived class
@@ -568,7 +745,47 @@ class Visualizer:
             help="flawed robot ratio to use in plotting time series data"
         )
 
+        # Ebert 2020 arguments
+        ebert_2020_subparser = benchmark_type_subparser.add_parser(
+            Ebert2020Visualizer.BENCHMARK_STR,
+            help="{0} benchmark".format(Ebert2020Visualizer.BENCHMARK_STR)
+        )
+
+        ebert_2020_viz_type_subparser = ebert_2020_subparser.add_subparsers(
+            dest="viz_type",
+            required=True,
+            help="commands for visualization type"
+        )
+
+        ebert_2020_viz_type_decision_subparser = ebert_2020_viz_type_subparser.add_parser(
+            "decision",
+            help="visualize collective-decision making data"
+        )
+
+        ebert_2020_viz_type_decision_subparser.add_argument( # might want to provide this from the derived class
+            Ebert2020Visualizer.BENCHMARK_PARAM_ABBR.upper(),
+            nargs="+",
+            type=float,
+            help="sensor probabilities (space-delimited array) to use in plotting collective decision data"
+        )
+
         args = parser.parse_args()
 
+        # Initialize visualizer objects
         if args.benchmark == Crosscombe2017Visualizer.BENCHMARK_STR:
             self.benchmark_visualizer = Crosscombe2017Visualizer(args)
+
+        elif args.benchmark == Ebert2020Visualizer.BENCHMARK_STR:
+            self.benchmark_visualizer = Ebert2020Visualizer(args)
+
+        # Generate plots
+        start = timeit.default_timer()
+
+        self.benchmark_visualizer.generate_plot(args)
+
+        end = timeit.default_timer()
+
+        print('Elapsed time:', end - start)
+
+        if args.s:
+            plt.show()

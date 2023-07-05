@@ -1761,6 +1761,53 @@ def adjust_subplot_legend_and_axis(subplot_fig, subplot_ax):
         handles, labels, loc="center right", bbox_to_anchor=(box_2.width * 1.25, 0.5)
     )
 
+def export_decision_data(decision_data: dict, filepath=None, curr_time=None):
+    """Serialize the class into a pickle.
+    """
+
+    """ Verify that the decision has the following format:
+    {
+        sensor_prob_1 (float):
+        {
+            sim_step_11 (int): decision_11 (float),
+            sim_step_12 (int): decision_12 (float),
+            ...
+        },
+        sensor_prob_2 (float):
+        {
+            sim_step_21 (int): decision_21 (float),
+            sim_step_22 (int): decision_22 (float),
+            ...
+        },
+        sensor_prob_3 (float):
+        {
+            sim_step_31 (int): decision_31 (float),
+            sim_step_32 (int): decision_32 (float),
+            ...
+        },
+        ...
+    }
+    """
+    for sensor_prob, inner_dict in decision_data.items():
+        assert(isinstance(sensor_prob, float))
+        for sim_step, decision_fraction in inner_dict.items():
+            assert(isinstance(sim_step, int))
+            assert(isinstance(decision_fraction, float))
+
+    # Get current time
+    if curr_time is None:
+        curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
+
+    if filepath:
+        save_path = filepath + "_" + curr_time + ".decd"
+    else:
+        save_path = "decd_" + curr_time + ".decd"
+
+    with open(save_path, "wb") as fopen:
+        pickle.dump(decision_data, fopen, pickle.HIGHEST_PROTOCOL)
+
+    print("\nSaved DecisionData object at: {0}.\n".format( os.path.abspath(save_path) ) )
+
 class Visualizer:
 
     def __init__(self, data_type):
