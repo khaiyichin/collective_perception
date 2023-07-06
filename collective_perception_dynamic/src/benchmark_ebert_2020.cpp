@@ -149,6 +149,9 @@ void BenchmarkEbert2020::SetupExperiment(const int &trial_ind, const std::pair<d
 
     // Initialize JSON file
     InitializeJson();
+
+    // Initialize sim clock tracker
+    current_sim_clock_in_ticks_ = 0.0;
 }
 
 void BenchmarkEbert2020::PostStep()
@@ -156,11 +159,17 @@ void BenchmarkEbert2020::PostStep()
     // Iterate through robots to process their posterior and decision
     buzz_foreach_vm_func_(process_robot_posterior_prob_functor_);
 
-    // Terminate early if all the robots have decided
-    if (process_robot_posterior_prob_functor_.decided)
+    // Keep track of current sim clock time
+    ++current_sim_clock_in_ticks_;
+
+    // Record the time step that all the robots have collectively decided
+    if (curr_json_["collectively_decided_timestep"] == -1.0 &&
+        process_robot_posterior_prob_functor_.decided)
     {
-        curr_json_["collectively_decided"] = true;
-        CSimulator::GetInstance().Terminate();
+        argos::TConfigurationNode config_root_node = CSimulator::GetInstance().GetConfigurationRoot();
+        double ticks_per_sec;
+        GetNodeAttribute(GetNode(GetNode(config_root_node, "framework"), "experiment"), "ticks_per_second", ticks_per_sec);
+        curr_json_["collectively_decided_timestep"] = current_sim_clock_in_ticks_ / ticks_per_sec;
     }
 }
 
@@ -198,7 +207,7 @@ void BenchmarkEbert2020::InitializeJson()
     curr_json_["prior_param"] = data_.prior_param;
     curr_json_["credible_threshold"] = data_.credible_threshold;
     curr_json_["positive_feedback"] = data_.positive_feedback;
-    curr_json_["collectively_decided"] = false;
+    curr_json_["collectively_decided_timestep"] = -1.0;
 }
 
 void BenchmarkEbert2020::SaveData(const std::string &foldername_prefix /*=""*/)

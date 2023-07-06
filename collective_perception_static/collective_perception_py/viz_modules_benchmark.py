@@ -508,7 +508,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
             {key: 0 for key in args.SP} if isinstance(args.SP, list) else {args.SP: 0}
         self.positive_feedback = \
             {key: 0 for key in args.SP} if isinstance(args.SP, list) else {args.SP: 0}
-        self.collectively_decided = \
+        self.collectively_decided_timestep = \
             {key: 0 for key in args.SP} if isinstance(args.SP, list) else {args.SP: 0}
 
         self.initial_pass = {key: True for key in self.sp}
@@ -551,7 +551,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                             self.prior_param = json_dict["prior_param"]
                             self.credible_threshold = json_dict["credible_threshold"]
                             self.positive_feedback = json_dict["positive_feedback"]
-                            self.collectively_decided[json_dict["sp"]] = json_dict["collectively_decided"]
+                            self.collectively_decided_timestep[json_dict["sp"]] = json_dict["collectively_decided_timestep"]
 
                         self.data[json_dict["sp"]] = np.empty(
                             (
@@ -565,8 +565,8 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                         self.initial_pass[json_dict["sp"]] = False
 
                     # Warn if the data contains undecided robots
-                    self.collectively_decided = json_dict["collectively_decided"]
-                    if not self.collectively_decided:
+                    self.collectively_decided_timestep = json_dict["collectively_decided_timestep"]
+                    if self.collectively_decided_timestep == -1.0:
                         warnings.warn("Not all robots have collectively made a decision for this file: {0}".format(f))
 
                     # Decode json file into data
@@ -637,35 +637,6 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                     for i in range(self.num_steps + 1)
                 ]
             )
-
-            """ Commenting the following (for now?) because we can just `ask' the robots what their decisions
-            are at specific time steps. If they haven't come to a decision yet, we consider that as an `incorrect'
-            decision.
-            """
-
-            # # Find the time step when each agent makes their decision
-            # first_decision_indices = np.argmax(np_array_data[0] != -1, axis = 1) # this returns an index of 0 if not found any 0s or 1s
-
-            # # Get the latest timestep where everyone has made their decision
-            # last_decision_ind = max(first_decision_indices)
-
-            # if not self.collectively_decided: # that means not all have decided
-            #     last_decision_ind = self.num_steps # set to the last timestep
-
-            # # Get the decisions of everyone at that timestep
-            # decisions = np_array_data[0][:,last_decision_ind]
-            # print("debug??!?!",first_decision_indices, last_decision_ind, decisions)
-
-            # first_decision_indices = np.argmax(np_array_data[1] != -1, axis = 1) # this returns an index of 0 if not found any 0s or 1s
-            # last_decision_ind = max(first_decision_indices)
-
-            # if not self.collectively_decided: # that means not all have decided
-            #     last_decision_ind = self.num_steps # set to the last timestep
-
-            # # Get the decisions of everyone at that timestep
-            # decisions = np_array_data[1][:,last_decision_ind]
-            # print("debug??!?!",first_decision_indices, last_decision_ind, decisions)
-
 
     def decode_data_str(self, data_str_vec):
         """Decodes the array of data string.

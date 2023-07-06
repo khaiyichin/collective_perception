@@ -458,6 +458,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         int size;
         float range;
 
+#ifdef ARGOS_EMANE
         try
         {
             auto &rab_map = space_ptr_->GetEntitiesByType("rab");
@@ -465,7 +466,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
             size = rab_map.size();
             range = random_rab.GetRange();
         }
-        catch (CARGoSException& ex1)
+        catch (CARGoSException &ex1)
         {
             try
             {
@@ -474,13 +475,19 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
                 size = emane_map.size();
                 range = random_emane.GetRange();
             }
-            catch (CARGoSException& ex2)
+            catch (CARGoSException &ex2)
             {
                 THROW_ARGOSEXCEPTION_NESTED("Cannot find the correct entities for range and bearing actuators/sensors.", ex2);
             }
         }
+#else
+        auto &rab_map = space_ptr_->GetEntitiesByType("rab");
+        CRABEquippedEntity &random_rab = *any_cast<CRABEquippedEntity *>(rab_map.begin()->second);
+        size = rab_map.size();
+        range = random_rab.GetRange();
+#endif
 
-        simulation_parameters_.num_agents_ = size;         // the number of range and bearing sensors is the same as the number of robots
+        simulation_parameters_.num_agents_ = size;   // the number of range and bearing sensors is the same as the number of robots
         simulation_parameters_.comms_range_ = range; // all the range and bearing sensors have the same range
         simulation_parameters_.density_ = simulation_parameters_.num_agents_ * M_PI * std::pow(simulation_parameters_.comms_range_, 2) /
                                           constrained_area; // the density is the ratio of swarm communication area to total walkable area

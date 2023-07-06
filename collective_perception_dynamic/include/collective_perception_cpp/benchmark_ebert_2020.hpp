@@ -136,6 +136,8 @@ public:
     inline std::string GetParameterKeywordAbbr() { return EBERT_2020_PARAM_ABBR; }
 
 private:
+    double current_sim_clock_in_ticks_;
+
     ProcessRobotPosteriorProb process_robot_posterior_prob_functor_;
 
     std::shared_ptr<RobotIdDataStrMap> id_data_str_map_ptr_;

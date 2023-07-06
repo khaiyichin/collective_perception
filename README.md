@@ -67,7 +67,7 @@ To create simulator containers, only `apptainer` is required; the other requirem
     When the build finishes you should see the `protobuf_no_qt_layer.sif` container.
 4. Build the final layer.
     ```
-    $ sudo apptainer build multi_agent_sim_full_no_qt.sif ../def/multi_agent_sim_full_no_qt.sif
+    $ sudo apptainer build multi_agent_sim_full_no_qt.sif ../def/multi_agent_sim_full_no_qt.def
     ```
     When the build finishes you should see the multi_agent_sim_full_no_qt.sif container.
 
