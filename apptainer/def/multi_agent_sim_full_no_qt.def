@@ -1,15 +1,16 @@
 Bootstrap: localimage
-From: argos_buzz_protobuf_no_qt.sif
+From: argos_buzz_no_qt_base.sif
 
 %labels
     AUTHOR khaiyichin@gmail.com
-    VERSION 1.1.0
-    NAME multi_agent_sim_full
+    VERSION 1.2.0
+    NAME multi_agent_sim_full_no_qt
 
 %help
     SUMMARY
     This container contains the environment setup to execute the simulation for
-    both the static (Python-based) and dynamic multi-agent simulation (ARGoS-based).
+    both the static (Python-based) and dynamic multi-agent simulation (ARGoS-based)
+    without QT support (i.e., no visualization).
 
     CHANGELOG
     v1.0.0
@@ -17,6 +18,10 @@ From: argos_buzz_protobuf_no_qt.sif
 
     v1.1.0
     Removed files after installation.
+
+    v1.2.0
+    Added installation of Protobuf so that source install is unneeded (i.e., no need for
+    a intermediate image that builds protobuf from source).
 
 %files
     ../../collective_perception_dynamic/argos /collective_perception/collective_perception_dynamic/argos
@@ -56,7 +61,7 @@ From: argos_buzz_protobuf_no_qt.sif
 
     # Install graph-tool dependencies
     loginfo "YELLOWB" "Installing graph-tool dependencies..."
-    apt install -q -y gnupg ca-certificates python3.8-dev python3-pip libcairo2-dev
+    apt install -q -y gnupg ca-certificates python3.8-dev python3-pip libcairo2-dev protobuf-compiler
 
     # Install graph-tool
     loginfo "YELLOWB" "Installing graph-tool..."

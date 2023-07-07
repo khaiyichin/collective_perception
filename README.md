@@ -17,7 +17,7 @@ The robots in the dynamic topology simulator move around a square arena of black
 <img src="dynamic_sim_graphic.png" alt="Dynamic simulated experiment visualized" width="450"/>
 
 ### Benchmark algorithms
-In addition to our collective perception algorithm, benchmark algorithms are also provided in this repository to provide performance comparison. They are simulated in a similar fashion to the dynamic topology simulator. See the [benchmark algorithm documentation](docs/benchmark_algo_explained.md) for more information.
+In addition to our collective perception algorithm, simulators for benchmark algorithms are also provided in this repository to provide performance comparison. They are simulated in a similar fashion to the dynamic topology simulator. See the [benchmark algorithm documentation](docs/benchmark_algo_explained.md) for more information.
 
 ## Requirements
 ### Local build
@@ -26,7 +26,7 @@ In addition to our collective perception algorithm, benchmark algorithms are als
 - [ARGoS](https://github.com/ilpincy/argos3.git)
 - [Buzz](https://github.com/NESTLab/Buzz)
 - [ARGoS-KheperaIV plugin](https://github.com/ilpincy/argos3-kheperaiv) - *in this repository Khepera IVs are used, but with some modification to the experiment files you could potentially use other robot types*
-- [Protobuf v21.1+ (`proto3`)](https://github.com/protocolbuffers/protobuf.git) - *source build recommended, although the `apt` package version may work as well*
+- [Protobuf v3.6.1+ (`proto3`)](https://github.com/protocolbuffers/protobuf.git) - *can be installed using the `apt` package manager or built from source*
 - [GraphTool v2.45+](https://graph-tool.skewed.de/) - *can be installed using the `apt` package manager*
 
 ### Container
@@ -55,21 +55,16 @@ To create simulator containers, only `apptainer` is required; the other requirem
     ```
     $ cd apptainer && mkdir containers
     ```
-2. Build the first container, which provides the ARGoS and Buzz base.
+2. Build the first image, which provides the ARGoS and Buzz base.
     ```
-    $ sudo apptainer build argos_buzz_no_qt_base.sif ../def/argos_buzz_no_qt_base.def
+    $ sudo apptainer build argos_buzz_no_qt_base.sif ../def/argos_buzz_no_qt_base.def # no_qt indicates no QT support
     ```
     When the build finishes you should see the `argos_buzz_no_qt_base.sif` container.
-3. Build the second container on top of the previous container (specified in the definition file), which provides the Protobuf layer.
-    ```
-    $ sudo apptainer build protobuf_no_qt_layer.sif ../def/protobuf_no_qt_layer.def
-    ```
-    When the build finishes you should see the `protobuf_no_qt_layer.sif` container.
-4. Build the final layer.
+3. Build the complete simulator image. This image can only be built on top of the first image layer that is named `argos_buzz_no_qt_base.sif`.
     ```
     $ sudo apptainer build multi_agent_sim_full_no_qt.sif ../def/multi_agent_sim_full_no_qt.def
     ```
-    When the build finishes you should see the multi_agent_sim_full_no_qt.sif container.
+    When the build finishes you should see the `multi_agent_sim_full_no_qt.sif` container.
 
 ## Execution
 The instructions here describe scripts that provide a **single simulation execution**. In a single simulation execution, there can be multiple experiments, each of which may have repeated trials.
