@@ -16,7 +16,7 @@ SIFFILE=$2
 OUTPUTDIR=$3
 
 # Define varying parameters
-SPEED=(10.0 15.0 20.0 25.0) # cm/s
+SPEED=(14.14) # cm/s
 POSITION=(4.436599480604251 3.1517942390846527 2.011746925739275 1.4371645541621039) # for D = (1 2 5 10) with number of agents = 50
 DENSITY=(1 2 5 10)
 THREADS=40
@@ -43,11 +43,6 @@ sed -i "s/<verbosity.*/<verbosity level=\"full\" \/>/" $ARGOSFILE # verbosity
 sed -i "s/<legacy.*/<legacy bool=\"$LEGACY\" \/>/" $ARGOSFILE # legacy equations
 sed -i "s/<experiment.*/<experiment length=\"$STEPS\" ticks_per_second=\"10\" random_seed=\"0\" \/>/" $ARGOSFILE # experiment length
 sed -i "s/<entity.*/<entity quantity=\"$AGENTS\" max_trials=\"100\" base_num=\"0\">/" $ARGOSFILE
-if [ $AGENTS -ge 100 ]; then # thread number
-    sed -i "s/<system threads=.*/<system threads=\"$THREADS\" \/>/" $ARGOSFILE
-else
-    sed -i "s/<system threads=.*/<system threads=\"0\" \/>/" $ARGOSFILE
-fi
 sed -i "s/<arena size.*/<arena size=\"$ARENA_LEN, $ARENA_LEN, 1\" center=\"0,0,0.5\">/" $ARGOSFILE # arena size
 sed -i "s/<box id=\"wall_north\".*/<box id=\"wall_north\" size=\"10,$WALL_THICKNESS,0.5\" movable=\"false\">/" $ARGOSFILE # north wall size
 sed -i "s/<box id=\"wall_south\".*/<box id=\"wall_south\" size=\"10,$WALL_THICKNESS,0.5\" movable=\"false\">/" $ARGOSFILE # south wall size
@@ -81,7 +76,7 @@ sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,1
             sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,10,0.5\" movable=\"false\">\n            <body position=\"-$pos,0,0\" orientation=\"0,0,0\" \/>/" $ARGOSFILE
             sed -i "s/<position method=\"uniform\".*/<position method=\"uniform\" min=\"-$pos,-$pos,0\" max=\"$pos,$pos,0\" \/>/" $ARGOSFILE
 
-            singularity exec $SIFFILE /collective_perception/collective_perception_dynamic/build/src/run_dynamic_simulations -l /dev/null -c $ARGOSFILE
+            apptainer exec $SIFFILE /collective_perception/collective_perception_dynamic/build/src/run_dynamic_simulations -l /dev/null -c $ARGOSFILE
 
             # Copy and move the data
             folder="spd${speed}_den${DENSITY[j]}" # concatenate string and numbers as folder name

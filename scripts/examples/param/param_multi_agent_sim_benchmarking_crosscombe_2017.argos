@@ -68,7 +68,6 @@
           ...
       -->
             <actuators>
-                <kheperaiv_ground implementation="rot_z_only" />
                 <differential_steering implementation="default" />
                 <range_and_bearing implementation="default" />
             </actuators>
@@ -89,7 +88,7 @@
           function.
           The user, writing the controller, defines how it is organized.
       -->
-            <params bytecode_file="collective_perception/collective_perception_dynamic/build/buzz/body_crosscombe_2017.bo" debug_file="collective_perception/collective_perception_dynamic/build/buzz/body_crosscombe_2017.bdb" />
+            <params bytecode_file="/collective_perception/collective_perception_dynamic/build/buzz/body_crosscombe_2017.bo" debug_file="/collective_perception/collective_perception_dynamic/build/buzz/body_crosscombe_2017.bdb" />
         </buzz_controller_kheperaiv>
 
     </controllers>
@@ -98,12 +97,13 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="collective_perception/collective_perception_dynamic/build/src/libbenchmarking_loop_functions" label="benchmarking_loop_functions">
+    <loop_functions library="/collective_perception/collective_perception_dynamic/build/src/libbenchmarking_loop_functions" label="benchmarking_loop_functions">
         <benchmarking>
             <algorithm type="crosscombe_2017">
-                <num_possible_options int="10" />
+                <num_possible_options value="10" />
                 <flawed_robot_ratio_range min="0.1" max="0.5" steps="2" />
             </algorithm>
+            <arena_tiles tile_count_x="500" tile_count_y="500" /> <!-- number of tiles for the arena -->
             <fill_ratio_range min="0.55" max="0.95" steps="2" /> <!-- range of target fill ratios -->
             <num_trials value="5" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <speed value="14.14" /> <!-- in units of cm/s -->

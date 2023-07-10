@@ -87,17 +87,17 @@ function step()
         communicate_tx("obs_or_decision", encounter_observation_table.observation)
     }
 
-    # Update beta posterior parameters
+    # Update beta posterior parameters (our convention is f = 1.0 is all black and f = 0.0 is all white)
     foreach(received_vals,
         function(key, value)
         {
             if (value == WHITE_OBS) # white observation or decision
             {
-                alpha = alpha + 1
+                beta = beta + 1
             }
             else if (value == BLACK_OBS) # black observation or decision
             {
-                beta = beta + 1
+                alpha = alpha + 1
             }
         }
     )

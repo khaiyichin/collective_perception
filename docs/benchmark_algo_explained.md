@@ -202,7 +202,7 @@ JSON data:
     */
     "frr": 0.1,                     // flawed robot ratio in this trial (float)
     "num_flawed_robots": 3,         // number of flawed robots in this trial (int); is the rounded value of frr*num_agents
-    "option_qualities": [           // quality of the options (array of int); dictates broadcast duration in units of time steps
+    "option_qualities": [           // quality of the options (array of int); dictates broadcast duration in units of ticks (see .argos configuration file for ticks_per_sec)
         0,
         0,
         0,
@@ -288,29 +288,29 @@ optional arguments:
 JSON data:
 ```json
 {
-    "sim_type": "ebert_2020",       // benchmark algorithm identifier (string)
+    "sim_type": "ebert_2020",               // benchmark algorithm identifier (string)
     /* 
-    ...                             // common data output
+    ...                                     // common data output
     */
-    "sp": 0.675,                    // sensor probability in this trial (float)
-    "prior_param": 10,              // prior distribution parameters, i.e., BetaDist(alpha=prior_param, beta=prior_param) (int)
-    "credible_threshold": 0.99,     // credible threshold (float)
-    "positive_feedback": false,     // positive feedback flag (bool)
-    "collectively_decided": false,  // flag that indicates whether the robots have each made a decision (bool)
-    "data_str": [                   // data string array of arrays; data string has the form "<A>,<B>,<P>,<D>" where
-                                    //      <A> = alpha parameter of Beta distribution
-                                    //      <B> = beta parameter of Beta distribution
-                                    //      <P> = P(X < 0.5) where X ~ BetaDist(alpha=<A>, beta=<B>)
-                                    //      <D> = decision made by the robot
-        [                           // data string of robot 0 (array of string)
-            "10,11,0.588099,-1",    // data string of robot 0 at time = 0 (string)
-            "13,12,0.419410,-1",    // data string of robot 0 at time = 1 (string)
+    "sp": 0.675,                            // sensor probability in this trial (float)
+    "prior_param": 10,                      // prior distribution parameters, i.e., BetaDist(alpha=prior_param, beta=prior_param) (int)
+    "credible_threshold": 0.99,             // credible threshold (float)
+    "positive_feedback": false,             // positive feedback flag (bool)
+    "collectively_decided_timestep": 13.8,  // timestep in seconds that all robots have come to a decision (float)
+    "data_str": [                           // data string array of arrays; data string has the form "<A>,<B>,<P>,<D>" where
+                                            //      <A> = alpha parameter of Beta distribution
+                                            //      <B> = beta parameter of Beta distribution
+                                            //      <P> = P(X < 0.5) where X ~ BetaDist(alpha=<A>, beta=<B>)
+                                            //      <D> = decision made by the robot
+        [                                   // data string of robot 0 (array of string)
+            "10,11,0.588099,-1",            // data string of robot 0 at time = 0 (string)
+            "13,12,0.419410,-1",            // data string of robot 0 at time = 1 (string)
             "15,14,0.425277,-1",
             "16,17,0.569975,-1",
             "18,19,0.566030,-1",
         ],
-        [                           // data string of robot 1
-            "11,10,0.411901,-1",    // data string of robot 1 at time step = 0 (string)
+        [                                   // data string of robot 1
+            "11,10,0.411901,-1",            // data string of robot 1 at time step = 0 (string)
             "12,12,0.500000,-1",
             "15,12,0.278599,-1",
             "15,15,0.500000,-1",
@@ -326,7 +326,7 @@ JSON data:
         [
             "10,11,0.588099,-1",
             "11,13,0.661180,-1",
-            "11,16,0.836530,-1",    // data string of robot 3 at time step = 2 (string)
+            "11,16,0.836530,-1",            // data string of robot 3 at time step = 2 (string)
             "12,18,0.867535,-1",
             "14,19,0.811457,-1",
         ]

@@ -12,6 +12,7 @@ import warnings
 from .viz_modules import line, \
                          YMIN_DECISION, \
                          YMAX_DECISION, \
+                         FIXED_SENSOR_PROBABILITY_BINS, \
                          activate_subplot_grid_lines
 
 
@@ -66,6 +67,7 @@ def plot_decision(decision_data, args):
     """
 
     benchmark_str = args["benchmark_str"]
+    benchmark_param_abbr = args["benchmark_param_abbr"]
     tfr = args["tfr"]
     benchmark_param_range = args["benchmark_param_range"]
     num_trials = args["num_trials"]
@@ -90,29 +92,35 @@ def plot_decision(decision_data, args):
     # Convert sensor probability values into IDs used for deciding marker colors (the colors are fixed for sensor probability values)
     id_lst = []
 
-    for bp in benchmark_param_range:
-        id_lst.append(
-            np.digitize(bp, benchmark_param_range) # may not be the correct variable to use
-        )
+    # For benchmark data whose params are sensor probabilities
+    if benchmark_param_abbr == "sp":
+        for bp in benchmark_param_range:
+            if bp >= 0.0: id_lst.append(np.digitize(bp, FIXED_SENSOR_PROBABILITY_BINS)) # homogeneous sensor probabilities
+            else: id_lst.append(0) # the distributed sensor probability case uses the black marker
+    else:
+        for bp in benchmark_param_range:
+            id_lst.append(
+                np.digitize(bp, benchmark_param_range) # may not be the correct variable to use
+            )
 
     # Define array of colors according to the nipy_spectral colormap
-    c = plt.cm.nipy_spectral(np.array(id_lst) / (num_options - 1))
+    c = plt.cm.nipy_spectral(np.array(id_lst) / (len(FIXED_SENSOR_PROBABILITY_BINS) - 1))
 
     # Check the decision fraction of each sensor probability to find the ones that clutter close to 1 (using 0.9 as a threshold)
-    # cluttered_keys = set()
-    # for sp_dict in decision_data.values():
-    #     cluttered_keys.update((k for k, v in sp_dict.items() if v > 0.9))
+    cluttered_keys = set()
+    for sp_dict in decision_data.values():
+        cluttered_keys.update((k for k, v in sp_dict.items() if v > 0.9))
 
     # # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
     max_comms_rounds = max(sim_steps)
-    # offset = (
-    #     np.linspace(
-    #         0,
-    #         1,
-    #         len(decision_data.keys())) * max_comms_rounds / 10 - max_comms_rounds / 20
-    # ).tolist()
-    # offset = [offset.pop(0) if bp in decision_data.keys() else 0.0 for _, bp in enumerate(benchmark_param_range)]
-    offset = [0] # @todo: unsure if staggering is needed
+    offset = (
+        np.linspace(
+            0,
+            1,
+            len(decision_data.keys())) * max_comms_rounds / 10 - max_comms_rounds / 20
+    ).tolist()
+    offset = [offset.pop(0) if bp in decision_data.keys() else 0.0 for _, bp in enumerate(benchmark_param_range)]
+    # offset = [0] # @todo: unsure if staggering is needed
 
     # Plot the lines for each sensor probability
     for ind, s in enumerate(benchmark_param_range):
@@ -159,7 +167,11 @@ def plot_decision(decision_data, args):
 
     # Create color bar
     color_bar_img = np.array(id_lst, ndmin=2).T
-    ax_lst[1].imshow(color_bar_img, aspect=2, cmap="nipy_spectral", vmin=0, vmax=num_options - 1)
+    ax_lst[1].imshow(color_bar_img,
+                     aspect=2,
+                     cmap="nipy_spectral",
+                     vmin=0,
+                     vmax=len(FIXED_SENSOR_PROBABILITY_BINS) - 1)
 
     # Modify tick labels
     ax_lst[1].yaxis.set_label_position("right")
@@ -296,26 +308,31 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
                     with open(os.path.join(root, f), "r") as file:
                         json_dict = json.load(file)
 
+                    benchmark_param_abbr = np.round(json_dict[self.BENCHMARK_PARAM_ABBR], 3)
+                    density = np.round(json_dict["density"])
+                    comms_range = np.round(json_dict["comms_range"])
+                    speed = np.round(json_dict["speed"])
+
                     # Store only the data that matches the desired tfr and benchmark param
-                    if (json_dict["tfr"] != self.tfr or json_dict[self.BENCHMARK_PARAM_ABBR] not in self.frr):
+                    if (json_dict["tfr"] != self.tfr or benchmark_param_abbr not in self.frr):
                         continue
 
                     # Initialize data
-                    if self.initial_pass[json_dict["frr"]]:
+                    if self.initial_pass[benchmark_param_abbr]:
 
                         # Store common parameters only for the first pass
                         if all(val_bool for val_bool in self.initial_pass.values()):
                             self.num_trials = json_dict["num_trials"]
                             self.num_agents = json_dict["num_agents"]
                             self.num_steps = json_dict["num_steps"]
-                            self.comms_range = round(json_dict["comms_range"], 3)
-                            self.speed = round(json_dict["speed"], 3)
-                            self.density = round(json_dict["density"], 3)
+                            self.comms_range = round(comms_range, 3)
+                            self.speed = round(speed, 3)
+                            self.density = round(density, 3)
                             self.option_qualities = json_dict["option_qualities"]
                             self.num_options = len(self.option_qualities)
 
-                        self.num_flawed_agents[json_dict["frr"]] = json_dict["num_flawed_robots"]
-                        self.data[json_dict["frr"]] = np.empty(
+                        self.num_flawed_agents[benchmark_param_abbr] = json_dict["num_flawed_robots"]
+                        self.data[benchmark_param_abbr] = np.empty(
                             (
                                 self.num_trials,
                                 self.num_agents - json_dict["num_flawed_robots"],
@@ -324,10 +341,10 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
                             )
                         )
 
-                        self.initial_pass[json_dict["frr"]] = False
+                        self.initial_pass[benchmark_param_abbr] = False
 
                     # Decode json file into data
-                    self.data[json_dict["frr"]][json_dict["trial_ind"]] = \
+                    self.data[benchmark_param_abbr][json_dict["trial_ind"]] = \
                         self.decode_beliefs(json_dict["beliefs"])
 
     def generate_plot(self, args=None):
@@ -339,6 +356,7 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
 
             args_plot_decision = {
                 "benchmark_str": self.BENCHMARK_STR,
+                "benchmark_param_abbr": self.BENCHMARK_PARAM_ABBR,
                 "tfr": self.tfr,
                 "benchmark_param_range": self.benchmark_param_range, # this is so that the plot functions can use a generic value
                 "num_trials": self.num_trials,
@@ -533,27 +551,33 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                     with open(os.path.join(root, f), "r") as file:
                         json_dict = json.load(file)
 
+                    # Round off the density, speed, comms range, and benchmark param
+                    benchmark_param_abbr = np.round(json_dict[self.BENCHMARK_PARAM_ABBR], 3)
+                    density = np.round(json_dict["density"])
+                    comms_range = np.round(json_dict["comms_range"])
+                    speed = np.round(json_dict["speed"])
+
                     # Store only the data that matches the desired tfr and benchmark param
-                    if (json_dict["tfr"] != self.tfr or json_dict[self.BENCHMARK_PARAM_ABBR] not in self.sp):
+                    if (json_dict["tfr"] != self.tfr or benchmark_param_abbr not in self.sp):
                         continue
 
                     # Initialize data
-                    if self.initial_pass[json_dict["sp"]]:
+                    if self.initial_pass[benchmark_param_abbr]:
 
                         # Store common parameters only for the first pass
                         if all(val_bool for val_bool in self.initial_pass.values()):
                             self.num_trials = json_dict["num_trials"]
                             self.num_agents = json_dict["num_agents"]
                             self.num_steps = json_dict["num_steps"]
-                            self.comms_range = round(json_dict["comms_range"], 3)
-                            self.speed = round(json_dict["speed"], 3)
-                            self.density = round(json_dict["density"], 3)
+                            self.comms_range = round(comms_range, 3)
+                            self.speed = round(speed, 3)
+                            self.density = round(density, 3)
                             self.prior_param = json_dict["prior_param"]
                             self.credible_threshold = json_dict["credible_threshold"]
                             self.positive_feedback = json_dict["positive_feedback"]
-                            self.collectively_decided_timestep[json_dict["sp"]] = json_dict["collectively_decided_timestep"]
+                            self.collectively_decided_timestep[benchmark_param_abbr] = json_dict["collectively_decided_timestep"]
 
-                        self.data[json_dict["sp"]] = np.empty(
+                        self.data[benchmark_param_abbr] = np.empty(
                             (
                                 self.num_trials,
                                 self.num_agents,
@@ -562,7 +586,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                             )
                         )
 
-                        self.initial_pass[json_dict["sp"]] = False
+                        self.initial_pass[benchmark_param_abbr] = False
 
                     # Warn if the data contains undecided robots
                     self.collectively_decided_timestep = json_dict["collectively_decided_timestep"]
@@ -570,7 +594,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                         warnings.warn("Not all robots have collectively made a decision for this file: {0}".format(f))
 
                     # Decode json file into data
-                    self.data[json_dict["sp"]][json_dict["trial_ind"]] = \
+                    self.data[benchmark_param_abbr][json_dict["trial_ind"]] = \
                         self.decode_data_str(json_dict["data_str"])
 
     def generate_plot(self, args=None):
@@ -583,6 +607,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
 
             args_plot_decision = {
                 "benchmark_str": self.BENCHMARK_STR,
+                "benchmark_param_abbr": self.BENCHMARK_PARAM_ABBR,
                 "tfr": self.tfr,
                 "benchmark_param_range": self.benchmark_param_range, # this is so that the plot functions can use a generic value
                 "num_trials": self.num_trials,
@@ -592,8 +617,6 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                 "num_options": 2,
                 "colorbar_label": "Sensor Accuracies"
             }
-
-            print("debugg", plotted_sim_steps, "\n", decision_data)
 
             plot_decision(decision_data, args_plot_decision)
 
