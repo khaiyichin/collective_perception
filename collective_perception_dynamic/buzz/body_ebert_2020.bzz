@@ -55,11 +55,11 @@ function step()
 
     if (encounter_observation_table.observation == WHITE_OBS) # white observation or decision
     {
-        alpha = alpha + 1
+        beta = beta + 1
     }
     else if (encounter_observation_table.observation == BLACK_OBS) # black observation or decision
     {
-        beta = beta + 1
+        alpha = alpha + 1
     }
 
     # Communicate TX
