@@ -13,8 +13,11 @@ from .viz_modules import line, \
                          YMIN_DECISION, \
                          YMAX_DECISION, \
                          FIXED_SENSOR_PROBABILITY_BINS, \
-                         activate_subplot_grid_lines
+                         activate_subplot_grid_lines, \
+                         decode_sp_distribution_key
 
+# Default values
+OFFSET_STEP = lambda max_comms_rounds : max_comms_rounds / 40 # tuned value
 
 def plot_timeseries(time_arr, data, args):
     """Plot the time-series data.
@@ -113,7 +116,7 @@ def plot_decision(decision_data, args):
 
     # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
     max_comms_rounds = max(sim_steps)
-    offset_step = max_comms_rounds/40 # tuned value
+    offset_step = OFFSET_STEP(max_comms_rounds)
     num_cluttered_keys = len(cluttered_keys)
     offset = (
         np.arange(0, num_cluttered_keys*offset_step, offset_step) - (num_cluttered_keys - 1)*offset_step/2 # center around zero offset
@@ -148,6 +151,10 @@ def plot_decision(decision_data, args):
                 ms="35",    # marker size
                 c=c[ind]    # color
             )
+
+    # Modify the label for the uniformly distributed sensor probability case
+    if benchmark_param_abbr == "sp" and 0 in id_lst:
+        benchmark_param_range[id_lst.index(0)] = decode_sp_distribution_key(benchmark_param_range[id_lst.index(0)])
 
     # Add ticker formatter (mostly for the log scale that is unused for now, but may be helpful in the future)
     ticker_formatter = FuncFormatter(lambda y, _: "{:.4g}".format(y))
