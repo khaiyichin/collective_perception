@@ -68,8 +68,8 @@ def plot_decision(decision_data, args):
 
     benchmark_str = args["benchmark_str"]
     benchmark_param_abbr = args["benchmark_param_abbr"]
-    tfr = args["tfr"]
     benchmark_param_range = args["benchmark_param_range"]
+    tfr = args["tfr"]
     num_trials = args["num_trials"]
     sim_steps = args["sim_steps"]
     speed = args["speed"]
@@ -86,7 +86,7 @@ def plot_decision(decision_data, args):
         tight_layout=True,
         figsize=fig_size,
         dpi=175,
-        gridspec_kw={"width_ratios": [6*num_options/len(benchmark_param_range), 1]}
+        gridspec_kw={"width_ratios": [6, 1]}
     )
 
     # Convert sensor probability values into IDs used for deciding marker colors (the colors are fixed for sensor probability values)
@@ -108,19 +108,18 @@ def plot_decision(decision_data, args):
 
     # Check the decision fraction of each sensor probability to find the ones that clutter close to 1 (using 0.9 as a threshold)
     cluttered_keys = set()
-    for sp_dict in decision_data.values():
-        cluttered_keys.update((k for k, v in sp_dict.items() if v > 0.9))
+    for sp, decision_fraction_dict in decision_data.items():
+        cluttered_keys.update((sp for v in decision_fraction_dict.values() if v > 0.95))
 
-    # # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
+    # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
     max_comms_rounds = max(sim_steps)
+    offset_step = max_comms_rounds/40 # tuned value
+    num_cluttered_keys = len(cluttered_keys)
     offset = (
-        np.linspace(
-            0,
-            1,
-            len(decision_data.keys())) * max_comms_rounds / 10 - max_comms_rounds / 20
+        np.arange(0, num_cluttered_keys*offset_step, offset_step) - (num_cluttered_keys - 1)*offset_step/2 # center around zero offset
     ).tolist()
-    offset = [offset.pop(0) if bp in decision_data.keys() else 0.0 for _, bp in enumerate(benchmark_param_range)]
-    # offset = [0] # @todo: unsure if staggering is needed
+    offset = [offset.pop(0) if bp in cluttered_keys else 0.0
+              for bp in benchmark_param_range] # add 0.0 offsets if the benchmark param is not in cluttered keys
 
     # Plot the lines for each sensor probability
     for ind, s in enumerate(benchmark_param_range):
@@ -143,7 +142,7 @@ def plot_decision(decision_data, args):
         consensus_ind = [i for i, p in enumerate(points) if p == 1.0]
         if consensus_ind:
             line(
-                line_data=[np.array(sim_steps[consensus_ind]), [1.0]*len(consensus_ind)],
+                line_data=[np.array(sim_steps[consensus_ind]) + offset[ind], [1.0]*len(consensus_ind)],
                 ax=ax_lst[0],
                 marker="|", # marker type
                 ms="35",    # marker size
@@ -308,17 +307,17 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
                     with open(os.path.join(root, f), "r") as file:
                         json_dict = json.load(file)
 
-                    benchmark_param_abbr = np.round(json_dict[self.BENCHMARK_PARAM_ABBR], 3)
+                    benchmark_param_abbr_val = np.round(json_dict[self.BENCHMARK_PARAM_ABBR], 3)
                     density = np.round(json_dict["density"])
                     comms_range = np.round(json_dict["comms_range"])
                     speed = np.round(json_dict["speed"])
 
                     # Store only the data that matches the desired tfr and benchmark param
-                    if (json_dict["tfr"] != self.tfr or benchmark_param_abbr not in self.frr):
+                    if (json_dict["tfr"] != self.tfr or benchmark_param_abbr_val not in self.frr):
                         continue
 
                     # Initialize data
-                    if self.initial_pass[benchmark_param_abbr]:
+                    if self.initial_pass[benchmark_param_abbr_val]:
 
                         # Store common parameters only for the first pass
                         if all(val_bool for val_bool in self.initial_pass.values()):
@@ -331,8 +330,8 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
                             self.option_qualities = json_dict["option_qualities"]
                             self.num_options = len(self.option_qualities)
 
-                        self.num_flawed_agents[benchmark_param_abbr] = json_dict["num_flawed_robots"]
-                        self.data[benchmark_param_abbr] = np.empty(
+                        self.num_flawed_agents[benchmark_param_abbr_val] = json_dict["num_flawed_robots"]
+                        self.data[benchmark_param_abbr_val] = np.empty(
                             (
                                 self.num_trials,
                                 self.num_agents - json_dict["num_flawed_robots"],
@@ -341,17 +340,17 @@ class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
                             )
                         )
 
-                        self.initial_pass[benchmark_param_abbr] = False
+                        self.initial_pass[benchmark_param_abbr_val] = False
 
                     # Decode json file into data
-                    self.data[benchmark_param_abbr][json_dict["trial_ind"]] = \
+                    self.data[benchmark_param_abbr_val][json_dict["trial_ind"]] = \
                         self.decode_beliefs(json_dict["beliefs"])
 
     def generate_plot(self, args=None):
 
         # Generate decision plot
         if args.viz_type == "decision":
-            plotted_sim_steps = [i for i in range(0, self.num_steps + 1, args.step_inc)]
+            plotted_sim_steps = np.arange(args.step_inc, self.num_steps+1, args.step_inc)
             decision_data = self.get_decision_data(plotted_sim_steps)
 
             args_plot_decision = {
@@ -552,17 +551,17 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                         json_dict = json.load(file)
 
                     # Round off the density, speed, comms range, and benchmark param
-                    benchmark_param_abbr = np.round(json_dict[self.BENCHMARK_PARAM_ABBR], 3)
+                    benchmark_param_abbr_val = np.round(json_dict[self.BENCHMARK_PARAM_ABBR], 3)
                     density = np.round(json_dict["density"])
                     comms_range = np.round(json_dict["comms_range"])
                     speed = np.round(json_dict["speed"])
 
                     # Store only the data that matches the desired tfr and benchmark param
-                    if (json_dict["tfr"] != self.tfr or benchmark_param_abbr not in self.sp):
+                    if (json_dict["tfr"] != self.tfr or benchmark_param_abbr_val not in self.sp):
                         continue
 
                     # Initialize data
-                    if self.initial_pass[benchmark_param_abbr]:
+                    if self.initial_pass[benchmark_param_abbr_val]:
 
                         # Store common parameters only for the first pass
                         if all(val_bool for val_bool in self.initial_pass.values()):
@@ -575,9 +574,9 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                             self.prior_param = json_dict["prior_param"]
                             self.credible_threshold = json_dict["credible_threshold"]
                             self.positive_feedback = json_dict["positive_feedback"]
-                            self.collectively_decided_timestep[benchmark_param_abbr] = json_dict["collectively_decided_timestep"]
+                            self.collectively_decided_timestep[benchmark_param_abbr_val] = json_dict["collectively_decided_timestep"]
 
-                        self.data[benchmark_param_abbr] = np.empty(
+                        self.data[benchmark_param_abbr_val] = np.empty(
                             (
                                 self.num_trials,
                                 self.num_agents,
@@ -586,7 +585,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                             )
                         )
 
-                        self.initial_pass[benchmark_param_abbr] = False
+                        self.initial_pass[benchmark_param_abbr_val] = False
 
                     # Warn if the data contains undecided robots
                     self.collectively_decided_timestep = json_dict["collectively_decided_timestep"]
@@ -594,7 +593,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                         warnings.warn("Not all robots have collectively made a decision for this file: {0}".format(f))
 
                     # Decode json file into data
-                    self.data[benchmark_param_abbr][json_dict["trial_ind"]] = \
+                    self.data[benchmark_param_abbr_val][json_dict["trial_ind"]] = \
                         self.decode_data_str(json_dict["data_str"])
 
     def generate_plot(self, args=None):
@@ -602,7 +601,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
         if args.viz_type == "decision":
             if self.num_steps < args.step_inc: raise Exception("Step increments is too large for number of timesteps available.")
 
-            plotted_sim_steps = [i for i in range(0, self.num_steps + 1, args.step_inc)]
+            plotted_sim_steps = np.arange(args.step_inc, self.num_steps+1, args.step_inc)
             decision_data = self.get_decision_data(plotted_sim_steps)
 
             args_plot_decision = {
