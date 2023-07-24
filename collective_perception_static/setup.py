@@ -63,6 +63,7 @@ setuptools.setup(
         "scripts/extract_local_values_to_viz_data.py",
         "scripts/extract_vd_from_vdg.py",
         "scripts/combine_vd_static.py",
-        "scripts/export_decision_data.py"
+        "scripts/export_decision_data.py",
+        "scripts/visualize_benchmark_performance_ratio.py"
     ]
 )

@@ -1761,34 +1761,50 @@ def adjust_subplot_legend_and_axis(subplot_fig, subplot_ax):
         handles, labels, loc="center right", bbox_to_anchor=(box_2.width * 1.25, 0.5)
     )
 
-def export_decision_data(decision_data: dict, filepath=None, curr_time=None):
-    """Serialize the class into a pickle.
+def serialize_decision_data(extracted_data: dict, filepath=None, curr_time=None):
+    """Serialize the decision data dict into a pickle.
     """
 
     """ Verify that the decision has the following format:
     {
-        sensor_prob_1 (float):
+        'meta_data':
         {
-            sim_step_11 (int): decision_11 (float),
-            sim_step_12 (int): decision_12 (float),
-            ...
+            'data_type': (str),
+            'density': (float),
+            'extracted_sim_steps': (list of ints),
+            'num_agents': (int),
+            'num_options': (int),
+            'num_steps': (int),
+            'num_trials': (int),
+            'sp': (list of floats),
+            'speed': (float),
+            'tfr': (float)
         },
-        sensor_prob_2 (float):
+        'dec_data':
         {
-            sim_step_21 (int): decision_21 (float),
-            sim_step_22 (int): decision_22 (float),
+            sensor_prob_1 (float):
+            {
+                sim_step_11 (int): decision_11 (float),
+                sim_step_12 (int): decision_12 (float),
+                ...
+            },
+            sensor_prob_2 (float):
+            {
+                sim_step_21 (int): decision_21 (float),
+                sim_step_22 (int): decision_22 (float),
+                ...
+            },
+            sensor_prob_3 (float):
+            {
+                sim_step_31 (int): decision_31 (float),
+                sim_step_32 (int): decision_32 (float),
+                ...
+            },
             ...
-        },
-        sensor_prob_3 (float):
-        {
-            sim_step_31 (int): decision_31 (float),
-            sim_step_32 (int): decision_32 (float),
-            ...
-        },
-        ...
+        }
     }
     """
-    for sensor_prob, inner_dict in decision_data.items():
+    for sensor_prob, inner_dict in extracted_data["dec_data"].items():
         assert(isinstance(sensor_prob, float))
         for sim_step, decision_fraction in inner_dict.items():
             assert(isinstance(sim_step, int))
@@ -1804,7 +1820,7 @@ def export_decision_data(decision_data: dict, filepath=None, curr_time=None):
         save_path = "decd_" + curr_time + ".decd"
 
     with open(save_path, "wb") as fopen:
-        pickle.dump(decision_data, fopen, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(extracted_data, fopen, pickle.HIGHEST_PROTOCOL)
 
     print("\nSaved DecisionData object at: {0}.\n".format( os.path.abspath(save_path) ) )
 

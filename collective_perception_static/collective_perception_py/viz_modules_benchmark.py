@@ -17,7 +17,8 @@ from .viz_modules import line, \
                          decode_sp_distribution_key
 
 # Default values
-OFFSET_STEP = lambda max_comms_rounds : max_comms_rounds / 40 # tuned value
+OFFSET_STEP = lambda max_comms_rounds : max_comms_rounds / 80 # tuned value
+PERF_RATIOS_MARKERS = ["o", "d", "s", "*", "^"]
 
 def plot_timeseries(time_arr, data, args):
     """Plot the time-series data.
@@ -92,15 +93,14 @@ def plot_decision(decision_data, args):
         gridspec_kw={"width_ratios": [6, 1]}
     )
 
-    # Convert sensor probability values into IDs used for deciding marker colors (the colors are fixed for sensor probability values)
+    # Convert benchmark param values into IDs used for deciding marker colors (the colors are fixed for sensor probability values)
     id_lst = []
 
-    # For benchmark data whose params are sensor probabilities
-    if benchmark_param_abbr == "sp":
+    if benchmark_param_abbr == "sp": # benchmark data whose params are sensor probabilities
         for bp in benchmark_param_range:
             if bp >= 0.0: id_lst.append(np.digitize(bp, FIXED_SENSOR_PROBABILITY_BINS)) # homogeneous sensor probabilities
             else: id_lst.append(0) # the distributed sensor probability case uses the black marker
-    else:
+    else: # benchmark data whose params are NOT sensor probabilities
         for bp in benchmark_param_range:
             id_lst.append(
                 np.digitize(bp, benchmark_param_range) # may not be the correct variable to use
@@ -109,7 +109,7 @@ def plot_decision(decision_data, args):
     # Define array of colors according to the nipy_spectral colormap
     c = plt.cm.nipy_spectral(np.array(id_lst) / (len(FIXED_SENSOR_PROBABILITY_BINS) - 1))
 
-    # Check the decision fraction of each sensor probability to find the ones that clutter close to 1 (using 0.9 as a threshold)
+    # Check the decision fraction of each benchmark param to find the ones that clutter close to 1 (using 0.9 as a threshold)
     cluttered_keys = set()
     for sp, decision_fraction_dict in decision_data.items():
         cluttered_keys.update((sp for v in decision_fraction_dict.values() if v > 0.95))
@@ -124,10 +124,10 @@ def plot_decision(decision_data, args):
     offset = [offset.pop(0) if bp in cluttered_keys else 0.0
               for bp in benchmark_param_range] # add 0.0 offsets if the benchmark param is not in cluttered keys
 
-    # Plot the lines for each sensor probability
-    for ind, s in enumerate(benchmark_param_range):
+    # Plot the lines for each benchmark parameter
+    for ind, bp in enumerate(benchmark_param_range):
 
-        points = [decision_data[s][step] for step in sim_steps]
+        points = [decision_data[bp][step] for step in sim_steps]
 
         line(
             # line_data=[np.array(sim_steps)/data_obj.comms_period + offset[ind], points],
@@ -193,6 +193,207 @@ def plot_decision(decision_data, args):
 
     fig.savefig(
         "decision_" + benchmark_str + "_" +
+        "s{0}_t{1}_{2}".format(int(max(sim_steps)),
+                               int(num_trials),
+                               filename_param) + ".png",
+        bbox_inches="tight",
+        dpi=300
+    )
+
+def plot_decision_performance_ratio(reference_decd: dict, benchmark_decd_dicts: dict, args):
+    """
+    benchmark_decd_dict: dict of .decd dicts (the keys are their filenames)
+    reference_decd: .decd dict of the minimalistic collective perception data
+
+    Each .decd dict has the following form:
+    {
+        'meta_data':
+        {
+            'data_type': (str),
+            'density': (float),
+            'extracted_sim_steps': (list of ints),
+            'num_agents': (int),
+            'num_options': (int),
+            'num_steps': (int),
+            'num_trials': (int),
+            'sp': (list of floats),
+            'speed': (float),
+            'tfr': (float)
+        },
+        'dec_data':
+        {
+            sensor_prob_1 (float):
+            {
+                sim_step_11 (int): decision_11 (float),
+                sim_step_12 (int): decision_12 (float),
+                ...
+            },
+            sensor_prob_2 (float):
+            {
+                sim_step_21 (int): decision_21 (float),
+                sim_step_22 (int): decision_22 (float),
+                ...
+            },
+            sensor_prob_3 (float):
+            {
+                sim_step_31 (int): decision_31 (float),
+                sim_step_32 (int): decision_32 (float),
+                ...
+            },
+            ...
+        }
+    }
+
+    Only doable for benchmark algorithms with sensor probabilities as
+    their params
+    """
+
+    benchmark_str = args["benchmark_str"]
+    tfr = args["tfr"]
+    sensor_probability_range = args["sensor_probability_range"]
+    num_trials = args["num_trials"]
+    sim_steps = args["sim_steps"]
+    speed = args["speed"]
+    density = args["density"]
+    num_options = args["num_options"]
+    cbar_label = args["colorbar_label"]
+    ymax = args["ymax"]
+    legends = args["legends"]
+
+    filename_param_1 = "spd{0}_den{1}_bins{2}{3}".format(int(speed), int(density), num_options, args["output_suffix"])
+
+    # Create the figures and axes
+    fig_size = (6, 4)
+    fig, ax_lst = plt.subplots(
+        1,
+        2,
+        tight_layout=True,
+        figsize=fig_size,
+        dpi=175,
+        gridspec_kw={"width_ratios": [6, 1]}
+    ) # 3 columns: 1st column is main data, 2nd column is colorbar, 3rd column is marker description
+    # the idea here is that post-processing can remove 2nd and 3rd columns if needed
+
+    # Convert sensor probability values into IDs used for deciding marker colors (the colors are fixed for sensor probability values)
+    id_lst = []
+
+    for sp in sensor_probability_range:
+        if sp >= 0.0: id_lst.append(np.digitize(sp, FIXED_SENSOR_PROBABILITY_BINS)) # homogeneous sensor probabilities
+        else: id_lst.append(0) # the distributed sensor probability case uses the black marker
+
+    # Define array of colors according to the nipy_spectral colormap
+    c = plt.cm.nipy_spectral(np.array(id_lst) / (len(FIXED_SENSOR_PROBABILITY_BINS) - 1))
+
+    # Compute the performance ratios
+    perf_ratios = {}
+
+    for bm_pathname, bm_decd in benchmark_decd_dicts.items():
+        perf_ratios[bm_pathname] = {}
+
+        # Iterate through the bm_decd dictionary
+        for sp in sensor_probability_range:
+
+            # decision_dict is a dict of decisions with key of sim steps and value of decision
+            dec_dict = bm_decd["dec_data"][sp]
+            perf_ratios[bm_pathname][sp] = {ss: dec_dict[ss]/reference_decd["dec_data"][sp][ss] for ss in sim_steps}
+
+    # Add offsets to reduce clutter of points so that the markers/lines that overlap is still visible
+    max_comms_rounds = max(sim_steps)
+    offset_step = OFFSET_STEP(max_comms_rounds)
+    num_cluttered_keys = len(perf_ratios) * len(sensor_probability_range) # number of files x number of sensor probabilities
+    offset = (np.arange(0, num_cluttered_keys*offset_step, offset_step) - (num_cluttered_keys - 1)*offset_step/2).tolist() # center around zero offset
+
+    # Plot the lines for each sensor probability
+    for bm_ind, bm_name in enumerate(perf_ratios.keys()):
+        for ind, sp in enumerate(sensor_probability_range):
+
+            # Plot the performance ratio data points by simulation step
+            points = np.asarray([perf_ratios[bm_name][sp][step] for step in sim_steps])
+
+            line(
+                line_data=[np.array(sim_steps) + offset[bm_ind*len(sensor_probability_range) + ind], points],
+                ax=ax_lst[0],
+                ls="-",     # line style
+                lw=1,       # line width
+                marker=PERF_RATIOS_MARKERS[bm_ind], # marker type
+                ms="12",     # marker size
+                mfc=c[ind], # marker face color
+                c=c[ind]    # color
+            )
+
+            # Add markers to performance ratios that are >= to the reference (minimalistic collective perception algorithm)
+            greater_than_equal_perf = [i for i, p in enumerate(points) if p >= 1.0]
+            if greater_than_equal_perf:
+                line(
+                    line_data=[np.array(sim_steps)[greater_than_equal_perf] + offset[bm_ind*len(sensor_probability_range) + ind], points[greater_than_equal_perf]],
+                    ax=ax_lst[0],
+                    marker="|", # marker type
+                    ms="35",    # marker size
+                    c=c[ind]    # color
+                )
+
+    # Modify the label for the uniformly distributed sensor probability case
+    if 0 in id_lst:
+        sensor_probability_range[id_lst.index(0)] = decode_sp_distribution_key(sensor_probability_range[id_lst.index(0)])
+
+    # Add ticker formatter (mostly for the log scale that is unused for now, but may be helpful in the future)
+    ticker_formatter = FuncFormatter(lambda y, _: "{:.4g}".format(y))
+
+    ax_lst[0].set_xlabel("Communication Rounds", fontsize=14)
+    ax_lst[0].set_ylabel("Performance Ratio", fontsize=14)
+    ax_lst[0].set_xticks(np.array(sim_steps))
+    ax_lst[0].set_ylim(bottom=YMIN_DECISION, top=YMAX_DECISION if not ymax else ymax)
+    ax_lst[0].xaxis.set_tick_params(which="both", labelsize=10)
+    ax_lst[0].yaxis.set_tick_params(which="both", labelsize=10)
+    ax_lst[0].yaxis.grid(which="both", linestyle=":")
+    ax_lst[0].xaxis.grid(which="major", linestyle=":")
+    ax_lst[0].yaxis.set_major_formatter(ticker_formatter)
+    ax_lst[0].yaxis.set_minor_formatter(ticker_formatter)
+
+    # Set legend for each input benchmark .decd file
+    legend_handles = []
+
+    if len(legends) == len(perf_ratios) + 1:
+        leg_title = legends[0]
+        leg_ind_offset = 1
+    else:
+        leg_title=None
+        leg_ind_offset = 0
+
+    for bm_ind, bm_name in enumerate(perf_ratios.keys()):
+        legend_handles.append(
+            plt.Line2D([],
+                       [],
+                       marker=PERF_RATIOS_MARKERS[bm_ind],
+                       color='black',
+                       linestyle='-',
+                       label=bm_name if not legends else r"{0}".format(legends[bm_ind + leg_ind_offset]))
+        )
+
+    ax_lst[0].legend(handles=legend_handles, title=leg_title)
+
+    # Create color bar
+    color_bar_img = np.array(id_lst, ndmin=2).T
+    ax_lst[1].imshow(color_bar_img,
+                     aspect=2,
+                     cmap="nipy_spectral",
+                     vmin=0,
+                     vmax=len(FIXED_SENSOR_PROBABILITY_BINS) - 1)
+
+    # Modify tick labels
+    ax_lst[1].yaxis.set_label_position("right")
+    ax_lst[1].yaxis.tick_right()
+    ax_lst[1].set_xticks([])
+    ax_lst[1].set_yticks(range(len(id_lst)), sensor_probability_range, fontsize=8)
+    ax_lst[1].set_ylabel(cbar_label, fontsize=14)
+
+    filename_param_2 = "tfr{0}".format(int(tfr * 1e3))
+
+    # Save the performance ratio plot
+    filename_param = "{0}_{1}".format(filename_param_2, filename_param_1)
+
+    fig.savefig(
+        "perf_comp_" + benchmark_str + "_" +
         "s{0}_t{1}_{2}".format(int(max(sim_steps)),
                                int(num_trials),
                                filename_param) + ".png",
@@ -602,6 +803,9 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
                     # Decode json file into data
                     self.data[benchmark_param_abbr_val][json_dict["trial_ind"]] = \
                         self.decode_data_str(json_dict["data_str"])
+
+        if not self.data: # no data populated
+            raise Exception("No data populated, please check provided arguments.")
 
     def generate_plot(self, args=None):
 
