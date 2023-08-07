@@ -14,32 +14,32 @@
 using RobotIdBeliefStrMap = std::unordered_map<std::string, std::vector<std::string>>;
 
 /**
- * @brief Enumeration class for belief states
- *
- */
-enum class BeliefState
-{
-    negative = 0,
-    indeterminate,
-    positive
-};
-
-/**
- * @brief Enumeration class for robot states
- *
- */
-enum class RobotState
-{
-    signalling = 0,
-    updating
-};
-
-/**
  * @brief Functor to process the robots' belief
  *
  */
 struct ProcessRobotBelief : public CBuzzLoopFunctions::COperation
 {
+    /**
+     * @brief Enumeration class for belief states
+     *
+     */
+    enum class BeliefState
+    {
+        negative = 0,
+        indeterminate,
+        positive
+    };
+
+    /**
+     * @brief Enumeration class for robot states
+     *
+     */
+    enum class RobotState
+    {
+        signalling = 0,
+        updating
+    };
+
     /**
      * @brief Construct a new ProcessRobotBelief object
      *

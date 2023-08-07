@@ -3,7 +3,7 @@ From: ubuntu:20.04
 
 %labels
     AUTHOR khaiyichin@gmail.com
-    VERSION 1.1.0
+    VERSION 1.2.0
     NAME argos_buzz_base_no_qt
 
 %help
@@ -17,6 +17,9 @@ From: ubuntu:20.04
 
     v1.1.0
     Removed files after installation.
+
+    v1.2.0
+    Updated to clone repository, instead of downloading archives of specific commits.
 
 %post -c /bin/bash
     # Setup color output macro
@@ -51,9 +54,7 @@ From: ubuntu:20.04
     # Install ARGoS
     loginfo "YELLOWB" "Installing ARGoS..."
 
-    wget "https://github.com/ilpincy/argos3/archive/da33b8786293dad40307e4182bb791add1e89172.tar.gz" -O argos3.tar.gz
-    mkdir argos3
-    tar -xvf argos3.tar.gz -C argos3 --strip-components=1
+    git clone https://github.com/ilpincy/argos3 argos3
     pushd argos3
     mkdir build && cd build
     cmake -DCMAKE_BUILD_TYPE=Release \
@@ -70,9 +71,7 @@ From: ubuntu:20.04
     # Install Buzz
     loginfo "YELLOWB" "Installing Buzz..."
 
-    wget "https://github.com/NESTLab/Buzz/archive/6a9a51f9b658b76fc995152546d4b625e74abb6d.tar.gz" -O buzz.tar.gz
-    mkdir buzz
-    tar -xvf buzz.tar.gz -C buzz --strip-components=1
+    git clone https://github.com/NESTLab/Buzz buzz
     pushd buzz
     mkdir build && cd build
     cmake -DCMAKE_BUILD_TYPE=Release -DARGOS_FORCE_NO_QTOPENGL=ON ../src
@@ -84,9 +83,7 @@ From: ubuntu:20.04
     # Install ARGoS-KheperaIV plugin
     loginfo "YELLOWB" "Installing KheperaIV plugin for ARGoS..."
 
-    wget "https://github.com/ilpincy/argos3-kheperaiv/archive/7807c3b71e13256c915dcc909707fee50a179273.tar.gz" -O argos3_kheperaiv.tar.gz
-    mkdir argos3_kheperaiv
-    tar -xvf argos3_kheperaiv.tar.gz -C argos3_kheperaiv --strip-components=1
+    git clone https://github.com/ilpincy/argos3-kheperaiv argos3_kheperaiv
     pushd argos3_kheperaiv
     mkdir build && cd build
     cmake -DCMAKE_BUILD_TYPE=Release -DARGOS_FORCE_NO_QTOPENGL=ON ../src
@@ -98,7 +95,6 @@ From: ubuntu:20.04
     # Remove files
     loginfo "YELLOWB" "Removing unneeded files and folders..."
 
-    rm -rf argos3.tar.gz buzz.tar.gz argos3_kheperaiv.tar.gz
     rm -rf argos3 buzz argos3_kheperaiv
 
     # Insert additional labels

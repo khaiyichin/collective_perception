@@ -23,7 +23,7 @@
           or set to zero, this value is taken from the clock and a warning
           message is displayed.
     -->
-        <experiment length="50" ticks_per_second="10" random_seed="0" />
+        <experiment length="10" ticks_per_second="10" random_seed="0" />
     </framework>
 
     <!-- *************** -->
@@ -89,8 +89,7 @@
           function.
           The user, writing the controller, defines how it is organized.
       -->
-            <!-- <params bytecode_file="build/buzz/body_crosscombe_2017.bo" debug_file="build/buzz/body_crosscombe_2017.bdb" /> -->
-            <params bytecode_file="build/buzz/body_ebert_2020.bo" debug_file="build/buzz/body_ebert_2020.bdb" />
+            <params bytecode_file="/collective_perception/collective_perception_dynamic/build/buzz/body_ebert_2020.bo" debug_file="/collective_perception/collective_perception_dynamic/build/buzz/body_ebert_2020.bdb" />
         </buzz_controller_kheperaiv>
 
     </controllers>
@@ -99,12 +98,8 @@
     <!-- * Loop functions * -->
     <!-- ****************** -->
 
-    <loop_functions library="build/src/libbenchmarking_loop_functions" label="benchmarking_loop_functions">
+    <loop_functions library="/collective_perception/collective_perception_dynamic/build/src/libbenchmarking_loop_functions" label="benchmarking_loop_functions">
         <benchmarking>
-            <!-- <algorithm type="crosscombe_2017">
-                <num_possible_options value="10" />
-                <flawed_robot_ratio_range min="0.1" max="0.5" steps="2" />
-            </algorithm> -->
             <algorithm type="ebert_2020">
                 <sensor_probability_range min="0.675" max="0.675" steps="1" />
                 <positive_feedback bool="false" />
@@ -112,14 +107,11 @@
                 <credible_threshold value="0.99" />
             </algorithm>
             <arena_tiles tile_count_x="500" tile_count_y="500" /> <!-- number of tiles for the arena -->
-            <fill_ratio_range min="0.55" max="0.55" steps="1" /> <!-- range of target fill ratios -->
-            <num_trials value="2" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
+            <fill_ratio_range min="0.55" max="0.95" steps="2" /> <!-- range of target fill ratios -->
+            <num_trials value="5" /> <!-- number of trials to repeat for a specific fill ratio and sensor probability -->
             <speed value="14.14" /> <!-- in units of cm/s -->
-            
-            <!-- path to the output data and datetime in foldername -->
-            <!-- <path folder="bm_crosscombe_2017" name="data.json" include_datetime="true" /> -->
-            <path folder="bm_ebert_2020" name="data.json" include_datetime="true" />
-            <verbosity level="full" /> <!-- "full", "reduced", "none" -->
+            <path folder="data" name="data.json" include_datetime="true" /> <!-- path to the output data and datetime in foldername -->
+            <verbosity level="reduced" /> <!-- "full", "reduced", "none" -->
         </benchmarking>
     </loop_functions>
 
@@ -141,29 +133,30 @@
  
       $ argos3 -q box
   -->
-    <arena size="5, 5, 1" center="0,0,0.5">
-        <!-- floor node required for ebert_2020 -->
-        <floor id="floor" source="loop_functions" pixels_per_meter="200" />
+    <arena size="10, 10, 1" center="0,0,0.5">
+
+        <floor id="floor" source="loop_functions" pixels_per_meter="100" />
 
         <!-- Place four boxes in a square to delimit the arena -->
-        <box id="wall_north" size="3.000000, 0.100000, 0.500000" movable="false">
-            <body position="0.000000, 1.030873, 0.000000" orientation="0, 0, 0" />
+        <box id="wall_north" size="10,0.1,0.5" movable="false">
+            <body position="0,4.436599480604251,0" orientation="0,0,0" />
         </box>
-        <box id="wall_south" size="3.000000, 0.100000, 0.500000" movable="false">
-            <body position="0.000000, -1.030873, 0.000000" orientation="0, 0, 0" />
+        <box id="wall_south" size="10,0.1,0.5" movable="false">
+            <body position="0,-4.436599480604251,0" orientation="0,0,0" />
         </box>
-        <box id="wall_east" size="0.100000, 3.000000, 0.500000" movable="false">
-            <body position="1.030873, 0.000000, 0.000000" orientation="0, 0, 0" />
+        <box id="wall_east" size="0.1,10,0.5" movable="false">
+            <body position="4.436599480604251,0,0" orientation="0,0,0" />
         </box>
-        <box id="wall_west" size="0.100000, 3.000000, 0.500000" movable="false">
-            <body position="-1.030873, 0.000000, 0.000000" orientation="0, 0, 0" />
+        <box id="wall_west" size="0.1,10,0.5" movable="false">
+            <body position="-4.436599480604251,0,0" orientation="0,0,0" />
         </box>
 
+        <!-- Place the Khepera IV robots in the arena in random and bind it to the controller -->
         <distribute>
-            <position method="uniform" min="-1.030873, -1.030873, 0" max="1.030873, 1.030873, 0" />
-            <orientation method="uniform" min="0, 0, 0" max="0, 0, 0" />
-            <entity quantity="5" max_trials="100" base_num="0">
-                <kheperaiv id="kiv" rab_data_size="200" rab_range="0.700000">
+            <position method="uniform" min="-4.436599480604251,-4.436599480604251,0" max="4.436599480604251,4.436599480604251,0" />
+            <orientation method="uniform" min="0,0,0" max="360,0,0" />
+            <entity quantity="50" max_trials="100" base_num="0">
+                <kheperaiv id="kiv" rab_data_size="200" rab_range="0.7">
                     <controller config="bck" />
                 </kheperaiv>
             </entity>

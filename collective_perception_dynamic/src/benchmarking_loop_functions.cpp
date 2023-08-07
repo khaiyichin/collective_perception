@@ -22,8 +22,36 @@ void BenchmarkingLoopFunctions::Init(TConfigurationNode &t_tree)
         // Initialize benchmark algorithm
         InitializeBenchmarkAlgorithm(algorithm_node);
 
-        // Obtain the pointer to the benchmark data
+        // Obtain the reference to the benchmark data
         BenchmarkDataBase &benchmark_data = benchmark_algo_ptr_->GetData();
+
+        // Grab arena information
+        TConfigurationNode &arena_tiles_node = GetNode(benchmarking_root_node, "arena_tiles");
+
+        // Get a reference to the ARGoS floor entity (method provided by superclass)
+        auto &floor_entity = GetSpace().GetFloorEntity();
+
+        // Get the size of the arena (in units of tiles)
+        unsigned int arena_x, arena_y;
+
+        GetNodeAttribute(arena_tiles_node, "tile_count_x", arena_x);
+        GetNodeAttribute(arena_tiles_node, "tile_count_y", arena_y);
+
+        arena_tile_count_ = std::make_pair(arena_x, arena_y);
+
+        // Get the limits of arena
+        CRange<CVector3> lims = GetSpace().GetArenaLimits();
+        arena_lower_lim_ = std::make_pair(static_cast<float>(lims.GetMin().GetX()),
+                                          static_cast<float>(lims.GetMin().GetY()));
+
+        // Compute tile size
+        CVector3 arena_size = GetSpace().GetArenaSize();
+
+        float length_x = arena_size.GetX() / arena_x; // tile size in the x-direction
+        float length_y = arena_size.GetY() / arena_y; // tile size in the y-direction
+
+        assert(length_x == length_y); // only square tiles allowed
+        arena_tile_size_ = length_x;
 
         // Grab the constrained area to compute the true swarm density
         auto &box_map = GetSpace().GetEntitiesByType("box");
@@ -112,12 +140,14 @@ void BenchmarkingLoopFunctions::Init(TConfigurationNode &t_tree)
         if (verbose_level_ == "full" || verbose_level_ == "reduced")
         {
             LOG << "[INFO] Benchmarking loop functions verbose level = \"" << verbose_level_ << "\"" << std::endl;
+            LOG << "[INFO] Specifying number of arena tiles = " << arena_x << "*" << arena_y << std::endl;
             LOG << "[INFO] Specifying number of robots = " << benchmark_data.num_agents << std::endl;
             LOG << "[INFO] Specifying robot speed = " << benchmark_data.speed << " cm/s" << std::endl;
             LOG << "[INFO] Specifying number of trials = " << benchmark_data.num_trials << std::endl;
             LOG << "[INFO] Specifying output folder = \"" << benchmark_data.output_folder << "\"" << std::endl;
             LOG << "[INFO] Specifying output data filename (" << ((output_datetime_) ? "with" : "without") << " datetime) = \"" << benchmark_data.output_filename << "\"" << std::endl;
             LOG << "[INFO] Computed swarm density = " << benchmark_data.density << std::endl;
+            LOG << "[INFO] Generated tile size = " << arena_tile_size_ << " m" << std::endl;
 
             // Remove underscores from the keyword
             std::string str = benchmark_algo_ptr_->GetParameterKeyword();
@@ -159,17 +189,30 @@ void BenchmarkingLoopFunctions::InitializeBenchmarkAlgorithm(TConfigurationNode 
     {
         benchmark_algo_ptr_ =
             std::make_shared<BenchmarkCrosscombe2017>(buzz_foreach_vm_func, t_tree, robot_id_vec);
-
-        benchmark_algo_ptr_->Init();
+    }
+    else if (algorithm_str_id_ == EBERT_2020)
+    {
+        benchmark_algo_ptr_ =
+            std::make_shared<BenchmarkEbert2020>(buzz_foreach_vm_func, t_tree, robot_id_vec);
     }
     else
     {
         THROW_ARGOSEXCEPTION("Unknown benchmark algorithm!");
     }
+
+    benchmark_algo_ptr_->Init();
 }
 
 void BenchmarkingLoopFunctions::SetupExperiment()
 {
+    // Create new Arena object
+    arena_ = Arena(arena_tile_count_, arena_lower_lim_, arena_tile_size_, static_cast<float>(curr_paired_parameter_range_itr_->first));
+
+    if (verbose_level_ == "full")
+    {
+        LOG << "[INFO] Arena tile fill ratio = " << arena_.GetTrueTileDistribution() << " with " << arena_.GetTotalNumTiles() << " tiles." << std::endl;
+    }
+
     benchmark_algo_ptr_->SetupExperiment(curr_trial_ind_, *curr_paired_parameter_range_itr_);
 }
 
@@ -251,6 +294,13 @@ void BenchmarkingLoopFunctions::SaveData()
     std::filesystem::create_directory(benchmark_data.output_folder);
 
     benchmark_algo_ptr_->SaveData(foldername_prefix);
+}
+
+CColor BenchmarkingLoopFunctions::GetFloorColor(const CVector2 &c_position_on_plane)
+{
+    unsigned int color_int = arena_.GetColor(c_position_on_plane.GetX(), c_position_on_plane.GetY());
+
+    return color_int == 1 ? CColor::BLACK : CColor::WHITE;
 }
 
 REGISTER_LOOP_FUNCTIONS(BenchmarkingLoopFunctions, "benchmarking_loop_functions")

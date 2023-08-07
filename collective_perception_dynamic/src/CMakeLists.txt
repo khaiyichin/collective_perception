@@ -18,6 +18,7 @@ add_library(collective_perception_test_interface
     SHARED
     arena.cpp
     brain.cpp
+    custom_beta_cdf_gsl.cpp
 )
 target_link_libraries(collective_perception_test_interface
     PRIVATE
@@ -54,13 +55,16 @@ target_include_directories(collective_perception_loop_functions
 # Build ARGoS benchmarking loop function library
 add_library(benchmarking_loop_functions
     SHARED
+    arena.cpp
     benchmarking_loop_functions.cpp
     benchmark_crosscombe_2017.cpp
+    benchmark_ebert_2020.cpp
+    custom_beta_cdf_gsl.cpp
 )
 target_link_libraries(benchmarking_loop_functions
     PUBLIC
     ${BUZZ_LIBRARY}
-    ${PROTO_LIB}
+    ${PROTO_LIB} # may be able to remove this
     argos3core_simulator
     argos3plugin_simulator_dynamics2d
     argos3plugin_simulator_entities

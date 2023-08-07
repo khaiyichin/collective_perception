@@ -26,6 +26,9 @@ YMAX_SCATTER = 0.36 # default maximum y-limit for the scatter plots
 YMIN_DECISION = 0.15 # default minimum y-limit for the decision plots
 YMAX_DECISION = 1.1 # default maximum y-limit for the decision plots
 
+# Assigned fixed colors to sensor probabilities; @TODO: kind of hacky
+FIXED_SENSOR_PROBABILITY_BINS = np.linspace(0.5125, 0.9875, 20) # 19 bins
+
 warnings.filterwarnings("ignore", category=UserWarning) # ignore UserWarning type warnings
 
 class VisualizationData:
@@ -1373,9 +1376,6 @@ def scatter(scatter_data, ax=None, **kwargs):
 
 def plot_decision(data_obj: VisualizationData, args):
 
-    # Assigned fixed colors to sensor probabilities; @TODO: kind of hacky
-    fixed_sensor_probability_bins = np.linspace(0.5125, 0.9875, 20) # 19 bins
-
     tfr = args["tfr"]
     sp = args["sp"]
     bins = args["bins"]
@@ -1401,17 +1401,17 @@ def plot_decision(data_obj: VisualizationData, args):
         tight_layout=True,
         figsize=fig_size,
         dpi=175,
-        gridspec_kw={"width_ratios": [6 * len(fixed_sensor_probability_bins) / len(sp), 1]})
+        gridspec_kw={"width_ratios": [6 * len(FIXED_SENSOR_PROBABILITY_BINS) / len(sp), 1]})
 
     # Convert sensor probability values into IDs used for deciding marker colors (the colors are fixed for sensor probability values)
     id_lst = []
 
     for s in sp:
-        if s >= 0.0: id_lst.append(np.digitize(s, fixed_sensor_probability_bins)) # homogeneous sensor probabilities
+        if s >= 0.0: id_lst.append(np.digitize(s, FIXED_SENSOR_PROBABILITY_BINS)) # homogeneous sensor probabilities
         else: id_lst.append(0) # the distributed sensor probability case uses the black marker
 
     # Define array of colors according to the nipy_spectral colormap
-    c = plt.cm.nipy_spectral(np.array(id_lst) / (len(fixed_sensor_probability_bins) - 1))
+    c = plt.cm.nipy_spectral(np.array(id_lst) / (len(FIXED_SENSOR_PROBABILITY_BINS) - 1))
 
     # Obtain the decision fractions
     decision_fractions = {step: data_obj.get_decision_fractions(tfr, sp, step, bins) for step in sim_steps}
@@ -1479,7 +1479,7 @@ def plot_decision(data_obj: VisualizationData, args):
         aspect=2,
         cmap="nipy_spectral",
         vmin=0,
-        vmax=len(fixed_sensor_probability_bins) - 1
+        vmax=len(FIXED_SENSOR_PROBABILITY_BINS) - 1
     )
 
     # Modify tick labels
@@ -1760,6 +1760,69 @@ def adjust_subplot_legend_and_axis(subplot_fig, subplot_ax):
     subplot_fig.legend(
         handles, labels, loc="center right", bbox_to_anchor=(box_2.width * 1.25, 0.5)
     )
+
+def serialize_decision_data(extracted_data: dict, filepath=None, curr_time=None):
+    """Serialize the decision data dict into a pickle.
+    """
+
+    """ Verify that the decision has the following format:
+    {
+        'meta_data':
+        {
+            'data_type': (str),
+            'density': (float),
+            'extracted_sim_steps': (list of ints),
+            'num_agents': (int),
+            'num_options': (int),
+            'num_steps': (int),
+            'num_trials': (int),
+            'sp': (list of floats),
+            'speed': (float),
+            'tfr': (float)
+        },
+        'dec_data':
+        {
+            sensor_prob_1 (float):
+            {
+                sim_step_11 (int): decision_11 (float),
+                sim_step_12 (int): decision_12 (float),
+                ...
+            },
+            sensor_prob_2 (float):
+            {
+                sim_step_21 (int): decision_21 (float),
+                sim_step_22 (int): decision_22 (float),
+                ...
+            },
+            sensor_prob_3 (float):
+            {
+                sim_step_31 (int): decision_31 (float),
+                sim_step_32 (int): decision_32 (float),
+                ...
+            },
+            ...
+        }
+    }
+    """
+    for sensor_prob, inner_dict in extracted_data["dec_data"].items():
+        assert(isinstance(sensor_prob, float))
+        for sim_step, decision_fraction in inner_dict.items():
+            assert(isinstance(sim_step, int))
+            assert(isinstance(decision_fraction, float))
+
+    # Get current time
+    if curr_time is None:
+        curr_time = datetime.now().strftime("%m%d%y_%H%M%S")
+
+    if filepath:
+        save_path = filepath + "_" + curr_time + ".decd"
+    else:
+        save_path = "decd_" + curr_time + ".decd"
+
+    with open(save_path, "wb") as fopen:
+        pickle.dump(extracted_data, fopen, pickle.HIGHEST_PROTOCOL)
+
+    print("\nSaved DecisionData object at: {0}.\n".format( os.path.abspath(save_path) ) )
 
 class Visualizer:
 

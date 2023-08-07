@@ -2,12 +2,11 @@
 
 # Script to execute static multi agent simulation (ARGoS-based)
 # on the HPC cluster, which means that the C++ script is run
-# in an Apptainer container. The apptainer name is assumed to be
-# multi_agent_sim_dynamic_no_qt.sif.
+# in an Apptainer container. 
 
 # Verify that arguments are provided
 if [ $# != 3 ]; then
-    echo "Incorrect number of arguments provided!"
+    echo "Not enough arguments provided!"
     exit 1
 fi
 
@@ -15,34 +14,36 @@ ARGOSFILE=$1
 SIFFILE=$2
 OUTPUTDIR=$3
 
-# Define varying parameters
+# Define outer group parameters
 SPEED=(14.14) # cm/s
-POSITION=(4.436599480604251 3.1517942390846527 2.011746925739275 1.4371645541621039) # for D = (1 2 5 10) with number of agents = 50
-DENSITY=(1 2 5 10)
-THREADS=40
+POSITION=(3.1517942390846527) # for D = 1 with number of agents = 25
+DENSITY=(1)
+PRIOR=10
+THRSH=0.99
+POSFB="true"
 
 # Set fixed parameters
-TFR_RANGE=(0.05 0.95 19)
-SP_RANGE=(0.525 0.975 19)
-TRIALS=5
-STEPS=50
+TFR_RANGE=(0.55 0.95 2)
+SP_RANGE=(0.525 0.975 4)
+TRIALS=30
+STEPS=1000
 TILES=1000
-STATSPATH="multi_agent_sim_dynamic_stats.pbs"
-AGENTDATAPATH="multi_agent_sim_dynamic_agent_data.pbad"
-AGENTS=50
+DATAPATH="data.json"
+AGENTS=25
 WALL_THICKNESS=0.1
 ARENA_LEN=10
-LEGACY="false"
 
 sed -i "s/<fill_ratio_range.*/<fill_ratio_range min=\"${TFR_RANGE[0]}\" max=\"${TFR_RANGE[1]}\" steps=\"${TFR_RANGE[2]}\" \/>/" $ARGOSFILE # fill ratio range
 sed -i "s/<sensor_probability_range.*/<sensor_probability_range min=\"${SP_RANGE[0]}\" max=\"${SP_RANGE[1]}\" steps=\"${SP_RANGE[2]}\" \/>/" $ARGOSFILE # sensor prob range
+sed -i "s/<positive_feedback.*/<positive_feedback bool=\"${POSFB}\" \/>/" $ARGOSFILE # positive feedback
+sed -i "s/<prior.*/<prior value=\"${PRIOR}\" \/>/" $ARGOSFILE # beta prior parameter
+sed -i "s/<credible_threshold.*/<credible_threshold value=\"${THRSH}\" \/>/" $ARGOSFILE # credible threshold
 sed -i "s/<num_trials.*/<num_trials value=\"$TRIALS\" \/>/" $ARGOSFILE # number of trials
 sed -i "s/<arena_tiles.*/<arena_tiles tile_count_x=\"$TILES\" tile_count_y=\"$TILES\" \/>/" $ARGOSFILE # tile count
-sed -i "s/<path.*/<path folder=\"$OUTPUTDIR\" stats=\"$STATSPATH\" agent_data=\"$AGENTDATAPATH\"  include_datetime=\"true\" \/>/" $ARGOSFILE # output path
+sed -i "s/<path.*/<path folder=\"$OUTPUTDIR\" name=\"$DATAPATH\" include_datetime=\"true\" \/>/" $ARGOSFILE # output path
 sed -i "s/<verbosity.*/<verbosity level=\"full\" \/>/" $ARGOSFILE # verbosity
-sed -i "s/<legacy.*/<legacy bool=\"$LEGACY\" \/>/" $ARGOSFILE # legacy equations
 sed -i "s/<experiment.*/<experiment length=\"$STEPS\" ticks_per_second=\"10\" random_seed=\"0\" \/>/" $ARGOSFILE # experiment length
-sed -i "s/<entity.*/<entity quantity=\"$AGENTS\" max_trials=\"100\" base_num=\"0\">/" $ARGOSFILE
+sed -i "s/<entity.*/<entity quantity=\"$AGENTS\" max_trials=\"100\" base_num=\"0\">/" $ARGOSFILE # number of robots
 sed -i "s/<arena size.*/<arena size=\"$ARENA_LEN, $ARENA_LEN, 1\" center=\"0,0,0.5\">/" $ARGOSFILE # arena size
 sed -i "s/<box id=\"wall_north\".*/<box id=\"wall_north\" size=\"10,$WALL_THICKNESS,0.5\" movable=\"false\">/" $ARGOSFILE # north wall size
 sed -i "s/<box id=\"wall_south\".*/<box id=\"wall_south\" size=\"10,$WALL_THICKNESS,0.5\" movable=\"false\">/" $ARGOSFILE # south wall size
@@ -76,12 +77,7 @@ sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,1
             sed -i "s/<box id=\"wall_west\".*/<box id=\"wall_west\" size=\"$WALL_THICKNESS,10,0.5\" movable=\"false\">\n            <body position=\"-$pos,0,0\" orientation=\"0,0,0\" \/>/" $ARGOSFILE
             sed -i "s/<position method=\"uniform\".*/<position method=\"uniform\" min=\"-$pos,-$pos,0\" max=\"$pos,$pos,0\" \/>/" $ARGOSFILE
 
-            apptainer exec $SIFFILE /collective_perception/collective_perception_dynamic/build/src/run_dynamic_simulations -l /dev/null -c $ARGOSFILE
-
-            # Copy and move the data
-            folder="spd${speed}_den${DENSITY[j]}" # concatenate string and numbers as folder name
-            mkdir -p $folder
-            mv $OUTPUTDIR/* $folder
+            apptainer exec $SIFFILE /collective_perception/collective_perception_dynamic/build/src/run_dynamic_simulations -c $ARGOSFILE
         done
     done
 

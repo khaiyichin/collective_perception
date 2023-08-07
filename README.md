@@ -7,7 +7,7 @@ Two simulators are provided here:
 2. ARGoS-based dynamic topology simulator `collection_perception_dynamic`.
 
 ### Static topology simulation
-The robots in the static topology simulator do not move in the normal sense and have fixed communication channels with its neighbors (the communication network is specified by the user). In each simulated experiment, a fixed number of robots would traverse their own black and white tile-track and communicate periodically with their neighbors. The figure below illustrates what it would look like for 4 robots in a ring topology.
+The robots in the static topology simulator *do not move in the normal sense* and have fixed communication channels with its neighbors (the communication network is specified by the user). In each simulated experiment, a fixed number of robots would traverse their own black and white tile-track and communicate periodically with their neighbors. The figure below illustrates what it would look like for 4 robots in a ring topology.
 
 <img src="static_sim_graphic.png" alt="Static simulated experiment visualized" width="450"/>
 
@@ -16,14 +16,17 @@ The robots in the dynamic topology simulator move around a square arena of black
 
 <img src="dynamic_sim_graphic.png" alt="Dynamic simulated experiment visualized" width="450"/>
 
+### Benchmark algorithms
+In addition to our collective perception algorithm, simulators for benchmark algorithms are also provided in this repository to provide performance comparison. They are simulated in a similar fashion to the dynamic topology simulator. See the [benchmark algorithm documentation](docs/benchmark_algo_explained.md) for more information.
+
 ## Requirements
 ### Local build
 - Python 3.8+ and `pip`
 - CMake 3.15+
 - [ARGoS](https://github.com/ilpincy/argos3.git)
 - [Buzz](https://github.com/NESTLab/Buzz)
-- [ARGoS-KheperaIV plugin](https://github.com/NESTLab/argos3-kheperaiv) - *in this repository Khepera IVs are used, but with some modification to the experiment files you could potentially use other robot types*
-- [Protobuf v21.1+ (`proto3`)](https://github.com/protocolbuffers/protobuf.git) - *source build recommended, although the `apt` package version may work as well*
+- [ARGoS-KheperaIV plugin](https://github.com/ilpincy/argos3-kheperaiv) - *in this repository Khepera IVs are used, but with some modification to the experiment files you could potentially use other robot types*
+- [Protobuf v3.6.1+ (`proto3`)](https://github.com/protocolbuffers/protobuf.git) - *can be installed using the `apt` package manager or built from source*
 - [GraphTool v2.45+](https://graph-tool.skewed.de/) - *can be installed using the `apt` package manager*
 
 ### Container
@@ -52,21 +55,16 @@ To create simulator containers, only `apptainer` is required; the other requirem
     ```
     $ cd apptainer && mkdir containers
     ```
-2. Build the first container, which provides the ARGoS and Buzz base.
+2. Build the first image, which provides the ARGoS and Buzz base.
     ```
-    $ sudo apptainer build argos_buzz_no_qt_base.sif ../def/argos_buzz_no_qt_base.def
+    $ sudo apptainer build argos_buzz_no_qt_base.sif ../def/argos_buzz_no_qt_base.def # no_qt indicates no QT support
     ```
     When the build finishes you should see the `argos_buzz_no_qt_base.sif` container.
-3. Build the second container on top of the previous container (specified in the definition file), which provides the Protobuf layer.
+3. Build the complete simulator image. This image can only be built on top of the first image layer that is named `argos_buzz_no_qt_base.sif`.
     ```
-    $ sudo apptainer build protobuf_no_qt_layer.sif ../def/protobuf_no_qt_layer.def
+    $ sudo apptainer build multi_agent_sim_full_no_qt.sif ../def/multi_agent_sim_full_no_qt.def
     ```
-    When the build finishes you should see the `protobuf_no_qt_layer.sif` container.
-4. Build the final layer.
-    ```
-    $ sudo apptainer build multi_agent_sim_full_no_qt.sif ../def/multi_agent_sim_full_no_qt.sif
-    ```
-    When the build finishes you should see the multi_agent_sim_full_no_qt.sif container.
+    When the build finishes you should see the `multi_agent_sim_full_no_qt.sif` container.
 
 ## Execution
 The instructions here describe scripts that provide a **single simulation execution**. In a single simulation execution, there can be multiple experiments, each of which may have repeated trials.
@@ -90,6 +88,8 @@ In general, simulation executions are controlled by two groups of parameters: an
 The inner parameter group has two parameters: *target fill ratios* and *sensor probabilities*, and is the same for both simulation types. That is, a pair of target fill ratio and sensor probability values are used in one experiment. When the experiment (including the repeated trials) completes, a different pair of target fill ratio and sensor probability values is used in the next experiment.
 
 The outer parameter group differs between the static and dynamic simulation types. For the static topology simulator, the parameters are *communication period* and *number of agents*; for the dynamic topology simulator, the parameters are *robot speed* and *swarm density*.
+
+Ulitmately, a single simulation execution allows you to run different experiments (each with the amount of repeated trials that you desire) with different inner parameters. That is, by setting up a experiment configuration file once --- and then running a single simulation execution --- you get data from experiments with varying inner parameter values but with common outer parameter values.
 
 The following instructions apply directly for the local build; for the container simulator simply prepend `apptainer exec multi_agent_sim_full_no_qt.sif` to the commands ([see the Apptainer documentation for more info](https://apptainer.org/docs/)).
 
@@ -170,4 +170,10 @@ $ gdb tests/tests # or gdb --args tests/tests <ARGS> if you have arguments, e.g.
 
 # Run with valgrind
 $ valgrind tests/tests <ARGS-IF-ANY>
+```
+
+### Additional testing notes
+To provide the ability to compute Beta CDF values required by one of the benchmark algorithms, the `custom_beta_cdf_gsl.*pp` implmentation is provided, ported from GSL. Subsequently, a test script has been created to ensure that the porting process was correct, which can be executed by doing the following.
+```
+$ tests/test_custom_beta_cdf_gsl
 ```
