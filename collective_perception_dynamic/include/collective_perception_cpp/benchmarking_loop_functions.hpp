@@ -12,6 +12,7 @@
 // Local headers
 #include "util.hpp"
 #include "arena.hpp"
+#include "benchmark_valentini_2016.hpp"
 #include "benchmark_crosscombe_2017.hpp"
 #include "benchmark_ebert_2020.hpp"
 

@@ -57,6 +57,7 @@ add_library(benchmarking_loop_functions
     SHARED
     arena.cpp
     benchmarking_loop_functions.cpp
+    benchmark_valentini_2016.cpp
     benchmark_crosscombe_2017.cpp
     benchmark_ebert_2020.cpp
     custom_beta_cdf_gsl.cpp

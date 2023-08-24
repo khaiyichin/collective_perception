@@ -185,7 +185,12 @@ void BenchmarkingLoopFunctions::InitializeBenchmarkAlgorithm(TConfigurationNode 
     { CBuzzLoopFunctions::BuzzForeachVM(arg); };
 
     // Determine algorithm type
-    if (algorithm_str_id_ == CROSSCOMBE_2017)
+    if (algorithm_str_id_ == VALENTINI_2016)
+    {
+        benchmark_algo_ptr_ =
+            std::make_shared<BenchmarkValentini2016>(buzz_foreach_vm_func, t_tree, robot_id_vec);
+    }
+    else if (algorithm_str_id_ == CROSSCOMBE_2017)
     {
         benchmark_algo_ptr_ =
             std::make_shared<BenchmarkCrosscombe2017>(buzz_foreach_vm_func, t_tree, robot_id_vec);

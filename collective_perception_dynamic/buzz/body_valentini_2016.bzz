@@ -1,0 +1,198 @@
+include "body_common.bzz"
+
+# Define macros/enum for robot decisions; if modified then must change must change at other locations (in C++ header files)
+WHITE_OBS = 0
+BLACK_OBS = 1
+OPINION_WHITE_ENUM = WHITE_OBS
+OPINION_BLACK_ENUM = BLACK_OBS
+EXPLORATION_STATE_ENUM = 0
+DISSEMINATION_STATE_ENUM = 1
+
+function init()
+{
+    # Initialize values
+    reset_values()
+
+    # Define listener callback function
+    neighbors.listen("opinion",
+        function(vid, val, rid) # val is the neighbor's opinion
+        {
+            received_vals = append_to_table(received_vals, val)
+        }
+    )
+
+    ### Set custom seed that depends on the clock ###
+    # This has to be done so that not all the robots are set to the same clock seed:
+    #   * Default seed (i.e., clock) causes all the robots to be seeded the same, making them behave the same
+    #   * Vanilla ID custom seed (i.e., `math.rng.setseed(id)`) causes deterministic behaviors across different trials
+    # Solution: `math.rng.uniform()` is seeded by the clock, while `id` modifies the seed for the number generator used in the motion
+    # Robots now all behave differently, across different trials.
+    math.rng.setseed(id + math.rng.uniform())
+}
+
+function step()
+{
+    # Detect any nearby obstacles
+    var obstacles = detect_obstacles()
+    if (not obstacles)
+    {
+        # Move robot in random walk fashion
+        var movement = move(move_type, move_duration, rot_direction, spd)
+        move_type = movement.type
+        move_duration = movement.duration
+        rot_direction = movement.rot_dir
+    }
+    else
+    {
+        # Avoid obstacles
+        var movement = avoid_obstacles(spd, obstacles)
+        move_type = movement.type
+        move_duration = movement.duration
+        rot_direction = movement.rot_dir
+    }
+
+    # Execute states
+    if ((current_state == EXPLORATION_STATE_ENUM) and (duration_tracker <= exp_duration))
+    {
+
+        # Make observation and evaluate opinion quality (evaluates both colors)
+        encounter_observation_table = observe(b_prob, w_prob)
+        collected_observations[encounter_observation_table.observation] = collected_observations[encounter_observation_table.observation] + 1
+
+        duration_tracker = duration_tracker + 1
+
+        # Change state if duration is up
+        if (duration_tracker > exp_duration)
+        {
+            # Estimate opinion qualities
+            opinion_qualities = estimate_quality(collected_observations)
+
+            # Reset values
+            current_state = DISSEMINATION_STATE_ENUM # new state
+            duration_tracker = 0
+            collected_observations[WHITE_OBS] = 0
+            collected_observations[BLACK_OBS] = 0
+        }
+    }
+    else if ((current_state == DISSEMINATION_STATE_ENUM) and (duration_tracker <= dis_duration))
+    {
+        # Communicate current opinion
+        communicate_tx("opinion", current_opinion)
+
+        duration_tracker = duration_tracker + 1
+
+        # Change state if duration is up
+        if (duration_tracker > dis_duration)
+        {
+            # Adopt opinion
+            current_opinion = adopt_opinion(use_voter_model, received_vals)
+
+            # Reset values
+            current_state = EXPLORATION_STATE_ENUM # new state
+            duration_tracker = 0
+        }
+    }
+    else
+    {
+        logerr("Unknown current state =", current_state,"!")
+    }
+
+    # Clear the received neighbor values at the end of each loop
+    received_vals = {}
+}
+
+
+##############################
+### User defined functions ###
+##############################
+
+# Estimate quality of opinion
+function estimate_quality(collected_obs_tab)
+{
+    var qualities = {}
+    qualities[OPINION_WHITE_ENUM] = float(collected_obs_tab[OPINION_WHITE_ENUM]) / float(exp_duration)
+    qualities[OPINION_BLACK_ENUM] = float(collected_obs_tab[OPINION_BLACK_ENUM]) / float(exp_duration)
+
+    return qualities
+}
+
+function adopt_opinion(voter_model, neighbor_vals)
+{
+    if (voter_model)
+    {
+        # Pick random opinion from received neighbor values
+        var random_ind = math.rng.uniform(size(neighbor_vals))
+        return neighbor_vals[random_ind]
+    }
+    else
+    {
+        # Find majority opinion
+        var majority_tie_breaker = 0
+
+        foreach(neighbor_vals,
+            function(key, value)
+            {
+                if (value == OPINION_WHITE_ENUM)
+                {
+                    majority_tie_breaker = majority_tie_breaker - 1
+                }
+                else if (value == OPINION_BLACK_ENUM)
+                {
+                    majority_tie_breaker = majority_tie_breaker + 1
+                }
+            }
+        )
+
+        if (majority_tie_breaker < 0)
+        {
+            return OPINION_WHITE_ENUM
+        }
+        else if (majority_tie_breaker > 0)
+        {
+            return OPINION_BLACK_ENUM
+        }
+        else
+        {
+            return math.rng.uniform(1) # tie, so return random option
+        }
+    }
+}
+
+# Clear the robot values
+function reset_values()
+{
+    # Define sensor accuracy variables, modified by the ARGoS loop functions
+    b_prob = nil
+    w_prob = nil
+
+    # Define velocity variables, modified by the ARGoS loop functions
+    spd = nil # cm/s
+
+    # Define state duration, modified by the ARGoS loop functions
+    exp_duration = nil
+    dis_duration = nil
+    duration_tracker = 0
+
+    opinion_qualities = {}
+    opinion_qualities[OPINION_WHITE_ENUM] = 0.0
+    opinion_qualities[OPINION_BLACK_ENUM] = 0.0
+    collected_observations = {}
+    collected_observations[WHITE_OBS] = 0
+    collected_observations[BLACK_OBS] = 0
+
+    # Define current robot state, should be either in exploration or dissemination
+    current_state = nil
+    current_opinion = nil
+
+    # Define whether to use voter model or majority model
+    use_voter_model = nil
+
+    # Define initial values, not modified by ARGoS loop functions
+    move_type = nil
+    move_duration = 0
+    rot_direction = nil
+    received_vals = {}
+
+    # Initialize decision state
+    decision_state = DECISION_UNDECIDED_ENUM
+}
