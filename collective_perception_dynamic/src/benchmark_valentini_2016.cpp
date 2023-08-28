@@ -31,7 +31,10 @@ void ProcessRobotOpinions::operator()(const std::string &str_robot_id, buzzvm_t 
         BuzzPut(t_vm, "current_opinion", initial_opinion_dist(generator));
 
         // Set exploration duration
-        BuzzPut(t_vm, "exp_duration", static_cast<int>(exploration_duration_dist(generator)));
+        double exp_duration = exploration_duration_dist(generator);
+        BuzzPut(t_vm,
+                "exp_duration",
+                exp_duration < 1.0 ? 1 : static_cast<int>(exp_duration)); // to ensure that duration is at least 1 tick
 
         // Set voter model flag
         BuzzPut(t_vm, "use_voter_model", voter_model);
@@ -111,7 +114,7 @@ void ProcessRobotOpinions::operator()(const std::string &str_robot_id, buzzvm_t 
 
                 BuzzPut(t_vm,
                         "exp_duration",
-                        current_robot_data.current_exp_duration == 0 ? 1 : current_robot_data.current_exp_duration);
+                        current_robot_data.current_exp_duration == 0 ? 1 : current_robot_data.current_exp_duration); // to ensure that duration is at least 1 tick
             }
             else
             {

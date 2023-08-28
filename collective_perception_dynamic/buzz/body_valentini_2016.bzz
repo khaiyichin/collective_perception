@@ -52,9 +52,8 @@ function step()
     }
 
     # Execute states
-    if ((current_state == EXPLORATION_STATE_ENUM) and (duration_tracker <= exp_duration))
+    if ((current_state == EXPLORATION_STATE_ENUM) and (duration_tracker < exp_duration))
     {
-
         # Make observation and evaluate opinion quality (evaluates both colors)
         encounter_observation_table = observe(b_prob, w_prob)
         collected_observations[encounter_observation_table.observation] = collected_observations[encounter_observation_table.observation] + 1
@@ -62,7 +61,7 @@ function step()
         duration_tracker = duration_tracker + 1
 
         # Change state if duration is up
-        if (duration_tracker > exp_duration)
+        if (duration_tracker >= exp_duration)
         {
             # Estimate opinion qualities
             opinion_qualities = estimate_quality(collected_observations)
@@ -74,7 +73,7 @@ function step()
             collected_observations[BLACK_OBS] = 0
         }
     }
-    else if ((current_state == DISSEMINATION_STATE_ENUM) and (duration_tracker <= dis_duration))
+    else if ((current_state == DISSEMINATION_STATE_ENUM) and (duration_tracker < dis_duration))
     {
         # Communicate current opinion
         communicate_tx("opinion", current_opinion)
@@ -82,10 +81,10 @@ function step()
         duration_tracker = duration_tracker + 1
 
         # Change state if duration is up
-        if (duration_tracker > dis_duration)
+        if (duration_tracker >= dis_duration)
         {
             # Adopt opinion
-            current_opinion = adopt_opinion(use_voter_model, received_vals)
+            current_opinion = adopt_opinion(use_voter_model, received_vals, opinion_qualities)
 
             # Reset values
             current_state = EXPLORATION_STATE_ENUM # new state
@@ -101,6 +100,14 @@ function step()
     received_vals = {}
 }
 
+# Executed once when the robot (or the simulator) is reset.
+function reset()
+{
+    reset_values()
+}
+
+# Executed once at the end of experiment.
+function destroy() {}
 
 ##############################
 ### User defined functions ###
@@ -116,13 +123,29 @@ function estimate_quality(collected_obs_tab)
     return qualities
 }
 
-function adopt_opinion(voter_model, neighbor_vals)
+function adopt_opinion(voter_model, neighbor_vals, op_qualities)
 {
     if (voter_model)
     {
         # Pick random opinion from received neighbor values
-        var random_ind = math.rng.uniform(size(neighbor_vals))
-        return neighbor_vals[random_ind]
+        var num_neighbors = size(neighbor_vals)
+        if (num_neighbors > 0)
+        {
+            var random_ind = math.rng.uniform(num_neighbors)
+            return neighbor_vals[random_ind]
+        }
+        else
+        {
+            # Select the opinion with the highest quality
+            if (op_qualities[OPINION_WHITE_ENUM] > op_qualities[OPINION_BLACK_ENUM])
+            {
+                return OPINION_WHITE_ENUM
+            }
+            else
+            {
+                return OPINION_BLACK_ENUM
+            }
+        }
     }
     else
     {
@@ -151,9 +174,17 @@ function adopt_opinion(voter_model, neighbor_vals)
         {
             return OPINION_BLACK_ENUM
         }
-        else
+        else # tie, so return most frequent opinion that it believes
         {
-            return math.rng.uniform(1) # tie, so return random option
+            # Select the opinion with the highest quality
+            if (op_qualities[OPINION_WHITE_ENUM] > op_qualities[OPINION_BLACK_ENUM])
+            {
+                return OPINION_WHITE_ENUM
+            }
+            else
+            {
+                return OPINION_BLACK_ENUM
+            }
         }
     }
 }

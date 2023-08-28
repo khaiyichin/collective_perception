@@ -8,6 +8,24 @@ OBSTACLE_AVOIDANCE_ANG = (5*math.pi)/9 # angle range in which objects enter to a
 AVOIDANCE_COUNTER = 0
 AVOIDANCE_UNSTUCK_THRESHS = {.FIRST = 30, .SECOND = 60}
 
+function setseed(robot_id, deterministic)
+{
+    if (deterministic)
+    {
+        # do nothing (not setting seed)
+    }
+    else
+    {
+        ### Set custom seed that depends on the clock ###
+        # This has to be done so that not all the robots are set to the same clock seed:
+        #   * Default seed (i.e., clock) causes all the robots to be seeded the same, making them behave the same
+        #   * Vanilla ID custom seed (i.e., `math.rng.setseed(id)`) causes deterministic behaviors across different trials
+        # Solution: `math.rng.uniform()` is seeded by the clock, while `id` modifies the seed for the number generator used in the motion
+        # Robots now all behave differently, across different trials.
+        math.rng.setseed(robot_id + math.rng.uniform())
+    }
+}
+
 # Execute robot motion
 function move(move_type, move_duration, rot_direction, spd)
 {
