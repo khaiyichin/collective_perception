@@ -1,5 +1,5 @@
 Bootstrap: localimage
-From: argos_buzz_no_qt_base.sif
+From: argos_buzz_base_no_qt.sif
 
 %labels
     AUTHOR khaiyichin@gmail.com

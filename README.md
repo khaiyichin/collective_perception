@@ -9,12 +9,16 @@ Two simulators are provided here:
 ### Static topology simulation
 The robots in the static topology simulator *do not move in the normal sense* and have fixed communication channels with its neighbors (the communication network is specified by the user). In each simulated experiment, a fixed number of robots would traverse their own black and white tile-track and communicate periodically with their neighbors. The figure below illustrates what it would look like for 4 robots in a ring topology.
 
+<p align="center">
 <img src="static_sim_graphic.png" alt="Static simulated experiment visualized" width="450"/>
+</p>
 
 ### Dynamic topology simulation
 The robots in the dynamic topology simulator move around a square arena of black and white tiles. In each simulated experiment, a fixed number of robots would randomly move around the arena and communicate with neighbors within their proximity. The figure below is a screenshot of the simulation for 25 robots.
 
+<p align="center">
 <img src="dynamic_sim_graphic.png" alt="Dynamic simulated experiment visualized" width="450"/>
+</p>
 
 ### Benchmark algorithms
 In addition to our collective perception algorithm, simulators for benchmark algorithms are also provided in this repository to provide performance comparison. They are simulated in a similar fashion to the dynamic topology simulator. See the [benchmark algorithm documentation](docs/benchmark_algo_explained.md) for more information.

@@ -4,6 +4,14 @@ This page describes how one would execute and implement benchmark algorithms to 
 ## Description of algorithms
 The complete inner workings of the respective algorithms can be found in their cited work. Here, only information related to the implementation in this repository is discussed.
 
+<details><summary><a href="https://link.springer.com/chapter/10.1007/978-3-319-44427-7_6">Valentini <i>et al.</i> (2016) </a></summary>
+
+The robots move around in a random walk, alternating between an exploration and an dissemination state, where they would estimate the quality of an opinion they hold in the former and broadcast their opinion in the latter. The opinion they hold is a scalar value of either `0` (white) or `1` (black); in the beginning, a random opinion is adopted. Robots adopt a new opinion (from listening to their neighbors) at the end of the dissemination state, either using DMVD or DMMD.
+
+The duration for both states are exponentially distributed variables. While the distribution for the exploration duration is parameterized directly (using the mean duration), the distribution for the dissemination duration can only be partially parameterized (using a mean duration *factor*). This is because the actual mean value for the dissemination duration distribution is scaled by the quality of a robot's held opinion.
+
+</details>
+
 <details><summary><a href="https://ieeexplore.ieee.org/document/8206297">Crosscombe <i>et al.</i> (2017) </a></summary>
 
 All robots start with a random belief state. That is, flawed and non-flawed robots have completely random belief state vectors, where `0` indicate `negative` (falsy), `1` indicate `indeterminate`, and `2` indicate `positive` (truthy). For example, in the case of 5 options, robot 1 can have <0, 1, 1, 0, 0> while robot 2 can have <0, 2, 2, 0, 1>. Note that robot 2's belief will be normalized before being populated and communicated, i.e., robot 2's normalized belief is <0, 1, 1, 0, 0>.
@@ -15,8 +23,6 @@ During the updating phase, if the non-flawed robots cannot decide option -- they
 <details><summary><a href="https://ieeexplore.ieee.org/document/9196584">Ebert <i>et al.</i> (2020) </a></summary>
 
 The robots move around in a random walk fashion communicating their observations (or decisions, if positive feedback enabled) to each other. These communicated values are used to adjust the parameters of a Beta distribution, which is the posterior distribution of the tile fill ratio. The robots' decisions states are: `-1` (undecided), `0` (white), and `1` (black). *Note that the black and white decisions are flipped from the original paper to maintain uniformity with our collective perception work.* 
-
-Once each robot has come to their decision, the simulation will be terminated. Otherwise, it will run up until a specified duration in the `.argos` file.
 
 </details>
 
@@ -34,6 +40,21 @@ The following subsections describe how to set up the `.argos` configuration file
 
 ### Buzz controller
 The location of the `body*` bytecode files depends on where you execute the simulation. For the locally built simulator, it is recommended that you use absolute paths so that the execution location is flexible. For the containerized simulator use the path `/collective_perception/collective_perception_dynamic/build/buzz/body*`.
+
+<details><summary><a href="https://link.springer.com/chapter/10.1007/978-3-319-44427-7_6">Valentini <i>et al.</i> (2016) </a></summary>
+
+```xml
+<buzz_controller_kheperaiv id="bck">
+
+    <!-- Locations of Buzz bytecode files -->
+    <params
+        bytecode_file="/collective_perception/collective_perception_dynamic/build/buzz/body_valentini_2016.bo"
+        debug_file="/collective_perception/collective_perception_dynamic/build/buzz/body_valentini_2016.bdb" />
+
+</buzz_controller_kheperaiv>
+```
+
+</details>
 
 <details><summary><a href="https://ieeexplore.ieee.org/document/8206297">Crosscombe <i>et al.</i> (2017) </a></summary>
 
@@ -73,7 +94,7 @@ For the location of the `benchmarking_loop_functions` library, specify them as y
 
     <benchmarking>
         <!-- Specific benchmarking algorithm parameters -->
-        <algorithm ... />
+        <algorithm type=... />
 
         <!-- Number of tiles for the arena in the x and y direction -->
         <!-- NOTE: must have equal number of tile counts -->
@@ -103,6 +124,35 @@ For the location of the `benchmarking_loop_functions` library, specify them as y
 
 </loop_functions>
 ```
+
+<details><summary><a href="https://link.springer.com/chapter/10.1007/978-3-319-44427-7_6">Valentini <i>et al.</i> (2016) </a></summary>
+
+```xml
+<algorithm type="valentini_2016"> <!-- the value to `type` is provided as a macro in the benchmark algorithm `.hpp` file -->
+
+    <!--
+        range of sensor probabilities
+        `steps` must be an integer:
+            - positive, probabilities are spread linearly from min to max
+            - -2 indicates a uniform distribution with range [`min`, `max`)
+            - -3 indicates a normal distribution with mean=`min`, variance=`max`
+    -->
+    <sensor_probability_range min="0.525" max="0.975" steps="-2" />
+
+    <!-- Mean duration for the exploration state -->
+    <exploration_mean_duration value="10.0" />
+
+    <!-- Mean duration factor for the dissemination state -->
+    <dissemination_mean_duration_factor value="10.0" />
+
+    <!-- Flag to activate the voter model (true) or majority model (false) -->
+    <voter_model bool="true" />
+</algorithm>
+```
+
+For this benchmark algorithm, the additional parameters in the outer parameter group are `exploration_mean_duration`, `dissemination_mean_duration_factor`, and `voter_model`. `sensor_probability_range` remains a parameter in the inner parameter group.
+
+</details>
 
 <details><summary><a href="https://ieeexplore.ieee.org/document/8206297">Crosscombe <i>et al.</i> (2017) </a></summary>
 
@@ -190,6 +240,80 @@ optional arguments:
   -s                   flag to show the plots
 ```
 Benchmark algorithm-specific arguments are described in their respective dropdowns.
+
+<details><summary><a href="https://link.springer.com/chapter/10.1007/978-3-319-44427-7_6">Valentini <i>et al.</i> (2016) </a></summary>
+
+JSON data:
+```json
+{
+    "sim_type": "valentini_2016",   // benchmark algorithm identifier (string)
+    /*
+    ...                             // common data output
+    */
+    "sp": 0.675,                    // sensor probability in this trial (float)
+    "exp_mean_dur": 10.0,           // exploration mean duration (float)
+    "dis_mean_dur_factor": 10.0,    // dissemination mean duration factor (float)
+    "voter_model": true,            // using voter model for adopting new opinions (bool)
+    "data_str": [                   // data string array of arrays; data string has the form "<A>,<B>,<P>,<D>" where
+                                    //      <A> = current state: 0 = exploration, 1 = dissemination
+                                    //      <B> = estimated quality if the opinion is white (0)
+                                    //      <P> = estimated quality if the opinion is black (1)
+                                    //      <D> = current opinion held by the robot
+        [                           // data string of robot 0 (array of string)
+            "10,11,0.588099,-1",    // data string of robot 0 at time = 0 (string)
+            "13,12,0.419410,-1",    // data string of robot 0 at time = 1 (string)
+            "15,14,0.425277,-1",
+            "16,17,0.569975,-1",
+            "18,19,0.566030,-1",
+        ],
+        [                           // data string of robot 1
+            "11,10,0.411901,-1",    // data string of robot 1 at time step = 0 (string)
+            "12,12,0.500000,-1",
+            "15,12,0.278599,-1",
+            "15,15,0.500000,-1",
+            "16,17,0.569975,-1",
+        ],
+        [
+            "11,10,0.411901,-1",
+            "12,13,0.580590,-1",
+            "12,17,0.827536,-1",
+            "15,18,0.701693,-1",
+            "16,21,0.797484,-1",
+        ],
+        [
+            "10,11,0.588099,-1",
+            "11,13,0.661180,-1",
+            "11,16,0.836530,-1",    // data string of robot 3 at time step = 2 (string)
+            "12,18,0.867535,-1",
+            "14,19,0.811457,-1",
+        ]
+    ]
+}
+```
+
+Visualization script:
+```
+usage: visualize_multi_agent_data_benchmark.py FOLDER TFR valentini_2016 [-h] {decision} ...
+
+positional arguments:
+  {decision}  commands for visualization type
+    decision  visualize collective-decision making data
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+- `decision` usage:
+    ```
+    usage: visualize_multi_agent_data_benchmark.py FOLDER TFR valentini_2016 decision [-h] SP [SP ...]
+
+    positional arguments:
+    SP          sensor probabilities (space-delimited array) to use in plotting collective decision data
+
+    optional arguments:
+    -h, --help  show this help message and exit
+    ```
+</details>
 
 <details><summary><a href="https://ieeexplore.ieee.org/document/8206297">Crosscombe <i>et al.</i> (2017) </a></summary>
 
@@ -281,6 +405,7 @@ optional arguments:
     optional arguments:
     -h, --help  show this help message and exit
     ```
+
 </details>
 
 <details><summary><a href="https://ieeexplore.ieee.org/document/9196584">Ebert <i>et al.</i> (2017) </a></summary>
@@ -336,8 +461,26 @@ JSON data:
 
 Visualization script:
 ```
-lorem ipsum
+usage: visualize_multi_agent_data_benchmark.py FOLDER TFR ebert_2020 [-h] {decision} ...
+
+positional arguments:
+  {decision}  commands for visualization type
+    decision  visualize collective-decision making data
+
+optional arguments:
+  -h, --help  show this help message and exit
 ```
+
+- `decision` usage:
+    ```
+    usage: visualize_multi_agent_data_benchmark.py FOLDER TFR ebert_2020 decision [-h] SP [SP ...]
+
+    positional arguments:
+    SP          sensor probabilities (space-delimited array) to use in plotting collective decision data
+
+    optional arguments:
+    -h, --help  show this help message and exit
+    ```
 </details>
 
 ## Development

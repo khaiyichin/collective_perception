@@ -476,6 +476,165 @@ class BenchmarkVisualizerBase(ABC):
         return self.benchmark_param_range
 
 
+class Valentini2016Visualizer(BenchmarkVisualizerBase):
+    BENCHMARK_STR = "valentini_2016"
+    BENCHMARK_PARAM_ABBR = "sp" # sensor probability
+
+    def __init__(self, args):
+        # Initialize parameters to visualize
+        self.tfr = float(args.TFR)
+        self.benchmark_param_range = \
+            [float(i) for i in args.SP] if isinstance(args.SP, list) else [args.SP]
+        self.sp = self.benchmark_param_range
+        self.exp_mean_dur = \
+            {key: 0 for key in args.SP} if isinstance(args.SP, list) else [args.SP]
+        self.dis_mean_dur_factor = \
+            {key: 0 for key in args.SP} if isinstance(args.SP, list) else [args.SP]
+        self.voter_model = \
+            {key: 0 for key in args.SP} if isinstance(args.SP, list) else [args.SP]
+
+        self.initial_pass = {key: True for key in self.sp}
+
+        self.load_data(args.FOLDER)
+
+    def load_data(self, data_folder: str):
+        """Load the JSON data from a given folder.
+
+        Args:
+            data_folder: Path to the folder containing all the JSON data files.
+        """
+        self.data = {key: None for key in self.sp}
+
+        # Receive folder path
+        for root, _, files in os.walk(data_folder):
+            for f in files:
+
+                if os.path.splitext(f)[1] == ".json":
+
+                    # Load the JSON file
+                    with open(os.path.join(root, f), "r") as file:
+                        json_dict = json.load(file)
+
+                    # Round off the density, speed, comms range, and benchmark param
+                    benchmark_param_abbr_val = np.round(json_dict[self.BENCHMARK_PARAM_ABBR], 3)
+                    density = np.round(json_dict["density"], 3)
+                    comms_range = np.round(json_dict["comms_range"], 3)
+                    speed = np.round(json_dict["speed"], 3)
+
+                    # Store only the data that matches the desired tfr and benchmark param
+                    if (json_dict["tfr"] != self.tfr or benchmark_param_abbr_val not in self.sp):
+                        continue
+
+                    # Initialize data
+                    if self.initial_pass[benchmark_param_abbr_val]:
+
+                        # Store common parameters only for the first pass
+                        if all(val_bool for val_bool in self.initial_pass.values()):
+                            self.num_trials = json_dict["num_trials"]
+                            self.num_agents = json_dict["num_agents"]
+                            self.num_steps = json_dict["num_steps"]
+                            self.comms_range = comms_range
+                            self.speed = speed
+                            self.density = density
+                            self.exp_mean_dur = json_dict["exp_mean_dur"]
+                            self.dis_mean_dur_factor = json_dict["dis_mean_dur_factor"]
+                            self.voter_model = json_dict["voter_model"]
+
+                        self.data[benchmark_param_abbr_val] = np.empty(
+                            (
+                                self.num_trials,
+                                self.num_agents,
+                                self.num_steps + 1,
+                                1 # decision of robot
+                            )
+                        )
+
+                        self.initial_pass[benchmark_param_abbr_val] = False
+
+                    # Decode json file into data
+                    self.data[benchmark_param_abbr_val][json_dict["trial_ind"]] = \
+                        self.decode_data_str(json_dict["data_str"])
+
+        if not self.data: # no data populated
+            raise Exception("No data populated, please check provided arguments.")
+
+    def generate_plot(self, args=None):
+
+        if args.viz_type == "decision":
+            if self.num_steps < args.step_inc: raise Exception("Step increments is too large for number of timesteps available.")
+
+            plotted_sim_steps = np.arange(args.step_inc, self.num_steps+1, args.step_inc)
+            decision_data = self.get_decision_data(plotted_sim_steps)
+
+            args_plot_decision = {
+                "benchmark_str": self.BENCHMARK_STR,
+                "benchmark_param_abbr": self.BENCHMARK_PARAM_ABBR,
+                "tfr": self.tfr,
+                "benchmark_param_range": self.benchmark_param_range, # this is so that the plot functions can use a generic value
+                "num_trials": self.num_trials,
+                "sim_steps": plotted_sim_steps,
+                "speed": self.speed,
+                "density": self.density,
+                "num_options": 2,
+                "colorbar_label": "Sensor Accuracies"
+            }
+
+            plot_decision(decision_data, args_plot_decision)
+
+    def get_decision_data(self, sim_steps: list):
+        """Get the decision data of all the robots.
+
+        Args:
+            sim_steps: Time step instances to get decision data from.
+
+        Returns:
+            A dict in the form {sp_1: {ss_11: decision_11, ss_12: decision_12, ...},
+                                sp_2: {ss_21: decision_21, ss_22: decision_22, ...},
+                                sp_3: {ss_31: decision_31, ss_32: decision_32, ...},
+                                ...}
+        """
+
+        # Convert the beliefs into decisions
+        if not self.decision_fraction:
+            self.compute_correct_decision()
+            self.compute_decision_fraction()
+
+        return {
+            bp: {ss: self.decision_fraction[bp][ss] for ss in sim_steps
+                } for bp in self.benchmark_param_range
+        }
+
+    def compute_correct_decision(self):
+        self.correct_decision = 0 if self.tfr < 0.5 else 1
+
+    def compute_decision_fraction(self):
+        # self.data is a dict of sp: trials: num_agents
+
+        # Calculate the fractions by each sp value
+        total_agents = self.num_agents * self.num_trials
+
+        for sp, np_array_data in self.data.items(): # np_array_data is num_trials x num_agents x num_steps x 1
+
+            self.decision_fraction[sp] = np.asarray(
+                [
+                    np.count_nonzero(np_array_data[:,:,i] == self.correct_decision) / total_agents
+                    for i in range(self.num_steps + 1)
+                ]
+            )
+
+    def decode_data_str(self, data_str_vec):
+        """Decodes the array of data string.
+
+        Args:
+            data_str_vec: List of lists of data string for all robots (across all time steps) in a single trial
+
+        Returns:
+            Numpy array of decisions for the robots across all time steps (num_agents x num_timesteps x 1)
+        """
+        # data_str_vec is a num_agents x num_steps list of lists
+        return np.asarray([[[int(elem.split(",")[3])] for elem in row] for row in data_str_vec]) # the 4th element is the decision
+
+
 class Crosscombe2017Visualizer(BenchmarkVisualizerBase):
 
     BENCHMARK_STR = "crosscombe_2017"
@@ -883,6 +1042,7 @@ class Ebert2020Visualizer(BenchmarkVisualizerBase):
         # data_str_vec is a num_agents x num_steps list of lists
         return np.asarray([[[int(elem.split(",")[3])] for elem in row] for row in data_str_vec]) # the 4th element is the decision
 
+
 class Visualizer:
 
     def __init__(self):
@@ -913,6 +1073,30 @@ class Visualizer:
             dest="benchmark",
             required=True,
             help="benchmark type"
+        )
+
+        # Valentini 2016 arguments
+        valentini_2016_subparser = benchmark_type_subparser.add_parser(
+            Valentini2016Visualizer.BENCHMARK_STR,
+            help="{0} benchmark".format(Valentini2016Visualizer.BENCHMARK_STR)
+        )
+
+        valentini_2016_viz_type_subparser = valentini_2016_subparser.add_subparsers(
+            dest="viz_type",
+            required=True,
+            help="commands for visualization type"
+        )
+
+        valentini_2016_viz_type_decision_subparser = valentini_2016_viz_type_subparser.add_parser(
+            "decision",
+            help="visualize collective-decision making data"
+        )
+
+        valentini_2016_viz_type_decision_subparser.add_argument(
+            Valentini2016Visualizer.BENCHMARK_PARAM_ABBR.upper(),
+            nargs="+",
+            type=float,
+            help="sensor probabilities (space-delimited array) to use in plotting collective decision data"
         )
 
         # Crosscombe 2017 arguments
@@ -976,7 +1160,10 @@ class Visualizer:
         args = parser.parse_args()
 
         # Initialize visualizer objects
-        if args.benchmark == Crosscombe2017Visualizer.BENCHMARK_STR:
+        if args.benchmark == Valentini2016Visualizer.BENCHMARK_STR:
+            self.benchmark_visualizer = Valentini2016Visualizer(args)
+
+        elif args.benchmark == Crosscombe2017Visualizer.BENCHMARK_STR:
             self.benchmark_visualizer = Crosscombe2017Visualizer(args)
 
         elif args.benchmark == Ebert2020Visualizer.BENCHMARK_STR:

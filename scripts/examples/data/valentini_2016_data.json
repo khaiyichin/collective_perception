@@ -1,0 +1,21 @@
+{
+    "sim_type": "valentini_2016",
+    "num_agents": 25,
+    "num_trials": 2,
+    "num_steps": 500,
+    "comms_range": 0.699999988079071,
+    "speed": 14.140000343322754,
+    "density": 10.00001049041748,
+    "tfr": 0.95,
+    "sp": 0.975,
+    "trial_ind": 0,
+    "exp_mean_dur": 10.0,
+    "dis_mean_dur_factor": 10.0,
+    "voter_model": true,
+    "data_str": [ // <CURRENT STATE (0 = EXP, 1 = DIS)>, <EST QUALITY WHITE>, <EST QUALITY BLACK>, <ROBOT_OPINION = 0 MAJOR WHITE; 1 MAJOR BLACK>
+        [
+            "0,10.2,40.2,1"
+        ],
+        []
+    ]
+}

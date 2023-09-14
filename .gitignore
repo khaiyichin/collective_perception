@@ -1,6 +1,5 @@
 *.asv
 *.pyc
-data/
 .venv/
 
 # Buzz files
