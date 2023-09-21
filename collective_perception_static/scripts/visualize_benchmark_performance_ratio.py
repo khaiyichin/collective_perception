@@ -29,7 +29,7 @@ def main():
         "BM",
         type=str,
         nargs="+",
-        help="the target fill ratio for the experiment that produced the data to be extracted"
+        help="space-delimited array of .decd files to be compared against the reference data"
     )
     parser.add_argument(
         "--sp",

@@ -313,6 +313,7 @@ optional arguments:
     optional arguments:
     -h, --help  show this help message and exit
     ```
+
 </details>
 
 <details><summary><a href="https://ieeexplore.ieee.org/document/8206297">Crosscombe <i>et al.</i> (2017) </a></summary>
@@ -481,6 +482,7 @@ optional arguments:
     optional arguments:
     -h, --help  show this help message and exit
     ```
+
 </details>
 
 ## Development

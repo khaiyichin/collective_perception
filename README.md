@@ -1,6 +1,6 @@
 # Collective Perception with Imperfect Sensors
 ## Introduction
-This repository provides the code to simulate collective perception experiments shown in [Minimalistic Collective Perception with Imperfect Sensors (ICRA 2023 submission pre-print)](https://arxiv.org/abs/2209.12858).
+This repository provides the code to simulate collective perception experiments shown in [Minimalistic Collective Perception with Imperfect Sensors (accpeted to IROS 2023)](https://arxiv.org/abs/2209.12858).
 
 Two simulators are provided here:
 1. Python-based static topology simulator `collective_perception_static`, and

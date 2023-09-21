@@ -34,7 +34,11 @@ def load_data(args):
         args.FOLDER = args.FILE # add the .FOLDER field so that the Visualizer object can use it
         
         # Convert JSON files into the Visualizer object so that we can extract the decision data
-        if sim_type == vmb.Crosscombe2017Visualizer.BENCHMARK_STR:
+        if sim_type == vmb.Valentini2016Visualizer.BENCHMARK_STR:
+            args.SP = args.PARAM_2_RANGE # add the .sp field so that the Visualizer object can use it
+            data_obj = vmb.Valentini2016Visualizer(args)
+
+        elif sim_type == vmb.Crosscombe2017Visualizer.BENCHMARK_STR:
             args.FRR = args.PARAM_2_RANGE # add the .FRR field so that the Visualizer object can use it
             data_obj = vmb.Crosscombe2017Visualizer(args)
 
