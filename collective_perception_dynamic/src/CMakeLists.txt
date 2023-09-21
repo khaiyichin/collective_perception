@@ -1,3 +1,8 @@
+# Add definition if EMANE integration is desired
+if (ARGOS_EMANE)
+    add_compile_definitions(ARGOS_EMANE)
+endif()
+
 # Build library of data structures
 add_library(collective_perception_data_structures
     SHARED
