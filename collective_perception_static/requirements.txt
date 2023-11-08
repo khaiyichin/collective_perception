@@ -5,7 +5,7 @@ kiwisolver==1.4.2
 matplotlib==3.5.2
 numpy==1.22.3
 packaging==21.3
-Pillow==9.3.0
+Pillow==10.0.1
 protoletariat==0.9.4
 pyparsing==3.0.9
 pytest==7.1.2
