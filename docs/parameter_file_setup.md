@@ -69,6 +69,10 @@ For the location of the `collective_perception_loop_functions` library, specify 
         -->
         <sensor_probability_range min="0.525" max="0.975" steps="19" />
 
+        <!-- Assumed sensor probability to use when computing estimates -->
+        <!-- This means that the actual observation may be done using a different probability than the one used to compute the estimate -->
+        <assumed_sensor_probability bool="true" value="0.75" />
+
         <!-- Robot speed in cm/s -->
         <speed value="10.0" />
 
