@@ -41,6 +41,7 @@ message SimulationSet
     float comms_range = 12;
     float density = 13;
     float speed = 14;
+    float assumed_sp = 15;
 }
 
 message SimulationStatsSet

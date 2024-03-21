@@ -20,6 +20,7 @@ public:
         speed_ = s.speed_;
         tfr_range_ = s.tfr_range_;
         sp_range_ = s.sp_range_;
+        assumed_sensor_probability_ = s.assumed_sensor_probability_;
     }
 
     std::string simulation_type_ = "dynamic";
@@ -36,6 +37,8 @@ public:
 
     float speed_;
 
+    float assumed_sensor_probability_;
+
     std::vector<double> tfr_range_;
 
     std::vector<double> sp_range_;
@@ -47,13 +50,14 @@ public:
     {
         auto sim_set_msg_ptr = msg.mutable_sim_set();
 
-        simulation_type_ = sim_set_msg_ptr->sim_type(); // simuation type
-        num_agents_ = sim_set_msg_ptr->num_agents();    // number of agents
-        num_trials_ = sim_set_msg_ptr->num_trials();    // number of experiments
-        num_steps_ = sim_set_msg_ptr->num_steps();      // number of simulation steps
-        comms_range_ = sim_set_msg_ptr->comms_range();  // communication range
-        density_ = sim_set_msg_ptr->density();          // swarm density
-        speed_ = sim_set_msg_ptr->speed();              // speed
+        simulation_type_ = sim_set_msg_ptr->sim_type();              // simuation type
+        num_agents_ = sim_set_msg_ptr->num_agents();                 // number of agents
+        num_trials_ = sim_set_msg_ptr->num_trials();                 // number of experiments
+        num_steps_ = sim_set_msg_ptr->num_steps();                   // number of simulation steps
+        comms_range_ = sim_set_msg_ptr->comms_range();               // communication range
+        density_ = sim_set_msg_ptr->density();                       // swarm density
+        speed_ = sim_set_msg_ptr->speed();                           // speed
+        assumed_sensor_probability_ = sim_set_msg_ptr->assumed_sp(); // assumed sensor probability
 
         std::copy(sim_set_msg_ptr->tfr_range().begin(),
                   sim_set_msg_ptr->tfr_range().end(),
@@ -68,13 +72,14 @@ public:
     {
         auto sim_set_msg_ptr = msg.mutable_sim_set();
 
-        sim_set_msg_ptr->set_sim_type(simulation_type_); // simulation type
-        sim_set_msg_ptr->set_num_agents(num_agents_);    // number of agents
-        sim_set_msg_ptr->set_num_trials(num_trials_);    // number of experiments
-        sim_set_msg_ptr->set_num_steps(num_steps_);      // number of simulation steps
-        sim_set_msg_ptr->set_comms_range(comms_range_);  // communication range
-        sim_set_msg_ptr->set_density(density_);          // swarm density
-        sim_set_msg_ptr->set_speed(speed_);              // swarm speed
+        sim_set_msg_ptr->set_sim_type(simulation_type_);              // simulation type
+        sim_set_msg_ptr->set_num_agents(num_agents_);                 // number of agents
+        sim_set_msg_ptr->set_num_trials(num_trials_);                 // number of experiments
+        sim_set_msg_ptr->set_num_steps(num_steps_);                   // number of simulation steps
+        sim_set_msg_ptr->set_comms_range(comms_range_);               // communication range
+        sim_set_msg_ptr->set_density(density_);                       // swarm density
+        sim_set_msg_ptr->set_speed(speed_);                           // swarm speed
+        sim_set_msg_ptr->set_assumed_sp(assumed_sensor_probability_); // assumed sensor probability
 
         *(sim_set_msg_ptr->mutable_tfr_range()) = {tfr_range_.begin(), tfr_range_.end()};
         *(sim_set_msg_ptr->mutable_sp_range()) = {sp_range_.begin(), sp_range_.end()};
@@ -104,7 +109,7 @@ protected:
     inline void InsertPacket(const T &packet, PacketDict<T> &packets_ref)
     {
         int tfr_internal = RoundToMultiple(ConvertToInternalUnits(packet.target_fill_ratio), 5);
-        int sp_internal =  packet.b_prob < 0.0 ? packet.b_prob : RoundToMultiple(ConvertToInternalUnits(packet.b_prob), 5);
+        int sp_internal = packet.b_prob < 0.0 ? packet.b_prob : RoundToMultiple(ConvertToInternalUnits(packet.b_prob), 5);
         packets_ref[tfr_internal][sp_internal] = packet;
     }
 

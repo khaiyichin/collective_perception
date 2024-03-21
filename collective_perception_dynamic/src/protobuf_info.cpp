@@ -78,6 +78,9 @@ int main(int argc, char **argv)
     std::cout << "\t\t"
               << "Robot speed"
               << "\t\t\t: " << s.speed_ << " cm/s" << std::endl;
+    std::cout << "\t\t"
+              << "Assumed sensor probability"
+              << "\t: " << s.assumed_sensor_probability_ << std::endl;
 
     std::cout << "\t\t"
               << "Target fill ratio range"

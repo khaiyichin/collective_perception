@@ -116,7 +116,20 @@ public:
      * @param b_prob Sensor accuracy for black tiles
      * @param w_prob Sensor accuracy for white tiles
      */
-    Brain(const std::string &id, const float &b_prob, const float &w_prob, const bool &legacy = false)
+    /**
+     * @brief Construct a new Brain object
+     *
+     * @param id ID of the robot
+     * @param b_prob Sensor accuracy for black tiles
+     * @param w_prob Sensor accuracy for white tiles
+     * @param legacy Whether to use legacy equations for computing social estimate
+     * @param assumed_b_prob Assumed sensor accuracy that may differ from actual sensor accuracy (b_prob)
+     */
+    Brain(const std::string &id,
+          const float &b_prob,
+          const float &w_prob,
+          const bool &legacy = false,
+          const float assumed_b_prob = -1.0)
         : id_(id), b_prob_(b_prob), w_prob_(w_prob), legacy_(legacy){};
 
     /**

@@ -51,21 +51,24 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
      *
      * @param id_brain_ptr Pointer to the unordered map to be populated with robot IDs and Brain instances
      * @param str_id_ptr Pointer to the unordered map to be populated with robot IDs and their corresponding integer indices
-     * @param sensor_prob Initial sensor probability to be assigned to robots
+     * @param sensor_prob Initial sensor probability to be assigned to robots to do observation
      * @param spd Speed to be assigned to robots
      * @param legacy Flag to use legacy equations
+     * @param assumed_sensor_prob Assumed sensor probability that robots use to compute estimate
      */
     inline InitializeRobot(const std::shared_ptr<RobotIdBrainMap> &id_brain_ptr,
                            const std::shared_ptr<std::unordered_map<std::string, int>> &str_id_ptr,
                            const double &sensor_prob,
                            const float &spd,
-                           const bool &legacy)
+                           const bool &legacy = false,
+                           const double &assumed_sensor_prob = -1.0)
         : id_brain_map_ptr(id_brain_ptr),
           str_int_id_map_ptr(str_id_ptr),
           b_prob(sensor_prob),
           w_prob(sensor_prob),
           spd(spd),
-          legacy(legacy)
+          legacy(legacy),
+          assumed_sensor_prob(assumed_sensor_prob)
     {
         // Initialize generator
         std::random_device rd;
@@ -90,9 +93,11 @@ struct InitializeRobot : public CBuzzLoopFunctions::COperation
 
     bool legacy; ///< Flag to indicate whether legacy equations are being used
 
-    double b_prob; ///< Sensor quality in identifying black tiles
+    double b_prob; ///< Actual sensor quality in identifying black tiles
 
-    double w_prob; ///< Sensor quality in identifying white tiles
+    double w_prob; ///< Actual sensor quality in identifying white tiles
+
+    double assumed_sensor_prob; ///< Assumed sensor quality which may differ from actual sensor quality
 
     float spd; ///< Robot speed
 
@@ -305,6 +310,8 @@ private:
     float arena_tile_size_; ///< Size of an arena tile (value is length, since the tile is square)
 
     float ticks_per_sec_; ///< Number of ticks in one second
+
+    float assumed_sensor_probability_; ///< Assumed robot sensor probability; only used when computing estimates, not when observing
 
     std::string verbose_level_; ///< Output verbosity level
 

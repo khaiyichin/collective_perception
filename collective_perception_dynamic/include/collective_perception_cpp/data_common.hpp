@@ -72,6 +72,10 @@ struct Packet
 
     double w_prob;
 
+    double assumed_b_prob;
+
+    double assumed_w_prob;
+
     unsigned int num_agents;
 
     unsigned int num_trials;

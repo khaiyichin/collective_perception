@@ -23,8 +23,17 @@ void InitializeRobot::operator()(const std::string &str_robot_id, buzzvm_t t_vm)
     // Set robot speed
     BuzzPut(t_vm, "spd", spd);
 
-    // Initialize RobotIDBrainMap
-    (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, prob, prob, legacy);
+    // Set sensor probability
+    if (assumed_sensor_prob > 0.0)
+    {
+        // Initialize RobotIDBrainMap using assumed sensor probability, which means the observed tiles may not be observed with the same probability
+        (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, assumed_sensor_prob, assumed_sensor_prob, legacy);
+    }
+    else
+    {
+        // Initialize RobotIDBrainMap with the exact sensor probability as the one used by the robots to observe tiles
+        (*id_brain_map_ptr)[str_robot_id.c_str()] = Brain(str_robot_id, prob, prob, legacy);
+    }
 
     // Assign indices to robot IDs
     (*str_int_id_map_ptr)[str_robot_id.c_str()] = internal_counter++;
@@ -392,6 +401,22 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
         GetNodeAttribute(sensor_probability_node, "max", max);
         GetNodeAttribute(sensor_probability_node, "steps", steps);
 
+        // Grab assumed sensor probability
+        bool use_assumed_sensor_probability;
+
+        TConfigurationNode &assumed_sensor_probability_node = GetNode(col_per_root_node, "assumed_sensor_probability");
+
+        GetNodeAttribute(assumed_sensor_probability_node, "bool", use_assumed_sensor_probability);
+        if (use_assumed_sensor_probability)
+        {
+            GetNodeAttribute(assumed_sensor_probability_node, "value", assumed_sensor_probability_);
+        }
+        else
+        {
+            assumed_sensor_probability_ = -1.0;
+        }
+        simulation_parameters_.assumed_sensor_probability_ = assumed_sensor_probability_;
+
         if (steps < 0.0) // distributed robot sensor probabilities within each experiment/trial
         {
             /*
@@ -573,6 +598,7 @@ void CollectivePerceptionLoopFunctions::Init(TConfigurationNode &t_tree)
             LOG << "[INFO] Specifying number of robots = " << simulation_parameters_.num_agents_ << std::endl;
             LOG << "[INFO] Specifying robot speed = " << simulation_parameters_.speed_ << " cm/s" << std::endl;
             LOG << "[INFO] Specifying number of trials = " << simulation_parameters_.num_trials_ << std::endl;
+            LOG << "[INFO] " << (use_assumed_sensor_probability ? "Using" : "Not using") << " assumed sensor probability = " << assumed_sensor_probability_ << std::endl;
 
             if (disabled_robot_amount_ > 0)
             {
@@ -633,6 +659,8 @@ void CollectivePerceptionLoopFunctions::CreateNewPacket()
     curr_stats_packet_.target_fill_ratio = curr_tfr_sp_range_itr_->first;
     curr_stats_packet_.b_prob = curr_tfr_sp_range_itr_->second;
     curr_stats_packet_.w_prob = curr_tfr_sp_range_itr_->second;
+    curr_stats_packet_.assumed_b_prob = assumed_sensor_probability_;
+    curr_stats_packet_.assumed_w_prob = assumed_sensor_probability_;
     curr_stats_packet_.num_agents = simulation_parameters_.num_agents_;
     curr_stats_packet_.num_trials = simulation_parameters_.num_trials_;
     curr_stats_packet_.num_steps = simulation_parameters_.num_steps_;
@@ -650,6 +678,8 @@ void CollectivePerceptionLoopFunctions::CreateNewPacket()
     curr_agent_data_packet_.target_fill_ratio = curr_tfr_sp_range_itr_->first;
     curr_agent_data_packet_.b_prob = curr_tfr_sp_range_itr_->second;
     curr_agent_data_packet_.w_prob = curr_tfr_sp_range_itr_->second;
+    curr_agent_data_packet_.assumed_b_prob = assumed_sensor_probability_;
+    curr_agent_data_packet_.assumed_w_prob = assumed_sensor_probability_;
     curr_agent_data_packet_.num_agents = simulation_parameters_.num_agents_;
     curr_agent_data_packet_.num_trials = simulation_parameters_.num_trials_;
     curr_agent_data_packet_.num_steps = simulation_parameters_.num_steps_;
@@ -675,7 +705,8 @@ void CollectivePerceptionLoopFunctions::SetupExperiment()
                                               str_int_id_map_ptr_,
                                               curr_tfr_sp_range_itr_->second,
                                               simulation_parameters_.speed_,
-                                              legacy_);
+                                              legacy_,
+                                              assumed_sensor_probability_);
 
     BuzzForeachVM(initialization_functor_);
 

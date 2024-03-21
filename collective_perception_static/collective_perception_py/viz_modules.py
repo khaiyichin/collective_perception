@@ -204,6 +204,7 @@ class VisualizationData:
         setattr(simulation_set_pb2.SimulationStatsSet, "comms_range", sim_stats_set_msg.sim_set.comms_range)
         setattr(simulation_set_pb2.SimulationStatsSet, "speed", np.round(sim_stats_set_msg.sim_set.speed, 3))
         setattr(simulation_set_pb2.SimulationStatsSet, "density", np.round(sim_stats_set_msg.sim_set.density, 3))
+        setattr(simulation_set_pb2.SimulationStatsSet, "assumed_sp", np.round(sim_stats_set_msg.sim_set.assumed_sp, 3))
         setattr(simulation_set_pb2.SimulationStatsSet, "stats_obj_dict", {i: {j: None for j in sim_stats_set_msg.sp_range} for i in sim_stats_set_msg.tfr_range})
 
         for stats_packet in sim_stats_set_msg.stats_packets:
