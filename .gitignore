@@ -1,6 +1,7 @@
 *.asv
 *.pyc
 .venv/
+data/
 
 # Buzz files
 *.bo
