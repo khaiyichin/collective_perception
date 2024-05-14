@@ -111,6 +111,7 @@ class VisualizationData:
                         self.density = obj.density
                         self.speed = obj.speed
                         self.comms_period = 1
+                        self.assumed_sp = obj.assumed_sp
 
                     elif self.sim_type == "static":
                         self.graph_type = obj.graph_type

@@ -115,6 +115,8 @@ Saved VisualizationDataGroupDynamic object containing 2 items at: /home/user/con
 >:warning: Depending on the size of the simulated experiment (i.e., simulation duration, number of agents, number of tested parameters tested in a single execution), the conversion process may take a substantial amount of time (10 minutes to 1 hour). It is recommended that you start small to gauge the required conversion time.
 
 ### Visualizing data
+>:info: This subsection enumerates some visualization options that have been created for you to use. If you want to manipulate the data directly and create your own figures, go to the [Process Data Manually](#process-data-manually) subsection below.
+
 You can generate 3 forms of plots using the visualization data (i.e., the converted pickle file):
 
 1. `series`: time-series plot of agent estimates, for a fixed inner parameter pair (target fill ratio and sensor probability) and a fixed outer parameter pair.
@@ -227,7 +229,7 @@ Script help for the subcommands:
     $ visualize_multi_agent_data_static.py /home/user/converted_from_sf_network_ped.vdg 0.01 -gs heatmap -rstr "Num = 10" "Num = 20" "Num = 50" "Num = 100" -row 10 20 50 100 -cstr "Period = 1" "Period = 2" "Period = 5" "Period = 10" -col 1 2 5 10
     ```
 
-    <img src="img/heatmap_sta_conv10_s2000_t5.png" width="1000" />
+    <img src="./img/heatmap_sta_conv10_s2000_t5.png" width="1000" />
 
     </details>
 
@@ -266,7 +268,7 @@ Script help for the subcommands:
     $ visualize_multi_agent_data_static.py /home/user/converted_from_line_network_ped.vdg 0.01 -gsi scatter -tfr 0.75 -U 10 1 100
     ```
 
-    <img src="img/scatter_sta_conv10_s10000_t30_tfr750_prd10_cprob1_agt100.png" width="1000" />
+    <img src="./img/scatter_sta_conv10_s10000_t30_tfr750_prd10_cprob1_agt100.png" width="1000" />
 
     </details>
 
@@ -308,9 +310,55 @@ Script help for the subcommands:
     $ visualize_multi_agent_data_dynamic.py /home/user/converted_from_pbs.vdg 0.01 -gsi decision -sp -205250975 0.525 0.675 0.825 0.975 -tfr 0.5 -U 10 1
     ```
 
-    <img src="img/decision_dyn_s10000_t30_tfr550_spd10_den1_bins10.png" width="1000" />
+    <img src="./img/decision_dyn_s10000_t30_tfr550_spd10_den1_bins10.png" width="1000" />
 
     </details>
+
+### Process Data Manually
+First, ensure that the data you need has been converted to `VisualizationDataGroup` binaries.
+
+Once you have all the `*.vdg` files, you can write a python script (maybe a Jupyter notebook) to directly load the `*.vdg` files.
+
+#### Common assumed accuracy `.vdg` files
+Let's say you have `A.vdg` that resides in `/home/user/work/`.
+
+The way you load it is
+```python
+import collective_perception_py.viz_modules as vm
+
+vdg = vm.VisualizarionDataGroupDynamic.load("/home/user/work/A.vdg")
+```
+
+Now `vdg` is just the `VisualizationDataGroup` object which contains a member `viz_data_obj_dict`. In this dictionary it has 2 keys, `speed` and `density`, in that order. 
+
+For example, if you want to get the data from the experiment with swarm density of 2 and robot speed of 5.3, you would do `vdg.viz_data_obj_dict[5.3][2]`. This will return a `VisualizationData` object containing all the data given the `sp_range` and `tfr_range` and trials.
+```python
+vd = vdg.viz_data_obj_dict[5.3][2]
+"""Available methods for vd:
+vd.AggregateStats(                            vd.detect_convergence(                        vd.num_steps
+vd.agg_stats_dict                             vd.get_decision_fractions(                    vd.num_trials
+vd.aggregate_statistics(                      vd.get_individual_informed_estimate_metrics(  vd.save(
+vd.assumed_sp                                 vd.get_informed_estimate_metrics(             vd.sim_type
+vd.comms_period                               vd.load(                                      vd.sp_range
+vd.comms_range                                vd.load_pkl_file(                             vd.speed
+vd.compute_accuracy(                          vd.load_proto_file(                           vd.stats_obj_dict
+vd.density                                    vd.num_agents                                 vd.tfr_range
+"""
+```
+
+#### Computing convergence time
+The `VisualizationData` class has the method `.get_individual_informed_estimate_metrics` which has takes
+
+1. target fill ratio,
+2. actual sensor accuracy, and
+3. convergence threshold
+
+as arguments. This computes the convergence times and accuracies for each trial; _e.g.,_ if you have 3 trials you will have 3 convergence times and 3 accuracies. That's what the method returns as a tuple.
+
+#### Summary
+1. Convert data using the `convert_sim_stats_set_to_viz_data_group.py` script (no need to use a Python session).
+2. Load a Python session (script, notebook, etc.) to load the data.
+3. (If needed) compute convergence time and then plot however you want.
 
 ### Obtaining serialized data information
 `serial_data_info.py` displays information about a serialized pickle file. (TODO: currently only supports static simulation experiment outputs, i.e., pickled `ExperimentData` files):

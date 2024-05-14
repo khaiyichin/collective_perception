@@ -14,7 +14,7 @@ class GenerateProtolPb2Command(setuptools.command.install.install):
         simulation_set_proto_path = os.path.join(proto_path, "simulation_set.proto")
         pb2_relative_dir_path = "pb2"
 
-        # Defind command to generate vanilla pb2 files
+        # Define command to generate vanilla pb2 files
         protoc_cmd = "protoc"
         protoc_args = "--python_out={0} --proto_path={1} {2} {3}" \
             .format(pb2_relative_dir_path, proto_path, util_proto_path, simulation_set_proto_path).split(" ")
